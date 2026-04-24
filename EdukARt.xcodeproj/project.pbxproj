@@ -8,6 +8,7 @@
 
 /* Begin PBXFileReference section */
 		90C38F1F2F98194300AC16FE /* EdukARt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EdukARt.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		90C38F342F98195F00AC16FE /* EdukARt.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = EdukARt.xcodeproj; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -54,6 +55,13 @@
 			isa = PBXGroup;
 			children = (
 				90C38F1F2F98194300AC16FE /* EdukARt.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		90C38F372F98195F00AC16FE /* Products */ = {
+			isa = PBXGroup;
+			children = (
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -110,6 +118,12 @@
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 90C38F202F98194300AC16FE /* Products */;
 			projectDirPath = "";
+			projectReferences = (
+				{
+					ProductGroup = 90C38F372F98195F00AC16FE /* Products */;
+					ProjectRef = 90C38F342F98195F00AC16FE /* EdukARt.xcodeproj */;
+				},
+			);
 			projectRoot = "";
 			targets = (
 				90C38F1E2F98194300AC16FE /* EdukARt */,
