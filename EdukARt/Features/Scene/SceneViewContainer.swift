@@ -21,12 +21,23 @@ struct SceneViewContainer: UIViewRepresentable {
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal]
         configuration.environmentTexturing = .automatic
+
+        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+            configuration.sceneReconstruction = .mesh
+        }
+
         arView.session.run(configuration)
+
+        arView.environment.sceneUnderstanding.options.insert(.collision)
+        arView.environment.sceneUnderstanding.options.insert(.physics)
+        arView.environment.sceneUnderstanding.options.insert(.occlusion)
 
         let anchor = context.coordinator.makeScene(from: world)
         arView.scene.anchors.append(anchor)
 
+        
         return arView
+        
     }
 
     func updateUIView(_ uiView: ARView, context: Context) {

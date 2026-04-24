@@ -49,6 +49,7 @@ final class GameWorld: ObservableObject {
         }
     }
 
+    /*
     private func applyCurrentInput() {
         if currentInput.isForwardPressed {
             level.player.position.z -= moveStep
@@ -66,4 +67,59 @@ final class GameWorld: ObservableObject {
             level.player.position.x += moveStep
         }
     }
+    */
+    
+    private func applyCurrentInput() {
+        var candidatePosition = level.player.position
+
+        if currentInput.isForwardPressed {
+            candidatePosition.z -= moveStep
+        }
+
+        if currentInput.isBackwardPressed {
+            candidatePosition.z += moveStep
+        }
+
+        if currentInput.isLeftPressed {
+            candidatePosition.x -= moveStep
+        }
+
+        if currentInput.isRightPressed {
+            candidatePosition.x += moveStep
+        }
+
+        if canMove(to: candidatePosition) {
+            level.player.position = candidatePosition
+        }
+    }
+    
+    // check if move is possible or if there is an object blocking it
+    private func canMove(to candidatePosition: SIMD3<Float>) -> Bool {
+        let playerHalfSize = level.player.collisionSize / 2
+
+        let playerMin = candidatePosition - playerHalfSize
+        let playerMax = candidatePosition + playerHalfSize
+
+        for obstacle in level.obstacles {
+            let obstacleCenter = obstacle.position + SIMD3<Float>(0, obstacle.size.y / 2, 0)
+            let obstacleHalfSize = obstacle.size / 2
+
+            let obstacleMin = obstacleCenter - obstacleHalfSize
+            let obstacleMax = obstacleCenter + obstacleHalfSize
+
+            let overlapsX = playerMin.x <= obstacleMax.x && playerMax.x >= obstacleMin.x
+            let overlapsY = playerMin.y <= obstacleMax.y && playerMax.y >= obstacleMin.y
+            let overlapsZ = playerMin.z <= obstacleMax.z && playerMax.z >= obstacleMin.z
+
+            if overlapsX && overlapsY && overlapsZ {
+                return false
+            }
+        }
+
+        return true
+    }
+
 }
+
+
+

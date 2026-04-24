@@ -67,6 +67,15 @@ final class SceneCoordinator {
             playerEntity.addChild(backLeftWheel)
             playerEntity.addChild(backRightWheel)
             
+            // collission box around robot
+            playerEntity.components.set(
+                CollisionComponent(
+                    shapes: [
+                        .generateBox(size: player.collisionSize)
+                    ]
+                )
+            )
+            
             let bounds = chassisEntity.visualBounds(relativeTo: playerEntity)
             chassisEntity.position.y -= bounds.min.y
             
@@ -88,6 +97,18 @@ final class SceneCoordinator {
                 let material = SimpleMaterial(color: .gray, roughness: 0.4, isMetallic: false)
                 let boxEntity = ModelEntity(mesh: mesh, materials: [material])
                 boxEntity.position = obstacle.position + SIMD3<Float>(0, obstacle.size.y / 2, 0)
+                
+                // collission box
+                boxEntity.components.set(
+                    CollisionComponent(
+                        shapes: [
+                            .generateBox(size: obstacle.size)
+                        ]
+                    )
+                )
+
+                boxEntity.physicsBody = PhysicsBodyComponent(mode: .static)
+                
                 anchorEntity.addChild(boxEntity)
             }
         }
