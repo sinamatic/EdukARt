@@ -16,23 +16,24 @@ final class SceneCoordinator {
     )
     private let playerEntity = Entity()
     private let playerModelPitchCorrection = simd_quatf(angle: -.pi / 2, axis: [1, 0, 0])
-
+    private var realWorldCollisionShape: ShapeResource?
+    
     func makeScene(from world: GameWorld) -> AnchorEntity {
         addPlayer(from: world.level.player)
         addObstacles(from: world.level.obstacles)
         return anchorEntity
     }
-
+    
     func updateScene(from world: GameWorld, in arView: ARView) {
         if arView.scene.anchors.isEmpty {
             arView.scene.anchors.append(makeScene(from: world))
             return
         }
-
+        
         playerEntity.position = world.level.player.position
     }
     
-
+    
     private func addPlayer(from player: EduardPlayer) {
         guard playerEntity.children.isEmpty else {
             playerEntity.position = player.position
@@ -59,7 +60,7 @@ final class SceneCoordinator {
             backRightWheel.position = SIMD3<Float>(0,0,0)
             
             playerEntity.position = player.position
-            playerEntity.orientation = simd_quatf(angle: .pi, axis: [0, 1, 0]) 
+            playerEntity.orientation = simd_quatf(angle: .pi, axis: [0, 1, 0])
             
             playerEntity.addChild(chassisEntity)
             playerEntity.addChild(frontLeftWheel)
@@ -76,6 +77,8 @@ final class SceneCoordinator {
                 )
             )
             
+            realWorldCollisionShape = .generateBox(size: SIMD3<Float>(player.collisionSize.x, 0.06, player.collisionSize.z))
+            
             let bounds = chassisEntity.visualBounds(relativeTo: playerEntity)
             chassisEntity.position.y -= bounds.min.y
             
@@ -88,7 +91,7 @@ final class SceneCoordinator {
     
     
     
-
+    
     private func addObstacles(from obstacles: [Obstacle]) {
         for obstacle in obstacles {
             switch obstacle.shape {
@@ -106,11 +109,37 @@ final class SceneCoordinator {
                         ]
                     )
                 )
-
+                
                 boxEntity.physicsBody = PhysicsBodyComponent(mode: .static)
                 
                 anchorEntity.addChild(boxEntity)
             }
         }
+    }
+    func canMoveInRealWorld(from currentPosition: SIMD3<Float>, to candidatePosition: SIMD3<Float>, in arView: ARView) -> Bool {
+        guard let realWorldCollisionShape else {
+            return true
+        }
+        
+        let heightOffset: Float = 0.08
+        
+        let localFromPosition = currentPosition + SIMD3<Float>(0, heightOffset, 0)
+        let localToPosition = candidatePosition + SIMD3<Float>(0, heightOffset, 0)
+        
+        let worldFromPosition = anchorEntity.convert(position: localFromPosition, to: nil)
+        let worldToPosition = anchorEntity.convert(position: localToPosition, to: nil)
+        
+        let hits = arView.scene.convexCast(
+            convexShape: realWorldCollisionShape,
+            fromPosition: worldFromPosition,
+            fromOrientation: playerEntity.orientation,
+            toPosition: worldToPosition,
+            toOrientation: playerEntity.orientation,
+            query: .nearest,
+            mask: .sceneUnderstanding,
+            relativeTo: nil
+        )
+        
+        return hits.isEmpty
     }
 }

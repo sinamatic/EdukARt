@@ -18,7 +18,7 @@ struct EduardPlayer {
     let backLeftWheelModelName: String = "Mechanum_backLeft"
     let backRightWheelModelName: String = "Mechanum_backRight"
 
-    let collisionSize = SIMD3<Float>(0.18, 0.08, 0.22) // hit box around robot
+    let collisionSize = SIMD3<Float>(0.43, 0.8, 0.28) // hit box around robot
     
     var position: SIMD3<Float> = SIMD3<Float>(0, 0, 0)
 }

@@ -17,7 +17,7 @@ struct SceneViewContainer: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> ARView {
-        let arView = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false)
+        let arView = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false) // hide robot behind real objects
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal]
         configuration.environmentTexturing = .automatic
@@ -30,10 +30,25 @@ struct SceneViewContainer: UIViewRepresentable {
 
         arView.environment.sceneUnderstanding.options.insert(.collision)
         arView.environment.sceneUnderstanding.options.insert(.physics)
+        
+        /*
         arView.environment.sceneUnderstanding.options.insert(.occlusion)
-
+        */ // robot disapperas behind real objects
+        
         let anchor = context.coordinator.makeScene(from: world)
         arView.scene.anchors.append(anchor)
+        
+        world.canMoveInRealWorld = { [weak arView, weak coordinator = context.coordinator] currentPosition, candidatePosition in
+            guard let arView, let coordinator else {
+                return true
+            }
+
+            return coordinator.canMoveInRealWorld(
+                from: currentPosition,
+                to: candidatePosition,
+                in: arView
+            )
+        }
 
         
         return arView

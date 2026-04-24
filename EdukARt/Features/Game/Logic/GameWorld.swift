@@ -15,6 +15,7 @@ final class GameWorld: ObservableObject {
     private let moveStep: Float = 0.02
     private var currentInput: ControlInput = .idle
     private var movementTimer: Timer?
+    var canMoveInRealWorld: ((SIMD3<Float>, SIMD3<Float>) -> Bool)?
 
     init() {
         level = LevelData(
@@ -114,6 +115,11 @@ final class GameWorld: ObservableObject {
             if overlapsX && overlapsY && overlapsZ {
                 return false
             }
+        }
+
+        if let canMoveInRealWorld,
+           canMoveInRealWorld(level.player.position, candidatePosition) == false {
+            return false
         }
 
         return true
