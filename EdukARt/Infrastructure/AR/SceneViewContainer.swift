@@ -10,7 +10,8 @@ import ARKit
 import RealityKit
 
 struct SceneViewContainer: UIViewRepresentable {
-    @ObservedObject var world: GameWorld
+    @ObservedObject var game: Game
+    let isDebugEnabled: Bool
 
     func makeCoordinator() -> SceneCoordinator {
         SceneCoordinator()
@@ -22,9 +23,9 @@ struct SceneViewContainer: UIViewRepresentable {
         configuration.planeDetection = [.horizontal]
         configuration.environmentTexturing = .automatic
 
-        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
-            configuration.sceneReconstruction = .mesh
-        }
+        let debugController = SceneDebugController()
+        context.coordinator.debugController = debugController
+        debugController.configureSession(configuration)
 
         arView.session.run(configuration)
 
@@ -35,10 +36,10 @@ struct SceneViewContainer: UIViewRepresentable {
         arView.environment.sceneUnderstanding.options.insert(.occlusion)
         */ // robot disapperas behind real objects
         
-        let anchor = context.coordinator.makeScene(from: world)
+        let anchor = context.coordinator.makeScene(from: game)
         arView.scene.anchors.append(anchor)
         
-        world.canMoveInRealWorld = { [weak arView, weak coordinator = context.coordinator] currentPosition, candidatePosition in
+        game.canMoveInRealWorld = { [weak arView, weak coordinator = context.coordinator] currentPosition, candidatePosition in
             guard let arView, let coordinator else {
                 return true
             }
@@ -47,8 +48,10 @@ struct SceneViewContainer: UIViewRepresentable {
                 from: currentPosition,
                 to: candidatePosition,
                 in: arView
-            )
+        )
         }
+
+        debugController.updateDebugState(isEnabled: isDebugEnabled, in: arView)
 
         
         return arView
@@ -56,6 +59,7 @@ struct SceneViewContainer: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: ARView, context: Context) {
-        context.coordinator.updateScene(from: world, in: uiView)
+        context.coordinator.updateScene(from: game, in: uiView)
+        context.coordinator.debugController?.updateDebugState(isEnabled: isDebugEnabled, in: uiView)
     }
 }
