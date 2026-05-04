@@ -1,5 +1,5 @@
 //
-//  EdukARtApp.swift
+//  EduKARTApp.swift
 //  EdukARt
 //
 //  Created by Sina Steinmüller on 21.04.26.
@@ -8,10 +8,14 @@
 import SwiftUI
 
 @main
-struct EduKARtApp: App {
+struct EduKARTApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            start()
         }
+    }
+
+    func start() -> some View {
+        RootView()
     }
 }
