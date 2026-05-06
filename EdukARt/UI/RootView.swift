@@ -8,10 +8,10 @@
 import SwiftUI
 
 struct RootView: View {
+    @StateObject private var mapStore = MapStore()
     @State private var phase: LaunchPhase = .logo
     @State private var loadingProgress: Double = 0
     @State private var hasStartedLaunchSequence = false
-    @State private var activeMenuMessage: MenuMessage?
 
     var body: some View {
         Group {
@@ -29,7 +29,11 @@ struct RootView: View {
                     phase = .menu
                 }
             case .createMap:
-                CreateMapView {
+                CreateMapView(mapStore: mapStore) {
+                    phase = .menu
+                }
+            case .viewMaps:
+                MapsView(mapStore: mapStore) {
                     phase = .menu
                 }
             }
@@ -41,13 +45,6 @@ struct RootView: View {
 
             hasStartedLaunchSequence = true
             await runLaunchSequence()
-        }
-        .alert(item: $activeMenuMessage) { message in
-            Alert(
-                title: Text(message.title),
-                message: Text(message.text),
-                dismissButton: .cancel(Text("OK"))
-            )
         }
     }
 
@@ -151,7 +148,7 @@ struct RootView: View {
                     .buttonStyle(StartScreenButtonStyle(fillColor: Color.white.opacity(0.82), foregroundColor: brandGreen))
 
                     Button("View Maps") {
-                        activeMenuMessage = .viewMaps
+                        phase = .viewMaps
                     }
                     .buttonStyle(StartScreenButtonStyle(fillColor: .black.opacity(0.42), foregroundColor: .white))
                 }
@@ -205,28 +202,7 @@ private enum LaunchPhase {
     case gameLoading
     case game
     case createMap
-}
-
-private enum MenuMessage: Identifiable {
     case viewMaps
-
-    var id: String {
-        title
-    }
-
-    var title: String {
-        switch self {
-        case .viewMaps:
-            "View Maps"
-        }
-    }
-
-    var text: String {
-        switch self {
-        case .viewMaps:
-            "The saved maps view is not implemented yet."
-        }
-    }
 }
 
 private struct StartScreenButtonStyle: ButtonStyle {

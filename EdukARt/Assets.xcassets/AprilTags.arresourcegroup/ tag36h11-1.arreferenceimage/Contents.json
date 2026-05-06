@@ -1,0 +1,16 @@
+{
+  "images" : [
+    {
+      "filename" : "tag36h11-1.png",
+      "idiom" : "universal",
+      "physical-width" : 0.04
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "size" : "400x400"
+  }
+}

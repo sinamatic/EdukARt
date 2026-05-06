@@ -7,7 +7,6 @@
 import ARKit
 import RealityKit
 import SwiftUI
-import UIKit
 
 struct MapScanViewContainer: UIViewRepresentable {
     @ObservedObject var session: MapScanSession
@@ -29,17 +28,16 @@ struct MapScanViewContainer: UIViewRepresentable {
         }
 
         arView.debugOptions.insert(.showSceneUnderstanding)
-        arView.environment.sceneUnderstanding.options.insert(.collision)
-        arView.environment.sceneUnderstanding.options.insert(.physics)
         arView.session.delegate = context.coordinator
-        arView.session.run(configuration)
-
+        arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         context.coordinator.attach(to: arView)
         return arView
     }
 
     func updateUIView(_ uiView: ARView, context: Context) {
         context.coordinator.session = session
+        context.coordinator.handleOriginPlacementRequestIfNeeded()
+        context.coordinator.updateSessionStateIfNeeded()
     }
 }
 
@@ -49,10 +47,12 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
     private weak var arView: ARView?
     private let processingQueue = DispatchQueue(label: "MapScanCoordinator.processing", qos: .userInitiated)
     private var isProcessingMeshUpdate = false
-    private let floorOverlayAnchor = AnchorEntity(world: .zero)
-    private var floorTileEntities: [FloorCellKey: ModelEntity] = [:]
-    private let floorTileSize: Float = 0.16
+    private let floorTileSize: Float = StoredFloorMapConstants.tileSize
     private let lowestFloorTolerance: Float = 0.08
+    private let meshUpdateInterval: TimeInterval = 1.0
+    private var lastMeshProcessingDate = Date.distantPast
+    private var handledOriginPlacementRequest = 0
+    private var isSessionPaused = false
 
     init(session: MapScanSession) {
         self.session = session
@@ -60,31 +60,85 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
 
     func attach(to arView: ARView) {
         self.arView = arView
-        arView.scene.anchors.append(floorOverlayAnchor)
+    }
+
+    func handleOriginPlacementRequestIfNeeded() {
+        guard handledOriginPlacementRequest != session.originPlacementRequest else {
+            return
+        }
+
+        handledOriginPlacementRequest = session.originPlacementRequest
+        placeOriginAtScreenCenter()
+    }
+
+    func updateSessionStateIfNeeded() {
+        guard let arView else {
+            return
+        }
+
+        if session.isReviewingScan || session.hasSavedCurrentScan {
+            guard isSessionPaused == false else {
+                return
+            }
+
+            arView.session.pause()
+            isSessionPaused = true
+            return
+        }
+
+        guard isSessionPaused else {
+            return
+        }
+
+        let configuration = ARWorldTrackingConfiguration()
+        configuration.planeDetection = [.horizontal, .vertical]
+        configuration.environmentTexturing = .automatic
+
+        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
+            configuration.sceneReconstruction = .meshWithClassification
+        } else if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+            configuration.sceneReconstruction = .mesh
+        }
+
+        arView.session.run(configuration, options: [])
+        isSessionPaused = false
     }
 
     func session(_ arSession: ARSession, didUpdate frame: ARFrame) {
-        let yaw = cameraYaw(from: frame.camera.transform)
-
         Task { @MainActor [weak self] in
-            self?.session.recordCameraYaw(yaw, mappingStatus: frame.worldMappingStatus)
+            self?.session.updateMappingStatus(frame.worldMappingStatus)
+        }
+
+        if session.shouldUpdateLivePreview {
+            processMeshAnchorsIfNeeded(in: arSession)
         }
     }
 
-    func session(_ arSession: ARSession, didAdd anchors: [ARAnchor]) {
-        processMeshAnchorsIfNeeded(in: arSession)
-    }
+    private func placeOriginAtScreenCenter() {
+        guard let arView else {
+            return
+        }
 
-    func session(_ arSession: ARSession, didUpdate anchors: [ARAnchor]) {
-        processMeshAnchorsIfNeeded(in: arSession)
-    }
+        let center = CGPoint(x: arView.bounds.midX, y: arView.bounds.midY)
+        let results = arView.raycast(from: center, allowing: .estimatedPlane, alignment: .horizontal)
+        guard let firstResult = results.first else {
+            Task { @MainActor [weak self] in
+                self?.session.saveMessage = "Kein Boden unter dem Fadenkreuz gefunden. Richte die Kamera auf den Boden und versuche es erneut."
+            }
+            return
+        }
 
-    func session(_ arSession: ARSession, didRemove anchors: [ARAnchor]) {
-        processMeshAnchorsIfNeeded(in: arSession)
+        Task { @MainActor [weak self] in
+            self?.session.setOrigin(transform: firstResult.worldTransform)
+        }
     }
 
     private func processMeshAnchorsIfNeeded(in arSession: ARSession) {
         guard isProcessingMeshUpdate == false else {
+            return
+        }
+
+        guard Date().timeIntervalSince(lastMeshProcessingDate) >= meshUpdateInterval else {
             return
         }
 
@@ -97,94 +151,41 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
 
         guard meshAnchors.isEmpty == false else {
             Task { @MainActor [weak self] in
-                guard let self else {
-                    return
-                }
-                self.session.updateWallMetrics(
-                    scannedWallArea: 0,
-                    estimatedRoomArea: 0,
-                    coverageProgress: self.session.wallCoverageProgress,
-                    mappingStatus: mappingStatus
-                )
-                self.session.updateFloorMetrics(
+                self?.session.updateFloorMetrics(
                     confirmedFloorArea: 0,
-                    estimatedRoomArea: 0,
                     lowestFloorHeight: nil,
+                    floorTiles: [],
                     mappingStatus: mappingStatus
                 )
-                self.renderFloorTiles([])
             }
             return
         }
 
         isProcessingMeshUpdate = true
+        lastMeshProcessingDate = Date()
 
         processingQueue.async { [weak self] in
             guard let self else {
                 return
             }
 
-            let wallMetrics = self.computeWallMetrics(from: meshAnchors)
             let floorMetrics = self.computeFloorMetrics(from: meshAnchors)
 
             Task { @MainActor [weak self] in
                 guard let self else {
                     return
                 }
-
-                self.session.updateWallMetrics(
-                    scannedWallArea: wallMetrics.wallArea,
-                    estimatedRoomArea: wallMetrics.roomAreaEstimate,
-                    coverageProgress: self.session.wallCoverageProgress,
-                    mappingStatus: mappingStatus
-                )
-                self.session.updateFloorMetrics(
-                    confirmedFloorArea: floorMetrics.confirmedFloorArea,
-                    estimatedRoomArea: wallMetrics.roomAreaEstimate,
-                    lowestFloorHeight: floorMetrics.lowestFloorHeight,
-                    mappingStatus: mappingStatus
-                )
-                self.renderFloorTiles(floorMetrics.floorTiles)
+                if self.session.shouldUpdateLivePreview {
+                    self.session.updateFloorMetrics(
+                        confirmedFloorArea: floorMetrics.confirmedFloorArea,
+                        lowestFloorHeight: floorMetrics.lowestFloorHeight,
+                        floorTiles: floorMetrics.floorTiles.map { FloorTileSnapshot(center: $0.center) },
+                        mappingStatus: mappingStatus
+                    )
+                }
                 self.isProcessingMeshUpdate = false
             }
         }
-    }
-
-    private func computeWallMetrics(from meshAnchors: [ARMeshAnchor]) -> (wallArea: Float, roomAreaEstimate: Float) {
-        var totalWallArea: Float = 0
-        var minX = Float.greatestFiniteMagnitude
-        var maxX = -Float.greatestFiniteMagnitude
-        var minZ = Float.greatestFiniteMagnitude
-        var maxZ = -Float.greatestFiniteMagnitude
-
-        for anchor in meshAnchors {
-            let geometry = anchor.geometry
-            let transform = anchor.transform
-
-            for faceIndex in 0..<geometry.faces.count {
-                let classification = geometry.classificationOf(faceWithIndex: faceIndex)
-                guard classification == .wall || classification == .door || classification == .window else {
-                    continue
-                }
-
-                totalWallArea += geometry.areaOf(faceWithIndex: faceIndex)
-
-                let center = geometry.worldCenterOf(faceWithIndex: faceIndex, transform: transform)
-                minX = min(minX, center.x)
-                maxX = max(maxX, center.x)
-                minZ = min(minZ, center.z)
-                maxZ = max(maxZ, center.z)
-            }
-        }
-
-        let roomAreaEstimate: Float
-        if minX.isFinite, maxX.isFinite, minZ.isFinite, maxZ.isFinite {
-            roomAreaEstimate = max((maxX - minX) * (maxZ - minZ), 0)
-        } else {
-            roomAreaEstimate = 0
-        }
-
-        return (totalWallArea, roomAreaEstimate)
     }
 
     private func computeFloorMetrics(from meshAnchors: [ARMeshAnchor]) -> (confirmedFloorArea: Float, lowestFloorHeight: Float?, floorTiles: [FloorTile]) {
@@ -194,8 +195,10 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
         for anchor in meshAnchors {
             let geometry = anchor.geometry
             let transform = anchor.transform
+            let faceCount = geometry.faces.count
+            let sampleStep = max(faceCount / 350, 1)
 
-            for faceIndex in 0..<geometry.faces.count {
+            for faceIndex in stride(from: 0, to: faceCount, by: sampleStep) {
                 let classification = geometry.classificationOf(faceWithIndex: faceIndex)
                 let normal = geometry.worldNormalOf(faceWithIndex: faceIndex, transform: transform)
                 let upwardComponent = simd_dot(normal, SIMD3<Float>(0, 1, 0))
@@ -212,7 +215,9 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
 
                 let center = geometry.worldCenterOf(faceWithIndex: faceIndex, transform: transform)
                 lowestFaceHeight = min(lowestFaceHeight, center.y)
-                candidateFaces.append(FloorFace(center: center))
+                candidateFaces.append(
+                    FloorFace(center: center)
+                )
             }
         }
 
@@ -241,46 +246,81 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
             } else {
                 tilesByCell[key] = FloorTile(key: key, center: tileCenter)
             }
+
         }
 
-        let confirmedFloorArea = Float(tilesByCell.count) * floorTileSize * floorTileSize
-        return (confirmedFloorArea, lowestFaceHeight, Array(tilesByCell.values))
+        let simplifiedTiles = simplifyFloorTiles(from: tilesByCell)
+        let confirmedFloorArea = Float(simplifiedTiles.count) * floorTileSize * floorTileSize
+        return (confirmedFloorArea, lowestFaceHeight, simplifiedTiles)
     }
 
-    private func cameraYaw(from transform: simd_float4x4) -> Float {
-        let forward = SIMD3<Float>(-transform.columns.2.x, -transform.columns.2.y, -transform.columns.2.z)
-        return atan2(forward.x, forward.z)
-    }
+    private func simplifyFloorTiles(from tilesByCell: [FloorCellKey: FloorTile]) -> [FloorTile] {
+        let rows = Dictionary(grouping: tilesByCell.values, by: { $0.key.z })
+        let sortedRows = rows.keys.sorted()
+        var simplifiedRows: [Int: SimplifiedRow] = [:]
 
-    @MainActor
-    private func renderFloorTiles(_ tiles: [FloorTile]) {
-        let activeKeys = Set(tiles.map(\.key))
-
-        let removedKeys = floorTileEntities.keys.filter { activeKeys.contains($0) == false }
-        for key in removedKeys {
-            floorTileEntities[key]?.removeFromParent()
-            floorTileEntities.removeValue(forKey: key)
-        }
-
-        let material = SimpleMaterial(
-            color: UIColor(red: 0.18, green: 0.18, blue: 0.19, alpha: 0.94),
-            roughness: 1,
-            isMetallic: false
-        )
-
-        for tile in tiles {
-            if let entity = floorTileEntities[tile.key] {
-                entity.position = tile.center + SIMD3<Float>(0, 0.002, 0)
+        for row in sortedRows {
+            guard let rowTiles = rows[row], rowTiles.isEmpty == false else {
                 continue
             }
 
-            let mesh = MeshResource.generateBox(size: [floorTileSize, 0.004, floorTileSize])
-            let entity = ModelEntity(mesh: mesh, materials: [material])
-            entity.position = tile.center + SIMD3<Float>(0, 0.002, 0)
-            floorOverlayAnchor.addChild(entity)
-            floorTileEntities[tile.key] = entity
+            let xValues = rowTiles.map(\.key.x).sorted()
+            guard var minX = xValues.first, var maxX = xValues.last else {
+                continue
+            }
+
+            if maxX - minX >= 2 {
+                minX += 1
+                maxX -= 1
+            }
+
+            let averageY = rowTiles.map(\.center.y).reduce(0, +) / Float(rowTiles.count)
+            simplifiedRows[row] = SimplifiedRow(z: row, minX: minX, maxX: maxX, y: averageY)
         }
+
+        for row in sortedRows {
+            let neighbors = [row - 1, row, row + 1].compactMap { simplifiedRows[$0] }
+            guard neighbors.isEmpty == false else {
+                continue
+            }
+
+            let minXs = neighbors.map(\.minX).sorted()
+            let maxXs = neighbors.map(\.maxX).sorted()
+            let smoothedMinX = minXs[minXs.count / 2]
+            let smoothedMaxX = maxXs[maxXs.count / 2]
+
+            if var currentRow = simplifiedRows[row], smoothedMinX <= smoothedMaxX {
+                currentRow.minX = smoothedMinX
+                currentRow.maxX = smoothedMaxX
+                simplifiedRows[row] = currentRow
+            }
+        }
+
+        var simplifiedTiles: [FloorTile] = []
+
+        for row in sortedRows {
+            guard let simplifiedRow = simplifiedRows[row] else {
+                continue
+            }
+
+            for x in simplifiedRow.minX...simplifiedRow.maxX {
+                let center = SIMD3<Float>(
+                    Float(x) * floorTileSize,
+                    simplifiedRow.y,
+                    Float(simplifiedRow.z) * floorTileSize
+                )
+                simplifiedTiles.append(
+                    FloorTile(
+                        key: FloorCellKey(x: x, z: simplifiedRow.z),
+                        center: center
+                    )
+                )
+            }
+        }
+
+        return simplifiedTiles
     }
+
 }
 
 private extension ARMeshGeometry {
@@ -333,14 +373,6 @@ private extension ARMeshGeometry {
         return simd_normalize(normalTransform * faceNormal)
     }
 
-    func areaOf(faceWithIndex index: Int) -> Float {
-        let indices = faceIndices(at: index)
-        let a = vertex(at: indices.0)
-        let b = vertex(at: indices.1)
-        let c = vertex(at: indices.2)
-        return simd_length(simd_cross(b - a, c - a)) * 0.5
-    }
-
     func worldCenterOf(faceWithIndex index: Int, transform: simd_float4x4) -> SIMD3<Float> {
         let indices = faceIndices(at: index)
         let center = (vertex(at: indices.0) + vertex(at: indices.1) + vertex(at: indices.2)) / 3
@@ -348,10 +380,18 @@ private extension ARMeshGeometry {
         let worldCenter = transform * localCenter
         return SIMD3<Float>(worldCenter.x, worldCenter.y, worldCenter.z)
     }
+
 }
 
 private struct FloorFace {
     let center: SIMD3<Float>
+}
+
+private struct SimplifiedRow {
+    let z: Int
+    var minX: Int
+    var maxX: Int
+    let y: Float
 }
 
 private struct FloorTile {

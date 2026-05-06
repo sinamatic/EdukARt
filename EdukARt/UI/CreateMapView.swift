@@ -8,7 +8,9 @@ import Foundation
 import SwiftUI
 
 struct CreateMapView: View {
+    @ObservedObject var mapStore: MapStore
     @StateObject private var mapScanSession = MapScanSession()
+    @State private var mapName = ""
     let onClose: () -> Void
 
     var body: some View {
@@ -28,8 +30,8 @@ struct CreateMapView: View {
                 Spacer(minLength: 12)
                 footerCard
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
             .padding(.bottom, 24)
         }
     }
@@ -40,22 +42,18 @@ struct CreateMapView: View {
                 onClose()
             }
             .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .background(.black.opacity(0.65))
             .foregroundStyle(.white)
             .clipShape(Capsule())
 
             Spacer(minLength: 12)
 
-            Text(mapScanSession.statusText)
-                .font(.subheadline.weight(.semibold))
-                .multilineTextAlignment(.trailing)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(.black.opacity(0.65))
-                .foregroundStyle(.white)
-                .clipShape(Capsule())
+            VStack(alignment: .trailing, spacing: 8) {
+                statusPill(mapScanSession.statusText)
+                statusPill(mapScanSession.originStatusText)
+            }
         }
     }
 
@@ -71,11 +69,65 @@ struct CreateMapView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .foregroundStyle(.white.opacity(0.92))
 
-                switch mapScanSession.phase {
-                case .wallScan:
-                    wallScanContent
-                case .floorScan, .readyToSave:
-                    floorScanContent
+                statusRow(
+                    title: "Bodenflaeche bestaetigt",
+                    value: String(format: "%.1f m²", mapScanSession.confirmedFloorArea)
+                )
+
+                statusRow(
+                    title: "Mindestflaeche",
+                    value: String(format: "%.1f m²", mapScanSession.minimumRequiredAreaSquareMeters)
+                )
+
+                statusRow(
+                    title: "Fortschritt",
+                    value: "\(Int(mapScanSession.floorProgress * 100))%"
+                )
+
+                if let lowestFloorHeight = mapScanSession.lowestFloorHeight {
+                    statusRow(
+                        title: "Tiefster Boden",
+                        value: String(format: "%.2f m", lowestFloorHeight)
+                    )
+                }
+
+                statusRow(
+                    title: "Startpunkt",
+                    value: mapScanSession.hasOrigin ? "gesetzt" : "noch nicht gesetzt"
+                )
+
+                ProgressView(value: mapScanSession.floorProgress)
+                    .tint(.green)
+
+                if mapScanSession.hasOrigin == false {
+                    Button("Startpunkt setzen") {
+                        mapScanSession.requestOriginPlacement()
+                    }
+                    .buttonStyle(PrimaryScanButtonStyle())
+                }
+
+                if mapScanSession.canFinishScan {
+                    Button("Fertig") {
+                        mapScanSession.finishScan()
+                    }
+                    .buttonStyle(PrimaryScanButtonStyle())
+                }
+
+                if mapScanSession.isReviewingScan {
+                    TextField("Kartenname", text: $mapName)
+                        .textInputAutocapitalization(.words)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(Color.white.opacity(0.14))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                    Button(mapScanSession.saveButtonTitle) {
+                        mapScanSession.saveMap(named: mapName, into: mapStore)
+                    }
+                    .buttonStyle(PrimaryScanButtonStyle())
+                    .disabled(mapScanSession.canSaveMap == false)
+                    .opacity(mapScanSession.canSaveMap || mapScanSession.isSaving || mapScanSession.hasSavedCurrentScan ? 1 : 0.55)
                 }
 
                 if let saveMessage = mapScanSession.saveMessage {
@@ -91,84 +143,9 @@ struct CreateMapView: View {
             }
             .padding(20)
         }
-        .frame(maxWidth: .infinity, maxHeight: 340, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: 360, alignment: .leading)
         .background(.ultraThinMaterial.opacity(0.74))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-    }
-
-    private var wallScanContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            statusRow(
-                title: "Wandflaeche",
-                value: String(format: "%.1f m²", mapScanSession.scannedWallArea)
-            )
-
-            statusRow(
-                title: "Geschaetzte Raumflaeche",
-                value: String(format: "%.1f m²", mapScanSession.estimatedRoomArea)
-            )
-
-            statusRow(
-                title: "Rundum erfasst",
-                value: "\(Int(mapScanSession.wallCoverageProgress * 100))%"
-            )
-
-            ProgressView(value: mapScanSession.wallCoverageProgress)
-                .tint(.green)
-
-            Text(mapScanSession.canContinueToFloorScan ? "Die Waende sind ausreichend erfasst. Du kannst jetzt in den Bodenscan wechseln." : "Bewege dich einmal rundum und richte die Kamera weiter auf Waende und Raumgrenzen, bis der Raum stabil erfasst ist.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
-                .foregroundStyle(.white.opacity(0.82))
-
-            Button("Weiter zum Bodenscan") {
-                mapScanSession.continueToFloorScan()
-            }
-            .buttonStyle(PrimaryScanButtonStyle())
-            .disabled(mapScanSession.canContinueToFloorScan == false)
-            .opacity(mapScanSession.canContinueToFloorScan ? 1 : 0.55)
-        }
-    }
-
-    private var floorScanContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            statusRow(
-                title: "Bodenflaeche bestaetigt",
-                value: String(format: "%.1f m²", mapScanSession.confirmedFloorArea)
-            )
-
-            statusRow(
-                title: "Raumziel",
-                value: String(format: "%.1f m²", mapScanSession.estimatedRoomArea)
-            )
-
-            statusRow(
-                title: "Bodenabdeckung",
-                value: "\(Int(mapScanSession.floorCoverageProgress * 100))%"
-            )
-
-            if let lowestFloorHeight = mapScanSession.lowestFloorHeight {
-                statusRow(
-                    title: "Tiefster Boden",
-                    value: String(format: "%.2f m", lowestFloorHeight)
-                )
-            }
-
-            ProgressView(value: mapScanSession.floorCoverageProgress)
-                .tint(.green)
-
-            Text(mapScanSession.canSaveMap ? "Der dunkel eingefaerbte Boden ist weitgehend vollstaendig. Wenn die Flaeche stimmt, kannst du speichern." : "Nur die tiefste Flaeche wird als echter Boden gezaehlt. Scanne alle freien Bodenbereiche, bis die dunkle Flaeche den Raum abdeckt.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
-                .foregroundStyle(.white.opacity(0.82))
-
-            if mapScanSession.canSaveMap {
-                Button("Karte speichern") {
-                    mapScanSession.showSavePlaceholder()
-                }
-                .buttonStyle(PrimaryScanButtonStyle())
-            }
-        }
     }
 
     private func statusRow(title: String, value: String) -> some View {
@@ -184,6 +161,17 @@ struct CreateMapView: View {
                 .multilineTextAlignment(.trailing)
                 .foregroundStyle(.white)
         }
+    }
+
+    private func statusPill(_ text: String) -> some View {
+        Text(text)
+            .font(.subheadline.weight(.semibold))
+            .multilineTextAlignment(.trailing)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.black.opacity(0.65))
+            .foregroundStyle(.white)
+            .clipShape(Capsule())
     }
 }
 
