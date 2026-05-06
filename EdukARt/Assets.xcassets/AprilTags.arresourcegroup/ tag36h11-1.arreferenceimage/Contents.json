@@ -2,8 +2,7 @@
   "images" : [
     {
       "filename" : "tag36h11-1.png",
-      "idiom" : "universal",
-      "physical-width" : 0.04
+      "idiom" : "universal"
     }
   ],
   "info" : {
@@ -11,6 +10,7 @@
     "version" : 1
   },
   "properties" : {
-    "size" : "400x400"
+    "unit" : "centimeters",
+    "width" : 4
   }
 }
