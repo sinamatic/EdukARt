@@ -27,8 +27,8 @@ struct GameView: View {
                         onBack()
                     }
                     .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                     .background(.black.opacity(0.65))
                     .foregroundStyle(.white)
                     .clipShape(Capsule())
@@ -45,8 +45,8 @@ struct GameView: View {
                     .foregroundStyle(.white)
                     .clipShape(Capsule())
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 14)
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
 
                 Spacer()
 

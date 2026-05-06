@@ -8,15 +8,27 @@ import Foundation
 import SwiftUI
 
 struct CreateMapView: View {
+    private enum Mode {
+        case selection
+        case scanSurrounding
+        case searchAprilTag
+    }
+
     @ObservedObject var mapStore: MapStore
     @StateObject private var mapScanSession = MapScanSession()
+    @State private var mode: Mode = .selection
     @State private var mapName = ""
     let onClose: () -> Void
 
     var body: some View {
         ZStack {
-            MapScanViewContainer(session: mapScanSession)
-                .ignoresSafeArea()
+            if mode == .scanSurrounding {
+                MapScanViewContainer(session: mapScanSession)
+                    .ignoresSafeArea()
+            } else {
+                Color.black
+                    .ignoresSafeArea()
+            }
 
             LinearGradient(
                 colors: [.black.opacity(0.72), .clear, .black.opacity(0.84)],
@@ -39,7 +51,11 @@ struct CreateMapView: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
             Button("Zurueck") {
-                onClose()
+                if mode == .selection {
+                    onClose()
+                } else {
+                    mode = .selection
+                }
             }
             .font(.subheadline.weight(.semibold))
             .padding(.horizontal, 16)
@@ -50,14 +66,77 @@ struct CreateMapView: View {
 
             Spacer(minLength: 12)
 
-            VStack(alignment: .trailing, spacing: 8) {
-                statusPill(mapScanSession.statusText)
-                statusPill(mapScanSession.originStatusText)
+            if mode == .scanSurrounding {
+                VStack(alignment: .trailing, spacing: 8) {
+                    statusPill(mapScanSession.statusText)
+                    statusPill(mapScanSession.originStatusText)
+                }
             }
         }
     }
 
     private var footerCard: some View {
+        Group {
+            switch mode {
+            case .selection:
+                selectionCard
+            case .scanSurrounding:
+                scanCard
+            case .searchAprilTag:
+                aprilTagCard
+            }
+        }
+    }
+
+    private var selectionCard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Create Map")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.white)
+
+            Text("Waehle zuerst, wie du die Karte starten moechtest.")
+                .font(.body)
+                .foregroundStyle(.white.opacity(0.92))
+
+            Button("Scan Surrounding") {
+                mode = .scanSurrounding
+            }
+            .buttonStyle(PrimaryScanButtonStyle())
+
+            Button("Search April Tag") {
+                mode = .searchAprilTag
+            }
+            .buttonStyle(SecondaryScanButtonStyle())
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.ultraThinMaterial.opacity(0.74))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var aprilTagCard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Search April Tag")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.white)
+
+            Text("Dieser Modus ist als naechster Schritt vorbereitet, startet aber aktuell noch keinen eigenen Such-Flow.")
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(.white.opacity(0.92))
+
+            Button("Zur Auswahl zurueck") {
+                mode = .selection
+            }
+            .buttonStyle(PrimaryScanButtonStyle())
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.ultraThinMaterial.opacity(0.74))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var scanCard: some View {
         ScrollView(.vertical, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 16) {
                 Text(mapScanSession.titleText)
@@ -187,6 +266,27 @@ private struct PrimaryScanButtonStyle: ButtonStyle {
                     .fill(Color.green.opacity(configuration.isPressed ? 0.78 : 0.92))
             )
             .foregroundStyle(.black)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+private struct SecondaryScanButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline.weight(.semibold))
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.14 : 0.1))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .foregroundStyle(.white)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }

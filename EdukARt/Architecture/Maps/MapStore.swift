@@ -21,6 +21,15 @@ final class MapStore: ObservableObject {
         try persist()
     }
 
+    func delete(_ map: StoredFloorMap) throws {
+        maps.removeAll { $0.id == map.id }
+        try persist()
+    }
+
+    func estimatedStorageSize(for map: StoredFloorMap) -> Int {
+        (try? JSONEncoder.prettyPrinted.encode(map).count) ?? 0
+    }
+
     func load() {
         do {
             let data = try Data(contentsOf: storageURL)
