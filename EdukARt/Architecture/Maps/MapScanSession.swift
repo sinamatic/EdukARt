@@ -8,35 +8,37 @@ import ARKit
 import Combine
 import Foundation
 
+struct FloorTileSnapshot: Equatable {
+    let center: SIMD3<Float>
+}
+
 @MainActor
 final class MapScanSession: ObservableObject {
     enum Phase: Equatable {
-        case wallScan
-        case floorScan
+        case placingOrigin
+        case scanningFloor
         case readyToSave
     }
 
-    @Published private(set) var phase: Phase = .wallScan
+    @Published private(set) var phase: Phase = .placingOrigin
     @Published private(set) var mappingStatus: ARFrame.WorldMappingStatus = .notAvailable
-    @Published private(set) var wallCoverageProgress: Double = 0
-    @Published private(set) var scannedWallArea: Float = 0
-    @Published private(set) var estimatedRoomArea: Float = 0
-    @Published private(set) var floorCoverageProgress: Double = 0
     @Published private(set) var confirmedFloorArea: Float = 0
     @Published private(set) var lowestFloorHeight: Float?
+    @Published private(set) var hasOrigin = false
+    @Published private(set) var originPlacementRequest = 0
     @Published var saveMessage: String?
 
-    private let yawSectorCount = 12
-    private let requiredWallCoverageProgress = 0.92
-    private let requiredFloorCoverageRatio = 0.82
-    private var seenYawSectors = Set<Int>()
+    let minimumRequiredAreaSquareMeters: Float = 6
+
+    private var originTransform: simd_float4x4?
+    private var currentFloorTiles: [FloorTileSnapshot] = []
 
     var titleText: String {
         switch phase {
-        case .wallScan:
-            "Raum waende scannen"
-        case .floorScan:
-            "Boden bestaetigen"
+        case .placingOrigin:
+            "Startpunkt setzen"
+        case .scanningFloor:
+            "Bodenflaeche scannen"
         case .readyToSave:
             "Karte bereit"
         }
@@ -44,17 +46,17 @@ final class MapScanSession: ObservableObject {
 
     var instructionText: String {
         switch phase {
-        case .wallScan:
-            "Scanne zuerst nur die Waende des geschlossenen Raums. Richte die Kamera rundum auf Waende, Ecken, Tueren und Uebergaenge."
-        case .floorScan:
-            "Scanne jetzt den gesamten Boden. Es zaehlt nur die tiefste Flaeche im Raum. Starte nicht auf Sofa, Tisch oder anderen erhoehten Flaechen."
+        case .placingOrigin:
+            "Richte die Kamera auf den Boden an der Stelle, an der die Karte beginnen soll. Tippe dann auf \"Startpunkt setzen\"."
+        case .scanningFloor:
+            return "Der Startpunkt ist gesetzt. Scanne jetzt freie Bodenflaechen weiter. Es muessen mindestens 6 m² bestaetigt sein."
         case .readyToSave:
-            "Der dunkle Bodenbelag deckt den Raum ausreichend ab. Pruefe die Flaeche und speichere danach die Karte."
+            return "Die Mindestflaeche ist erreicht. Wenn die Flaeche stimmt, kannst du die Karte speichern."
         }
     }
 
     var statusText: String {
-        switch mappingStatus {
+        return switch mappingStatus {
         case .notAvailable:
             "Mapping startet"
         case .limited:
@@ -68,72 +70,92 @@ final class MapScanSession: ObservableObject {
         }
     }
 
-    var canContinueToFloorScan: Bool {
-        wallCoverageProgress >= requiredWallCoverageProgress &&
-        estimatedRoomArea > 0.5 &&
-        (mappingStatus == .extending || mappingStatus == .mapped)
+    var originStatusText: String {
+        hasOrigin ? "Startpunkt gesetzt" : "Startpunkt offen"
+    }
+
+    var floorProgress: Double {
+        let clampedArea = min(confirmedFloorArea, minimumRequiredAreaSquareMeters)
+        return Double(clampedArea / minimumRequiredAreaSquareMeters)
     }
 
     var canSaveMap: Bool {
-        phase == .readyToSave
+        phase == .readyToSave && hasOrigin && confirmedFloorArea >= minimumRequiredAreaSquareMeters
     }
 
-    func updateWallMetrics(
-        scannedWallArea: Float,
-        estimatedRoomArea: Float,
-        coverageProgress: Double,
-        mappingStatus: ARFrame.WorldMappingStatus
-    ) {
-        self.scannedWallArea = scannedWallArea
-        self.estimatedRoomArea = estimatedRoomArea
-        wallCoverageProgress = coverageProgress
+    func updateMappingStatus(_ mappingStatus: ARFrame.WorldMappingStatus) {
         self.mappingStatus = mappingStatus
+    }
+
+    func requestOriginPlacement() {
+        saveMessage = nil
+        originPlacementRequest += 1
+    }
+
+    func setOrigin(transform: simd_float4x4) {
+        originTransform = transform
+        hasOrigin = true
+        phase = .scanningFloor
+        confirmedFloorArea = 0
+        lowestFloorHeight = nil
+        currentFloorTiles = []
+        saveMessage = nil
     }
 
     func updateFloorMetrics(
         confirmedFloorArea: Float,
-        estimatedRoomArea: Float,
         lowestFloorHeight: Float?,
+        floorTiles: [FloorTileSnapshot],
         mappingStatus: ARFrame.WorldMappingStatus
     ) {
         self.confirmedFloorArea = confirmedFloorArea
-        self.estimatedRoomArea = max(self.estimatedRoomArea, estimatedRoomArea)
         self.lowestFloorHeight = lowestFloorHeight
+        currentFloorTiles = floorTiles
         self.mappingStatus = mappingStatus
 
-        let denominator = max(self.estimatedRoomArea, 0.01)
-        let ratio = min(Double(confirmedFloorArea / denominator), 1)
-        floorCoverageProgress = ratio
-
-        if ratio >= requiredFloorCoverageRatio &&
-            (mappingStatus == .extending || mappingStatus == .mapped) {
-            phase = .readyToSave
-        }
-    }
-
-    func recordCameraYaw(_ yaw: Float, mappingStatus: ARFrame.WorldMappingStatus) {
-        self.mappingStatus = mappingStatus
-
-        guard phase == .wallScan else {
+        guard hasOrigin else {
             return
         }
 
-        let normalizedYaw = yaw >= 0 ? yaw : yaw + (.pi * 2)
-        let sectorWidth = (Float.pi * 2) / Float(yawSectorCount)
-        let sector = min(Int(normalizedYaw / sectorWidth), yawSectorCount - 1)
-        seenYawSectors.insert(sector)
-        wallCoverageProgress = Double(seenYawSectors.count) / Double(yawSectorCount)
+        phase = confirmedFloorArea >= minimumRequiredAreaSquareMeters ? .readyToSave : .scanningFloor
     }
 
-    func continueToFloorScan() {
-        phase = .floorScan
-        confirmedFloorArea = 0
-        floorCoverageProgress = 0
-        lowestFloorHeight = nil
-        saveMessage = nil
+    func saveMap(named name: String, into store: MapStore) {
+        guard let map = makeStoredMap(named: name) else {
+            saveMessage = "Zum Speichern muessen zuerst der Startpunkt gesetzt und mindestens 6 m² Boden erkannt sein."
+            return
+        }
+
+        do {
+            try store.save(map)
+            saveMessage = "Karte \"\(map.name)\" gespeichert."
+        } catch {
+            saveMessage = "Speichern fehlgeschlagen: \(error.localizedDescription)"
+        }
     }
 
-    func showSavePlaceholder() {
-        saveMessage = "Der echte Speicherschritt folgt als naechstes. Der Button erscheint jetzt erst, wenn der Boden plausibel vollstaendig erkannt ist."
+    private func makeStoredMap(named name: String) -> StoredFloorMap? {
+        guard canSaveMap, let originTransform else {
+            return nil
+        }
+
+        let inverseOriginTransform = originTransform.inverse
+        let storedTiles = currentFloorTiles.map { tile in
+            let world = SIMD4<Float>(tile.center.x, tile.center.y, tile.center.z, 1)
+            let local = inverseOriginTransform * world
+            return StoredFloorTile(x: local.x, y: local.y, z: local.z)
+        }
+
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedName = trimmedName.isEmpty ? "Karte \(Date.now.formatted(date: .abbreviated, time: .shortened))" : trimmedName
+
+        return StoredFloorMap(
+            id: UUID(),
+            name: resolvedName,
+            createdAt: .now,
+            minimumAreaSquareMeters: minimumRequiredAreaSquareMeters,
+            floorTileSize: StoredFloorMapConstants.tileSize,
+            floorTiles: storedTiles
+        )
     }
 }
