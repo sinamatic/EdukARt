@@ -17,63 +17,83 @@ struct GameView: View {
     }
 
     var body: some View {
-        ZStack {
-            SceneViewContainer(game: game, isDebugEnabled: isDebugEnabled)
-                .ignoresSafeArea()
+        GeometryReader { geometry in
+            let isLandscape = geometry.size.width > geometry.size.height
 
-            VStack {
-                HStack {
-                    Button("Zurück") {
-                        onBack()
+            ZStack {
+                SceneViewContainer(game: game, isDebugEnabled: isDebugEnabled)
+                    .ignoresSafeArea()
+
+                VStack {
+                    HStack {
+                        Button("Zurück") {
+                            onBack()
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(.black.opacity(0.65))
+                        .foregroundStyle(.white)
+                        .clipShape(Capsule())
+
+                        Spacer()
+
+                        Button(isDebugEnabled ? "Debug On" : "Debug") {
+                            isDebugEnabled.toggle()
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(.black.opacity(0.65))
+                        .foregroundStyle(.white)
+                        .clipShape(Capsule())
                     }
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(.black.opacity(0.65))
-                    .foregroundStyle(.white)
-                    .clipShape(Capsule())
+                    .padding(.horizontal, 24)
+                    .padding(.top, 24)
 
                     Spacer()
+                }
 
-                    Button(isDebugEnabled ? "Debug On" : "Debug") {
-                        isDebugEnabled.toggle()
+                VStack(spacing: 12) {
+                    statusMessages
+
+                    if isLandscape == false {
+                        ControlPadView(onInputChanged: game.updateInput)
                     }
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 14)
+                }
+                .padding(.bottom, 40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+
+                if isLandscape {
+                    ControlPadView(onInputChanged: game.updateInput)
+                        .padding(.trailing, 32)
+                        .padding(.bottom, 32)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                }
+            }
+        }
+    }
+
+    private var statusMessages: some View {
+        VStack(spacing: 12) {
+            if let itemBoxMessage = game.itemBoxMessage {
+                Text(itemBoxMessage)
+                    .font(.headline)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(.black.opacity(0.65))
+                    .background(.yellow.opacity(0.9))
+                    .foregroundStyle(.black)
+                    .clipShape(Capsule())
+            }
+
+            if let collisionMessage = game.collisionMessage {
+                Text(collisionMessage)
+                    .font(.headline)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.red.opacity(0.85))
                     .foregroundStyle(.white)
                     .clipShape(Capsule())
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-
-                Spacer()
-
-                VStack(spacing: 16) {
-                    if let itemBoxMessage = game.itemBoxMessage {
-                        Text(itemBoxMessage)
-                            .font(.headline)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(.yellow.opacity(0.9))
-                            .foregroundStyle(.black)
-                            .clipShape(Capsule())
-                    }
-
-                    if let collisionMessage = game.collisionMessage {
-                        Text(collisionMessage)
-                            .font(.headline)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(.red.opacity(0.85))
-                            .foregroundStyle(.white)
-                            .clipShape(Capsule())
-                    }
-
-                    ControlPadView(onInputChanged: game.updateInput)
-                        .padding(.bottom, 40)
-                }
             }
         }
     }
