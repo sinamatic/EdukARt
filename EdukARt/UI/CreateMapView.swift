@@ -16,6 +16,7 @@ struct CreateMapView: View {
 
     @ObservedObject var mapStore: MapStore
     @StateObject private var mapScanSession = MapScanSession()
+    @StateObject private var aprilTagSearchSession = AprilTagSearchSession()
     @State private var mode: Mode = .selection
     @State private var mapName = ""
     let onClose: () -> Void
@@ -24,6 +25,9 @@ struct CreateMapView: View {
         ZStack {
             if mode == .scanSurrounding {
                 MapScanViewContainer(session: mapScanSession)
+                    .ignoresSafeArea()
+            } else if mode == .searchAprilTag {
+                AprilTagSearchViewContainer(session: aprilTagSearchSession)
                     .ignoresSafeArea()
             } else {
                 Color.black
@@ -71,6 +75,8 @@ struct CreateMapView: View {
                     statusPill(mapScanSession.statusText)
                     statusPill(mapScanSession.originStatusText)
                 }
+            } else if mode == .searchAprilTag {
+                statusPill(aprilTagSearchSession.statusText)
             }
         }
     }
@@ -116,14 +122,26 @@ struct CreateMapView: View {
 
     private var aprilTagCard: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Search April Tag")
+            Text(aprilTagSearchSession.titleText)
                 .font(.title2.weight(.bold))
                 .foregroundStyle(.white)
 
-            Text("Dieser Modus ist als naechster Schritt vorbereitet, startet aber aktuell noch keinen eigenen Such-Flow.")
+            Text(aprilTagSearchSession.instructionText)
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(.white.opacity(0.92))
+
+            if aprilTagSearchSession.detectedTagNames.isEmpty == false, aprilTagSearchSession.isTagTracked {
+                statusRow(
+                    title: "Erkannte Tags",
+                    value: aprilTagSearchSession.detectedTagNumbersText
+                )
+            }
+
+            statusRow(
+                title: "Status",
+                value: aprilTagSearchSession.statusText
+            )
 
             Button("Zur Auswahl zurueck") {
                 mode = .selection
