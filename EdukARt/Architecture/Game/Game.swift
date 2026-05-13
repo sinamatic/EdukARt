@@ -11,12 +11,46 @@ import simd
 import UIKit
 
 final class Game: ObservableObject {
+    enum SpeedMode: String, CaseIterable, Identifiable {
+        case slow = "Langsam"
+        case normal = "Normal"
+        case fast = "Schnell"
+
+        var id: String { rawValue }
+
+        var metersPerSecond: Float {
+            let normalSpeed: Float = 0.1 * .pi * 1.5
+
+            switch self {
+            case .slow:
+                return normalSpeed * 0.5
+            case .normal:
+                return normalSpeed
+            case .fast:
+                return normalSpeed * 1.25
+            }
+        }
+
+        var speedScale: Float {
+            switch self {
+            case .slow:
+                return 0.5
+            case .normal:
+                return 1
+            case .fast:
+                return 1.25
+            }
+        }
+    }
+
     @Published var collisionMessage: String?
     @Published var itemBoxMessage: String?
     @Published var isBlocked = false
     @Published var realRobotTagName: String?
     @Published var mapOriginMessage: String?
     @Published var isWaitingForMapOrigin = false
+    @Published var speedMode: SpeedMode = .normal
+    @Published var robotYaw: Float = 0
 
     private enum CollectibleLayout {
         static let itemBoxSize = SIMD3<Float>(0.32, 0.32, 0.32)
@@ -27,7 +61,9 @@ final class Game: ObservableObject {
     let currentRobot: any RobotTarget
     let selectedMap: StoredFloorMap?
 
-    private let moveStep: Float = 0.02
+    private let movementTicksPerSecond: Float = 60
+    private let normalRotationRadiansPerSecond: Float = .pi / 2
+    private var rotationInput: Float = 0
     private var movementTimer: Timer?
     private var itemBoxMessageClearWorkItem: DispatchWorkItem?
 
@@ -78,6 +114,10 @@ final class Game: ObservableObject {
         (currentController as? JoystickController)?.updateInput(input)
     }
 
+    func updateRotationInput(_ input: Float) {
+        rotationInput = input
+    }
+
     private func startMovementLoop() {
         movementTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
             self?.applyCurrentInput()
@@ -92,7 +132,16 @@ final class Game: ObservableObject {
         }
 
         let input = currentController.readInput()
-        let candidatePosition = currentRobot.move(input: input, step: moveStep)
+        let rotationStep = rotationInput * normalRotationRadiansPerSecond * speedMode.speedScale / movementTicksPerSecond
+        if abs(rotationStep) > 0.0001 {
+            objectWillChange.send()
+            robotYaw += rotationStep
+        }
+
+        let candidatePosition = currentRobot.move(
+            input: input,
+            step: speedMode.metersPerSecond / movementTicksPerSecond
+        )
         let hasMovementInput = input != .idle
 
         guard hasMovementInput else {

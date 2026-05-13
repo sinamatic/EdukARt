@@ -23,6 +23,19 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
     private let playerModelPitchCorrection = simd_quatf(angle: -.pi / 2, axis: [1, 0, 0])
     private let mapStartRobotOrientation = simd_quatf(angle: -.pi / 2, axis: [0, 1, 0])
     private let tagOverlayView = AprilTagOverlayView()
+    private let wheelRadiansPerMeter: Float = (1000 / (3.14 * 100)) * (2 * .pi)
+    private let wheelSpinAxis = SIMD3<Float>(1, 0, 0)
+    private weak var frontLeftWheelEntity: Entity?
+    private weak var frontRightWheelEntity: Entity?
+    private weak var backLeftWheelEntity: Entity?
+    private weak var backRightWheelEntity: Entity?
+    private var frontLeftWheelSpin: Float = 0
+    private var frontRightWheelSpin: Float = 0
+    private var backLeftWheelSpin: Float = 0
+    private var backRightWheelSpin: Float = 0
+    private var lastWheelRobotPosition: SIMD3<Float>?
+    private var lastWheelRobotYaw: Float?
+    private var simulatedRobotBaseOrientation = simd_quatf(angle: .pi, axis: [0, 1, 0])
     private var realWorldCollisionShape: ShapeResource?
     private var coinObstacleProbeShape: ShapeResource?
     private var obstacleEntities: [UUID: Entity] = [:]
@@ -100,9 +113,12 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
         }
         
         setPlayerVisibility(isVisible: game.isRealRobotTracked == false)
+        updateWheelRotation(for: game.currentRobot.position, yaw: game.robotYaw)
         playerEntity.position = game.currentRobot.position
         if let realRobotOrientation {
             playerEntity.orientation = realRobotOrientation
+        } else {
+            playerEntity.orientation = simulatedRobotBaseOrientation * simd_quatf(angle: game.robotYaw, axis: [0, 1, 0])
         }
         if hasLoadedInitialObstacles {
             syncObstacles(from: game.currentScene.level.obstacles)
@@ -209,7 +225,8 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
 
         anchorEntity.setTransformMatrix(tagAnchor.transform, relativeTo: nil)
         playerEntity.position = .zero
-        playerEntity.orientation = mapStartRobotOrientation
+        simulatedRobotBaseOrientation = mapStartRobotOrientation
+        playerEntity.orientation = simulatedRobotBaseOrientation
         hasAlignedMapOrigin = true
 
         if let arView, isSceneAnchorAdded == false {
@@ -418,23 +435,21 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
             let chassisEntity = try Entity.load(named: player.chassisModelName)
             chassisEntity.orientation = playerModelPitchCorrection
             
-            let frontLeftWheel = try Entity.load(named: player.frontLeftWheelModelName)
-            let frontRightWheel = try Entity.load(named: player.frontRightWheelModelName)
-            let backLeftWheel = try Entity.load(named: player.backLeftWheelModelName)
-            let backRightWheel = try Entity.load(named: player.backRightWheelModelName)
+            let frontLeftWheel = makeWheelPivot(from: try Entity.load(named: player.frontLeftWheelModelName))
+            let frontRightWheel = makeWheelPivot(from: try Entity.load(named: player.frontRightWheelModelName))
+            let backLeftWheel = makeWheelPivot(from: try Entity.load(named: player.backLeftWheelModelName))
+            let backRightWheel = makeWheelPivot(from: try Entity.load(named: player.backRightWheelModelName))
             
-            frontLeftWheel.orientation = playerModelPitchCorrection
-            frontRightWheel.orientation = playerModelPitchCorrection
-            backLeftWheel.orientation = playerModelPitchCorrection
-            backRightWheel.orientation = playerModelPitchCorrection
-            
-            frontLeftWheel.position = SIMD3<Float>(0,0,0)
-            frontRightWheel.position = SIMD3<Float>(0,0,0)
-            backLeftWheel.position = SIMD3<Float>(0,0,0)
-            backRightWheel.position = SIMD3<Float>(0,0,0)
-            
+            frontLeftWheelEntity = frontLeftWheel
+            frontRightWheelEntity = frontRightWheel
+            backLeftWheelEntity = backLeftWheel
+            backRightWheelEntity = backRightWheel
+            lastWheelRobotPosition = player.position
+            lastWheelRobotYaw = 0
+
             playerEntity.position = player.position
-            playerEntity.orientation = simd_quatf(angle: .pi, axis: [0, 1, 0])
+            simulatedRobotBaseOrientation = simd_quatf(angle: .pi, axis: [0, 1, 0])
+            playerEntity.orientation = simulatedRobotBaseOrientation
             
             playerEntity.addChild(chassisEntity)
             playerEntity.addChild(frontLeftWheel)
@@ -460,6 +475,60 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
         } catch {
             print("Failed to Load Player: \(error)")
         }
+    }
+
+    private func makeWheelPivot(from wheelModel: Entity) -> Entity {
+        let wheelContainer = Entity()
+        wheelModel.orientation = playerModelPitchCorrection
+        wheelContainer.addChild(wheelModel)
+
+        let bounds = wheelContainer.visualBounds(relativeTo: wheelContainer)
+        let wheelCenter = (bounds.min + bounds.max) / 2
+
+        let pivot = Entity()
+        pivot.position = wheelCenter
+        wheelContainer.position = -wheelCenter
+        pivot.addChild(wheelContainer)
+        return pivot
+    }
+
+    private func updateWheelRotation(for robotPosition: SIMD3<Float>, yaw: Float) {
+        guard let lastWheelRobotPosition, let lastWheelRobotYaw else {
+            self.lastWheelRobotPosition = robotPosition
+            self.lastWheelRobotYaw = yaw
+            return
+        }
+
+        let delta = robotPosition - lastWheelRobotPosition
+        let yawDelta = yaw - lastWheelRobotYaw
+        self.lastWheelRobotPosition = robotPosition
+        self.lastWheelRobotYaw = yaw
+
+        let forwardDistance = -delta.x
+        let lateralDistance = delta.z
+        let rotationDistance = yawDelta * 0.18
+        guard abs(forwardDistance) > 0.0001 || abs(lateralDistance) > 0.0001 || abs(rotationDistance) > 0.0001 else {
+            return
+        }
+
+        let frontLeftWheelDelta = (forwardDistance + lateralDistance - rotationDistance) * wheelRadiansPerMeter
+        let frontRightWheelDelta = (forwardDistance - lateralDistance + rotationDistance) * wheelRadiansPerMeter
+        let backLeftWheelDelta = (forwardDistance - lateralDistance - rotationDistance) * wheelRadiansPerMeter
+        let backRightWheelDelta = (forwardDistance + lateralDistance + rotationDistance) * wheelRadiansPerMeter
+
+        frontLeftWheelSpin += frontLeftWheelDelta
+        frontRightWheelSpin += frontRightWheelDelta
+        backLeftWheelSpin += backLeftWheelDelta
+        backRightWheelSpin += backRightWheelDelta
+
+        frontLeftWheelEntity?.orientation = wheelOrientation(spin: frontLeftWheelSpin)
+        backLeftWheelEntity?.orientation = wheelOrientation(spin: backLeftWheelSpin)
+        frontRightWheelEntity?.orientation = wheelOrientation(spin: frontRightWheelSpin)
+        backRightWheelEntity?.orientation = wheelOrientation(spin: backRightWheelSpin)
+    }
+
+    private func wheelOrientation(spin: Float) -> simd_quatf {
+        simd_quatf(angle: spin, axis: playerModelPitchCorrection.act(wheelSpinAxis))
     }
 
     private func setPlayerVisibility(isVisible: Bool) {

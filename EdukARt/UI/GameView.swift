@@ -77,20 +77,36 @@ struct GameView: View {
 
                 VStack(spacing: 12) {
                     statusMessages
-
-                    if isLandscape == false {
-                        ControlPadView(onInputChanged: game.updateInput)
-                    }
+                    speedControls
                 }
-                .padding(.bottom, 40)
+                .padding(.bottom, isLandscape ? 40 : 190)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
 
-                if isLandscape {
-                    ControlPadView(onInputChanged: game.updateInput)
-                        .padding(.trailing, 32)
-                        .padding(.bottom, 32)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                RotationPadView(onRotationChanged: game.updateRotationInput)
+                    .padding(.leading, isLandscape ? 32 : 28)
+                    .padding(.bottom, isLandscape ? 32 : 40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+
+                ControlPadView(onInputChanged: game.updateInput)
+                    .padding(.trailing, isLandscape ? 32 : 28)
+                    .padding(.bottom, isLandscape ? 32 : 40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            }
+        }
+    }
+
+    private var speedControls: some View {
+        HStack(spacing: 8) {
+            ForEach(Game.SpeedMode.allCases) { mode in
+                Button(mode.rawValue) {
+                    game.speedMode = mode
                 }
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(game.speedMode == mode ? .yellow.opacity(0.9) : .black.opacity(0.65))
+                .foregroundStyle(game.speedMode == mode ? .black : .white)
+                .clipShape(Capsule())
             }
         }
     }

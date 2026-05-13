@@ -65,3 +65,47 @@ struct ControlPadView: View {
         return ControlInput(direction: SIMD2<Float>(normalizedY, -normalizedX))
     }
 }
+
+struct RotationPadView: View {
+    let onRotationChanged: (Float) -> Void
+
+    @State private var knobOffset: CGSize = .zero
+
+    private let baseSize: CGFloat = 120
+    private let knobSize: CGFloat = 48
+    private let maxOffset: CGFloat = 36
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(.ultraThinMaterial)
+                .frame(width: baseSize, height: baseSize)
+
+            Text("ROT")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.white.opacity(0.75))
+
+            Circle()
+                .fill(.white.opacity(0.9))
+                .frame(width: knobSize, height: knobSize)
+                .offset(knobOffset)
+        }
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    let limitedOffset = limitedKnobOffset(for: value.translation)
+                    knobOffset = limitedOffset
+                    onRotationChanged(Float(limitedOffset.width / maxOffset))
+                }
+                .onEnded { _ in
+                    knobOffset = .zero
+                    onRotationChanged(0)
+                }
+        )
+    }
+
+    private func limitedKnobOffset(for translation: CGSize) -> CGSize {
+        let clampedWidth = min(max(translation.width, -maxOffset), maxOffset)
+        return CGSize(width: clampedWidth, height: 0)
+    }
+}
