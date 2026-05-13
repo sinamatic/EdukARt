@@ -10,7 +10,8 @@ import SwiftUI
 struct CreateMapView: View {
     private enum Mode {
         case selection
-        case scanSurrounding
+        case scanWithAprilTag
+        case scanWithoutAprilTag
         case searchAprilTag
     }
 
@@ -19,12 +20,13 @@ struct CreateMapView: View {
     @StateObject private var aprilTagSearchSession = AprilTagSearchSession()
     @State private var mode: Mode = .selection
     @State private var mapName = ""
+    @State private var scanUsesAprilTag = true
     let onClose: () -> Void
 
     var body: some View {
         ZStack {
-            if mode == .scanSurrounding {
-                MapScanViewContainer(session: mapScanSession)
+            if mode == .scanWithAprilTag || mode == .scanWithoutAprilTag {
+                MapScanViewContainer(session: mapScanSession, usesAprilTagOrigin: scanUsesAprilTag)
                     .ignoresSafeArea()
             } else if mode == .searchAprilTag {
                 AprilTagSearchViewContainer(session: aprilTagSearchSession)
@@ -70,7 +72,7 @@ struct CreateMapView: View {
 
             Spacer(minLength: 12)
 
-            if mode == .scanSurrounding {
+            if mode == .scanWithAprilTag || mode == .scanWithoutAprilTag {
                 VStack(alignment: .trailing, spacing: 8) {
                     statusPill(mapScanSession.statusText)
                     statusPill(mapScanSession.originStatusText)
@@ -86,7 +88,7 @@ struct CreateMapView: View {
             switch mode {
             case .selection:
                 selectionCard
-            case .scanSurrounding:
+            case .scanWithAprilTag, .scanWithoutAprilTag:
                 scanCard
             case .searchAprilTag:
                 aprilTagCard
@@ -104,10 +106,19 @@ struct CreateMapView: View {
                 .font(.body)
                 .foregroundStyle(.white.opacity(0.92))
 
-            Button("Scan Surrounding") {
-                mode = .scanSurrounding
+            Button("Create Map with Apriltag (recommended)") {
+                scanUsesAprilTag = true
+                mapScanSession.configureOriginMode(.aprilTag)
+                mode = .scanWithAprilTag
             }
             .buttonStyle(PrimaryScanButtonStyle())
+
+            Button("Create Map without April Tag") {
+                scanUsesAprilTag = false
+                mapScanSession.configureOriginMode(.manualFloorPoint)
+                mode = .scanWithoutAprilTag
+            }
+            .buttonStyle(SecondaryScanButtonStyle())
 
             Button("Search April Tag") {
                 mode = .searchAprilTag
@@ -189,14 +200,14 @@ struct CreateMapView: View {
                 }
 
                 statusRow(
-                    title: "Startpunkt",
-                    value: mapScanSession.hasOrigin ? "gesetzt" : "noch nicht gesetzt"
+                    title: scanUsesAprilTag ? "AprilTag" : "Startpunkt",
+                    value: mapScanSession.originStatusText
                 )
 
                 ProgressView(value: mapScanSession.floorProgress)
                     .tint(.green)
 
-                if mapScanSession.hasOrigin == false {
+                if scanUsesAprilTag == false, mapScanSession.hasOrigin == false {
                     Button("Startpunkt setzen") {
                         mapScanSession.requestOriginPlacement()
                     }

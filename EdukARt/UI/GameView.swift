@@ -8,11 +8,12 @@
 import SwiftUI
 
 struct GameView: View {
-    @StateObject private var game = Game()
+    @StateObject private var game: Game
     @State private var isDebugEnabled = false
     let onBack: () -> Void
 
-    init(onBack: @escaping () -> Void = {}) {
+    init(selectedMap: StoredFloorMap? = nil, onBack: @escaping () -> Void = {}) {
+        _game = StateObject(wrappedValue: Game(selectedMap: selectedMap))
         self.onBack = onBack
     }
 
@@ -37,6 +38,16 @@ struct GameView: View {
                         .clipShape(Capsule())
 
                         Spacer()
+
+                        if let realRobotTagName = game.realRobotTagName {
+                            Text("Real \(displayNumber(for: realRobotTagName))")
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(.green.opacity(0.82))
+                                .foregroundStyle(.black)
+                                .clipShape(Capsule())
+                        }
 
                         Button(isDebugEnabled ? "Debug On" : "Debug") {
                             isDebugEnabled.toggle()
@@ -96,5 +107,19 @@ struct GameView: View {
                     .clipShape(Capsule())
             }
         }
+    }
+
+    private func displayNumber(for tagName: String) -> String {
+        let trailingDigits = tagName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .reversed()
+            .prefix(while: { $0.isNumber })
+            .reversed()
+
+        guard trailingDigits.isEmpty == false else {
+            return tagName
+        }
+
+        return "#\(String(trailingDigits))"
     }
 }

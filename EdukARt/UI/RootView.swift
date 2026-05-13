@@ -12,6 +12,7 @@ struct RootView: View {
     @State private var phase: LaunchPhase = .logo
     @State private var loadingProgress: Double = 0
     @State private var hasStartedLaunchSequence = false
+    @State private var selectedGameMap: StoredFloorMap?
 
     var body: some View {
         Group {
@@ -25,9 +26,11 @@ struct RootView: View {
             case .gameLoading:
                 gameLoadingScreen
             case .game:
-                GameView {
+                GameView(selectedMap: selectedGameMap) {
                     phase = .menu
                 }
+            case .selectGameMap:
+                gameMapSelectionScreen
             case .createMap:
                 CreateMapView(mapStore: mapStore) {
                     phase = .menu
@@ -136,8 +139,13 @@ struct RootView: View {
 
                 VStack(spacing: 14) {
                     Button("Start Game") {
-                        Task {
-                            await runGameStartSequence()
+                        if mapStore.maps.isEmpty {
+                            selectedGameMap = nil
+                            Task {
+                                await runGameStartSequence()
+                            }
+                        } else {
+                            phase = .selectGameMap
                         }
                     }
                     .buttonStyle(StartScreenButtonStyle(fillColor: brandGreen))
@@ -158,6 +166,91 @@ struct RootView: View {
             }
             .padding(.horizontal, 28)
             .padding(.vertical, 40)
+        }
+    }
+
+    private var gameMapSelectionScreen: some View {
+        ZStack {
+            Image("EdukARtKeyvisual")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+
+            Color.black.opacity(0.84)
+                .ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                HStack {
+                    Button("Zurueck") {
+                        phase = .menu
+                    }
+                    .buttonStyle(CompactOverlayButtonStyle())
+
+                    Spacer()
+                }
+
+                Text("Karte fuer Spiel waehlen")
+                    .font(.largeTitle.weight(.bold))
+                    .foregroundStyle(.white)
+
+                Text("Die Coins werden im Raster auf der gespeicherten Bodenflaeche platziert.")
+                    .font(.subheadline)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white.opacity(0.82))
+
+                List {
+                    Button {
+                        selectedGameMap = nil
+                        Task {
+                            await runGameStartSequence()
+                        }
+                    } label: {
+                        Text("Ohne Karte starten")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(18)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+
+                    ForEach(mapStore.maps) { map in
+                        Button {
+                            selectedGameMap = map
+                            Task {
+                                await runGameStartSequence()
+                            }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(map.name)
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+
+                                Text("\(map.floorTiles.count) Bodenkacheln")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(brandGreen)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(18)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                    }
+                }
+                .scrollContentBackground(.hidden)
+                .listStyle(.plain)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 34)
+            .padding(.bottom, 24)
         }
     }
 
@@ -201,6 +294,7 @@ private enum LaunchPhase {
     case menu
     case gameLoading
     case game
+    case selectGameMap
     case createMap
     case viewMaps
 }
@@ -222,5 +316,17 @@ private struct StartScreenButtonStyle: ButtonStyle {
             .foregroundStyle(foregroundColor)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+private struct CompactOverlayButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.black.opacity(configuration.isPressed ? 0.48 : 0.65))
+            .foregroundStyle(.white)
+            .clipShape(Capsule())
     }
 }

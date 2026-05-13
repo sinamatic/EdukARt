@@ -12,7 +12,7 @@ import UIKit
 struct MapPreviewView: View {
     let map: StoredFloorMap
     let onBack: () -> Void
-    @State private var statusText = "Auf Boden ausrichten"
+    @State private var statusText = "Karte ausrichten"
     @State private var placementRequest = 0
 
     var body: some View {
@@ -57,14 +57,18 @@ struct MapPreviewView: View {
                     Text(map.name)
                         .font(.title2.weight(.bold))
                         .foregroundStyle(.white)
-                    Text("Richte die Kamera auf den Boden und platziere die gespeicherte Karte an der aktuellen Position.")
+                    Text(map.referenceTagName == nil
+                         ? "Richte die Kamera auf den Boden und platziere die gespeicherte Karte an der aktuellen Position."
+                         : "Richte die Kamera auf AprilTag #3. Die gespeicherte Karte wird automatisch an diesem Marker ausgerichtet.")
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.84))
 
-                    Button("Karte hier platzieren") {
-                        placementRequest += 1
+                    if map.referenceTagName == nil {
+                        Button("Karte hier platzieren") {
+                            placementRequest += 1
+                        }
+                        .buttonStyle(MapPreviewPlaceButtonStyle())
                     }
-                    .buttonStyle(MapPreviewPlaceButtonStyle())
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -91,6 +95,9 @@ private struct MapPreviewARViewContainer: UIViewRepresentable {
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal]
         configuration.environmentTexturing = .automatic
+        if map.referenceTagName != nil {
+            context.coordinator.configureReferenceTagDetection(on: configuration)
+        }
         arView.session.delegate = context.coordinator
         arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         context.coordinator.attach(to: arView)
@@ -108,6 +115,7 @@ private final class MapPreviewCoordinator: NSObject, ARSessionDelegate {
     private weak var arView: ARView?
     private let overlayAnchor = AnchorEntity(world: .zero)
     private var handledPlacementRequest = 0
+    private var renderedAnchorIdentifier: UUID?
 
     init(map: StoredFloorMap, statusText: Binding<String>) {
         self.map = map
@@ -126,6 +134,50 @@ private final class MapPreviewCoordinator: NSObject, ARSessionDelegate {
 
         handledPlacementRequest = placementRequest
         placeMapAtScreenCenter()
+    }
+
+    func configureReferenceTagDetection(on configuration: ARWorldTrackingConfiguration) {
+        guard let requiredTagName = map.referenceTagName else {
+            statusText.wrappedValue = "Auf Boden ausrichten"
+            return
+        }
+
+        guard let referenceImages = ARReferenceImage.referenceImages(inGroupNamed: "AprilTags", bundle: nil) else {
+            return
+        }
+
+        let requiredImages = referenceImages.filter { $0.name == requiredTagName }
+        guard requiredImages.isEmpty == false else {
+            statusText.wrappedValue = "AprilTag-Asset fehlt"
+            return
+        }
+
+        configuration.detectionImages = Set(requiredImages)
+        configuration.maximumNumberOfTrackedImages = 1
+        configuration.automaticImageScaleEstimationEnabled = false
+    }
+
+    func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        guard let requiredTagName = map.referenceTagName else {
+            return
+        }
+
+        guard let tagAnchor = frame.anchors
+            .compactMap({ $0 as? ARImageAnchor })
+            .first(where: { $0.referenceImage.name == requiredTagName }) else {
+            if renderedAnchorIdentifier == nil {
+                statusText.wrappedValue = "Suche AprilTag #3"
+            }
+            return
+        }
+
+        guard renderedAnchorIdentifier != tagAnchor.identifier else {
+            return
+        }
+
+        renderedAnchorIdentifier = tagAnchor.identifier
+        renderMap(relativeTo: tagAnchor.transform)
+        statusText.wrappedValue = "Karte an Tag #3 ausgerichtet"
     }
 
     private func placeMapAtScreenCenter() {

@@ -9,7 +9,14 @@ import ARKit
 import RealityKit
 import UIKit
 
-final class SceneCoordinator {
+enum RealRobotTrackingConstants {
+    static let robotTagName = "tag36h11-2"
+    static let tagHeightOffset: Float = 0.10
+    static let trackingLossGracePeriod: TimeInterval = 2.5
+    static let imageForwardSign: Float = -1
+}
+
+final class SceneCoordinator: NSObject, ARSessionDelegate {
     private let anchorEntity = AnchorEntity(
         plane: .horizontal,
         classification: .any,
@@ -20,10 +27,16 @@ final class SceneCoordinator {
     private let playerModelPitchCorrection = simd_quatf(angle: -.pi / 2, axis: [1, 0, 0])
     private var realWorldCollisionShape: ShapeResource?
     private var obstacleEntities: [UUID: Entity] = [:]
+    private var collectibleTemplates: [String: Entity] = [:]
+    private weak var game: Game?
+    private var lastRealRobotDetectionDate = Date.distantPast
+    private var realRobotOrientation: simd_quatf?
+    private var hasScheduledInitialObstacles = false
+    private var hasLoadedInitialObstacles = false
     
     func makeScene(from game: Game) -> AnchorEntity {
+        self.game = game
         addPlayer(from: game.currentRobot)
-        addObstacles(from: game.currentScene.level.obstacles)
         return anchorEntity
     }
     
@@ -33,8 +46,138 @@ final class SceneCoordinator {
             return
         }
         
+        setPlayerVisibility(isVisible: game.isRealRobotTracked == false)
         playerEntity.position = game.currentRobot.position
-        syncObstacles(from: game.currentScene.level.obstacles)
+        if let realRobotOrientation {
+            playerEntity.orientation = realRobotOrientation
+        }
+        if hasLoadedInitialObstacles {
+            syncObstacles(from: game.currentScene.level.obstacles)
+        }
+    }
+
+    func loadInitialObstacles(from game: Game) {
+        scheduleInitialObstaclesIfNeeded(for: game)
+    }
+
+    func configureRealRobotTracking(_ configuration: ARWorldTrackingConfiguration) {
+        guard let referenceImages = ARReferenceImage.referenceImages(inGroupNamed: "AprilTags", bundle: nil) else {
+            return
+        }
+
+        let robotReferenceImages = referenceImages.filter { $0.name == RealRobotTrackingConstants.robotTagName }
+        guard robotReferenceImages.isEmpty == false else {
+            return
+        }
+
+        configuration.detectionImages = Set(robotReferenceImages)
+        configuration.maximumNumberOfTrackedImages = 1
+        configuration.automaticImageScaleEstimationEnabled = false
+    }
+
+    func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        guard let game else {
+            return
+        }
+
+        scheduleInitialObstaclesIfNeeded(for: game)
+
+        guard let robotAnchor = frame.anchors
+            .compactMap({ $0 as? ARImageAnchor })
+            .first(where: { imageAnchor in
+                imageAnchor.isTracked &&
+                imageAnchor.referenceImage.name == RealRobotTrackingConstants.robotTagName
+            }) else {
+            clearRealRobotTrackingIfNeeded()
+            return
+        }
+
+        lastRealRobotDetectionDate = Date()
+
+        let robotPose = makeRealRobotPose(from: robotAnchor.transform)
+        realRobotOrientation = robotPose.orientation
+
+        Task { @MainActor in
+            game.syncRealRobot(
+                tagName: robotAnchor.referenceImage.name ?? "AprilTag",
+                position: robotPose.position
+            )
+        }
+    }
+
+    private func scheduleInitialObstaclesIfNeeded(for game: Game) {
+        guard hasScheduledInitialObstacles == false else {
+            return
+        }
+
+        hasScheduledInitialObstacles = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self, weak game] in
+            guard let self, let game else {
+                return
+            }
+
+            self.addObstaclesSequentially(Array(game.currentScene.level.obstacles))
+        }
+    }
+
+    private func addObstaclesSequentially(_ obstacles: [Obstacle], index: Int = 0) {
+        guard index < obstacles.count else {
+            hasLoadedInitialObstacles = true
+            return
+        }
+
+        addObstacles(from: [obstacles[index]])
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { [weak self] in
+            self?.addObstaclesSequentially(obstacles, index: index + 1)
+        }
+    }
+
+    private func clearRealRobotTrackingIfNeeded() {
+        guard Date().timeIntervalSince(lastRealRobotDetectionDate) > RealRobotTrackingConstants.trackingLossGracePeriod else {
+            return
+        }
+
+        realRobotOrientation = nil
+        Task { @MainActor [weak game] in
+            game?.clearRealRobotTracking()
+        }
+    }
+
+    private func makeRealRobotPose(from tagWorldTransform: simd_float4x4) -> (position: SIMD3<Float>, orientation: simd_quatf) {
+        let tagWorldPosition = SIMD3<Float>(
+            tagWorldTransform.columns.3.x,
+            tagWorldTransform.columns.3.y,
+            tagWorldTransform.columns.3.z
+        )
+        let tagNormal = simd_normalize(
+            SIMD3<Float>(
+                tagWorldTransform.columns.1.x,
+                tagWorldTransform.columns.1.y,
+                tagWorldTransform.columns.1.z
+            )
+        )
+        let robotWorldPosition = tagWorldPosition - (tagNormal * RealRobotTrackingConstants.tagHeightOffset)
+        var localRobotPosition = anchorEntity.convert(position: robotWorldPosition, from: nil)
+        localRobotPosition.y = max(0, localRobotPosition.y)
+
+        let anchorWorldTransform = anchorEntity.transformMatrix(relativeTo: nil)
+        let localTagTransform = anchorWorldTransform.inverse * tagWorldTransform
+        let imageForward = simd_normalize(
+            SIMD3<Float>(
+                localTagTransform.columns.2.x,
+                0,
+                localTagTransform.columns.2.z
+            ) * RealRobotTrackingConstants.imageForwardSign
+        )
+
+        guard imageForward.x.isFinite, imageForward.z.isFinite, simd_length(imageForward) > 0.001 else {
+            return (localRobotPosition, playerEntity.orientation)
+        }
+
+        let yaw = atan2(-imageForward.x, -imageForward.z)
+        return (localRobotPosition, simd_quatf(angle: yaw, axis: [0, 1, 0]))
     }
     
     
@@ -91,6 +234,12 @@ final class SceneCoordinator {
             print("Failed to Load Player: \(error)")
         }
     }
+
+    private func setPlayerVisibility(isVisible: Bool) {
+        playerEntity.components.set(
+            OpacityComponent(opacity: isVisible ? 1 : 0)
+        )
+    }
     
     
     
@@ -105,17 +254,15 @@ final class SceneCoordinator {
             switch obstacle.shape {
             case .box:
                 do {
-                    let itemBoxEntity = try Entity.load(named: "Itembox")
-                    itemBoxEntity.orientation = playerModelPitchCorrection
+                    let collectibleEntity = try makeCollectibleEntity(named: obstacle.modelName)
+                    collectibleEntity.orientation = playerModelPitchCorrection
 
-                    let bounds = itemBoxEntity.visualBounds(relativeTo: itemBoxEntity)
-                    applyItemBoxStyle(to: itemBoxEntity)
-                    
+                    let bounds = collectibleEntity.visualBounds(relativeTo: collectibleEntity)
                     let basePosition = obstacle.position + SIMD3<Float>(0, -bounds.min.y, 0)
 
-                    itemBoxEntity.position = basePosition
+                    collectibleEntity.position = basePosition
 
-                    itemBoxEntity.components.set(
+                    collectibleEntity.components.set(
                         CollisionComponent(
                             shapes: [
                                 .generateBox(size: obstacle.size)
@@ -123,24 +270,34 @@ final class SceneCoordinator {
                         )
                     )
 
-                    itemBoxEntity.components.set(
+                    collectibleEntity.components.set(
                         PhysicsBodyComponent(mode: .static)
                     )
 
-                    anchorEntity.addChild(itemBoxEntity)
-                    obstacleEntities[obstacle.id] = itemBoxEntity
-                    startFloatingAnimation(for: itemBoxEntity, basePosition: basePosition)
-                    startRotationAnimation(for: itemBoxEntity)
+                    anchorEntity.addChild(collectibleEntity)
+                    obstacleEntities[obstacle.id] = collectibleEntity
+                    if obstacle.modelName == "Coin" {
+                        startCoinRotationAnimation(for: collectibleEntity, delay: coinAnimationDelay(for: obstacle))
+                    } else {
+                        startFloatingAnimation(for: collectibleEntity, basePosition: basePosition)
+                        startRotationAnimation(for: collectibleEntity)
+                    }
                 } catch {
-                    print("Failed to load Itembox: \(error)")
+                    print("Failed to load \(obstacle.modelName): \(error)")
                 }
             }
         }
 
     }
 
-    private func applyItemBoxStyle(to entity: Entity) {
-        entity.components.set(OpacityComponent(opacity: 0.88))
+    private func makeCollectibleEntity(named modelName: String) throws -> Entity {
+        if let template = collectibleTemplates[modelName] {
+            return template.clone(recursive: true)
+        }
+
+        let template = try Entity.load(named: modelName)
+        collectibleTemplates[modelName] = template
+        return template.clone(recursive: true)
     }
 
     private func syncObstacles(from obstacles: [Obstacle]) {
@@ -241,6 +398,43 @@ final class SceneCoordinator {
             self.startRotationAnimation(for: entity)
         }
     }
+
+    private func coinAnimationDelay(for obstacle: Obstacle) -> TimeInterval {
+        let distanceOffset = max(0, abs(obstacle.position.z) - 0.65)
+        return TimeInterval(distanceOffset * 1.25)
+    }
+
+    private func startCoinRotationAnimation(for entity: Entity, delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            let baseOrientation = entity.orientation
+            let flippedOrientation = simd_quatf(angle: .pi, axis: [0, 1, 0]) * baseOrientation
+
+            func rotate(to orientation: simd_quatf, then next: @escaping () -> Void) {
+                guard entity.parent != nil else {
+                    return
+                }
+
+                entity.move(
+                    to: Transform(scale: entity.scale, rotation: orientation, translation: entity.position),
+                    relativeTo: entity.parent,
+                    duration: 7.0,
+                    timingFunction: .easeInOut
+                )
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 7.0, execute: next)
+            }
+
+            func rotateForward() {
+                rotate(to: flippedOrientation, then: rotateBack)
+            }
+
+            func rotateBack() {
+                rotate(to: baseOrientation, then: rotateForward)
+            }
+
+            rotateForward()
+        }
+    }
     
     
     func canMoveInRealWorld(from currentPosition: SIMD3<Float>, to candidatePosition: SIMD3<Float>, in arView: ARView) -> Bool {
@@ -296,5 +490,10 @@ final class SceneDebugController {
         } else {
             arView.debugOptions.remove(.showSceneUnderstanding)
         }
+    }
+}
+private extension Obstacle {
+    var modelName: String {
+        name
     }
 }

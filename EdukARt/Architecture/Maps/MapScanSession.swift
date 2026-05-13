@@ -14,6 +14,11 @@ struct FloorTileSnapshot: Equatable {
 
 @MainActor
 final class MapScanSession: ObservableObject {
+    enum OriginMode: Equatable {
+        case aprilTag
+        case manualFloorPoint
+    }
+
     enum Phase: Equatable {
         case placingOrigin
         case scanningFloor
@@ -31,15 +36,17 @@ final class MapScanSession: ObservableObject {
     @Published private(set) var hasSavedCurrentScan = false
     @Published var saveMessage: String?
 
-    let minimumRequiredAreaSquareMeters: Float = 6
+    let minimumRequiredAreaSquareMeters: Float = 2
+    private(set) var originMode: OriginMode = .aprilTag
 
     private var originTransform: simd_float4x4?
+    private var referenceTagName: String?
     private var currentFloorTiles: [FloorTileSnapshot] = []
 
     var titleText: String {
         switch phase {
         case .placingOrigin:
-            "Startpunkt setzen"
+            originMode == .aprilTag ? "AprilTag #3 suchen" : "Startpunkt setzen"
         case .scanningFloor:
             "Bodenflaeche scannen"
         case .reviewBeforeSave:
@@ -52,9 +59,17 @@ final class MapScanSession: ObservableObject {
     var instructionText: String {
         return switch phase {
         case .placingOrigin:
-            "Richte die Kamera auf den Boden an der Stelle, an der die Karte beginnen soll. Tippe dann auf \"Startpunkt setzen\"."
+            if originMode == .aprilTag {
+                "Richte die Kamera auf AprilTag #3. Sobald der Tag erkannt wird, startet der Umgebungsscan automatisch von diesem Punkt aus."
+            } else {
+                "Richte die Kamera auf den Boden an der Stelle, an der die Karte beginnen soll. Tippe dann auf \"Startpunkt setzen\"."
+            }
         case .scanningFloor:
-            "Der Startpunkt ist gesetzt. Scanne jetzt freie Bodenflaechen weiter. Es muessen mindestens 6 m² bestaetigt sein."
+            if originMode == .aprilTag {
+                "AprilTag #3 ist gesetzt. Scanne jetzt die Umgebung weiter. Es muessen mindestens 2 m² bestaetigt sein."
+            } else {
+                "Der Startpunkt ist gesetzt. Scanne jetzt die Umgebung weiter. Es muessen mindestens 2 m² bestaetigt sein."
+            }
         case .reviewBeforeSave:
             "Der Scan ist eingefroren. Pruefe die aufgenommene Flaeche und vergebe dann einen Namen, bevor du speicherst."
         case .saved:
@@ -78,7 +93,12 @@ final class MapScanSession: ObservableObject {
     }
 
     var originStatusText: String {
-        hasOrigin ? "Startpunkt gesetzt" : "Startpunkt offen"
+        switch originMode {
+        case .aprilTag:
+            hasOrigin ? "Tag #3 gesetzt" : "Tag #3 suchen"
+        case .manualFloorPoint:
+            hasOrigin ? "Startpunkt gesetzt" : "Startpunkt offen"
+        }
     }
 
     var floorProgress: Double {
@@ -118,13 +138,26 @@ final class MapScanSession: ObservableObject {
         self.mappingStatus = mappingStatus
     }
 
+    func configureOriginMode(_ originMode: OriginMode) {
+        guard phase == .placingOrigin, hasOrigin == false else {
+            return
+        }
+
+        self.originMode = originMode
+    }
+
     func requestOriginPlacement() {
         saveMessage = nil
         originPlacementRequest += 1
     }
 
     func setOrigin(transform: simd_float4x4) {
+        setOrigin(transform: transform, referenceTagName: nil)
+    }
+
+    func setOrigin(transform: simd_float4x4, referenceTagName: String?) {
         originTransform = transform
+        self.referenceTagName = referenceTagName
         hasOrigin = true
         phase = .scanningFloor
         confirmedFloorArea = 0
@@ -175,7 +208,9 @@ final class MapScanSession: ObservableObject {
         }
 
         guard let map = makeStoredMap(named: name) else {
-            saveMessage = "Zum Speichern muessen zuerst der Startpunkt gesetzt und mindestens 6 m² Boden erkannt sein."
+            saveMessage = originMode == .aprilTag
+                ? "Zum Speichern muss zuerst AprilTag #3 erkannt und mindestens 2 m² Boden erkannt sein."
+                : "Zum Speichern muss zuerst der Startpunkt gesetzt und mindestens 2 m² Boden erkannt sein."
             return
         }
 
@@ -217,6 +252,7 @@ final class MapScanSession: ObservableObject {
             createdAt: .now,
             minimumAreaSquareMeters: minimumRequiredAreaSquareMeters,
             floorTileSize: StoredFloorMapConstants.tileSize,
+            referenceTagName: referenceTagName,
             floorTiles: storedTiles
         )
     }

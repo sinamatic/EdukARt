@@ -14,18 +14,28 @@ final class Game: ObservableObject {
     @Published var collisionMessage: String?
     @Published var itemBoxMessage: String?
     @Published var isBlocked = false
+    @Published var realRobotTagName: String?
+
+    private enum CollectibleLayout {
+        static let itemBoxSize = SIMD3<Float>(0.32, 0.32, 0.32)
+    }
 
     let currentScene: any GameScene
     let currentController: any ControlSource
     let currentRobot: any RobotTarget
+    let selectedMap: StoredFloorMap?
 
     private let moveStep: Float = 0.02
     private var movementTimer: Timer?
     private var itemBoxMessageClearWorkItem: DispatchWorkItem?
 
     var canMoveInRealWorld: ((SIMD3<Float>, SIMD3<Float>) -> Bool)?
+    var isRealRobotTracked: Bool {
+        realRobotTagName != nil
+    }
 
     init(
+        selectedMap: StoredFloorMap? = nil,
         currentScene: (any GameScene)? = nil,
         currentController: (any ControlSource)? = nil,
         currentRobot: (any RobotTarget)? = nil
@@ -38,20 +48,14 @@ final class Game: ObservableObject {
             level: Level(
                 name: "Basic Level",
                 difficulty: .basic,
-                obstacles: [
-                    Obstacle(
-                        name: "Itembox",
-                        shape: .box,
-                        position: SIMD3<Float>(0, 0, -0.45),
-                        size: SIMD3<Float>(0.6, 0.6, 0.6)
-                    )
-                ]
+                obstacles: selectedMap.map(Self.makeCoinGrid(from:)) ?? Self.makeLinearCollectibles(around: robot.position)
             )
         )
 
         self.currentScene = scene
         self.currentController = currentController ?? JoystickController()
         self.currentRobot = robot
+        self.selectedMap = selectedMap
 
         startMovementLoop()
     }
@@ -75,6 +79,12 @@ final class Game: ObservableObject {
     }
 
     private func applyCurrentInput() {
+        guard isRealRobotTracked == false else {
+            isBlocked = false
+            collisionMessage = nil
+            return
+        }
+
         let input = currentController.readInput()
         let candidatePosition = currentRobot.move(input: input, step: moveStep)
         let hasMovementInput = input != .idle
@@ -98,13 +108,27 @@ final class Game: ObservableObject {
         }
     }
 
+    func syncRealRobot(tagName: String, position: SIMD3<Float>) {
+        objectWillChange.send()
+        realRobotTagName = tagName
+        currentRobot.position = position
+        collectItemBoxesIfNeeded(at: position)
+        currentScene.update()
+        isBlocked = false
+        collisionMessage = nil
+    }
+
+    func clearRealRobotTracking() {
+        realRobotTagName = nil
+    }
+
     private func canMove(to candidatePosition: SIMD3<Float>) -> Bool {
         let playerHalfSize = currentRobot.collisionSize / 2
         let playerMin = candidatePosition - playerHalfSize
         let playerMax = candidatePosition + playerHalfSize
 
         for obstacle in currentScene.level.obstacles {
-            guard obstacle.shape != .box else {
+            guard obstacle.isCollectible == false else {
                 continue
             }
 
@@ -132,7 +156,7 @@ final class Game: ObservableObject {
 
     private func collectItemBoxesIfNeeded(at playerPosition: SIMD3<Float>) {
         let collectedIDs = currentScene.level.obstacles.compactMap { obstacle -> UUID? in
-            guard obstacle.shape == .box else {
+            guard obstacle.isCollectible else {
                 return nil
             }
 
@@ -169,7 +193,7 @@ final class Game: ObservableObject {
     private func triggerItemBoxFeedback() {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
 
-        itemBoxMessage = "Itembox hit"
+        itemBoxMessage = "+1"
         itemBoxMessageClearWorkItem?.cancel()
 
         let clearWorkItem = DispatchWorkItem { [weak self] in
@@ -178,5 +202,64 @@ final class Game: ObservableObject {
 
         itemBoxMessageClearWorkItem = clearWorkItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: clearWorkItem)
+    }
+
+    nonisolated private static func makeLinearCollectibles(around origin: SIMD3<Float>) -> [Obstacle] {
+        [0.65, 0.85, 1.05].map { distance in
+            Obstacle(
+                name: "Coin",
+                shape: .box,
+                position: origin + SIMD3<Float>(0, 0, -Float(distance)),
+                size: SIMD3<Float>(0.25, 0.25, 0.25)
+                
+            )
+        }
+    }
+
+    nonisolated private static func makeCoinGrid(from map: StoredFloorMap) -> [Obstacle] {
+        let coinGridSpacing: Float = 0.5
+        let maxCoinCount = 80
+        var occupiedGridCells = Set<String>()
+        var coins: [Obstacle] = []
+
+        for tile in map.floorTiles {
+            let gridX = Int((tile.x / coinGridSpacing).rounded())
+            let gridZ = Int((tile.z / coinGridSpacing).rounded())
+            let key = "\(gridX):\(gridZ)"
+
+            guard occupiedGridCells.insert(key).inserted else {
+                continue
+            }
+
+            let x = Float(gridX) * coinGridSpacing
+            let z = Float(gridZ) * coinGridSpacing
+            guard simd_length(SIMD2<Float>(x, z)) > 0.35 else {
+                continue
+            }
+
+            coins.append(
+                Obstacle(
+                    name: "Coin",
+                    shape: .box,
+                    position: SIMD3<Float>(x, tile.y, z),
+                    size: SIMD3<Float>(0.25, 0.25, 0.25)
+                )
+            )
+
+            if coins.count >= maxCoinCount {
+                break
+            }
+        }
+
+        return coins.isEmpty ? makeLinearCollectibles(around: .zero) : coins
+    }
+}
+
+private extension Obstacle {
+    var isCollectible: Bool {
+        switch shape {
+        case .box:
+            return true
+        }
     }
 }

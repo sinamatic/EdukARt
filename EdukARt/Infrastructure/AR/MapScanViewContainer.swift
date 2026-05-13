@@ -7,12 +7,14 @@
 import ARKit
 import RealityKit
 import SwiftUI
+import UIKit
 
 struct MapScanViewContainer: UIViewRepresentable {
     @ObservedObject var session: MapScanSession
+    let usesAprilTagOrigin: Bool
 
     func makeCoordinator() -> MapScanCoordinator {
-        MapScanCoordinator(session: session)
+        MapScanCoordinator(session: session, usesAprilTagOrigin: usesAprilTagOrigin)
     }
 
     func makeUIView(context: Context) -> ARView {
@@ -20,6 +22,9 @@ struct MapScanViewContainer: UIViewRepresentable {
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal, .vertical]
         configuration.environmentTexturing = .automatic
+        if usesAprilTagOrigin {
+            context.coordinator.configureReferenceTagDetection(on: configuration)
+        }
 
         if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
             configuration.sceneReconstruction = .meshWithClassification
@@ -36,6 +41,7 @@ struct MapScanViewContainer: UIViewRepresentable {
 
     func updateUIView(_ uiView: ARView, context: Context) {
         context.coordinator.session = session
+        context.coordinator.usesAprilTagOrigin = usesAprilTagOrigin
         context.coordinator.handleOriginPlacementRequestIfNeeded()
         context.coordinator.updateSessionStateIfNeeded()
     }
@@ -43,23 +49,47 @@ struct MapScanViewContainer: UIViewRepresentable {
 
 final class MapScanCoordinator: NSObject, ARSessionDelegate {
     var session: MapScanSession
+    var usesAprilTagOrigin: Bool
 
     private weak var arView: ARView?
     private let processingQueue = DispatchQueue(label: "MapScanCoordinator.processing", qos: .userInitiated)
+    private let tagOverlayView = AprilTagOverlayView()
+    private let floorOverlayAnchor = AnchorEntity(world: .zero)
     private var isProcessingMeshUpdate = false
     private let floorTileSize: Float = StoredFloorMapConstants.tileSize
+    private let floorOverlayTileScale: Float = 0.42
     private let lowestFloorTolerance: Float = 0.08
     private let meshUpdateInterval: TimeInterval = 1.0
     private var lastMeshProcessingDate = Date.distantPast
     private var handledOriginPlacementRequest = 0
     private var isSessionPaused = false
+    private var isFloorOverlayAttached = false
 
-    init(session: MapScanSession) {
+    init(session: MapScanSession, usesAprilTagOrigin: Bool) {
         self.session = session
+        self.usesAprilTagOrigin = usesAprilTagOrigin
     }
 
     func attach(to arView: ARView) {
         self.arView = arView
+
+        if tagOverlayView.superview !== arView {
+            tagOverlayView.translatesAutoresizingMaskIntoConstraints = false
+            tagOverlayView.isUserInteractionEnabled = false
+            arView.addSubview(tagOverlayView)
+
+            NSLayoutConstraint.activate([
+                tagOverlayView.leadingAnchor.constraint(equalTo: arView.leadingAnchor),
+                tagOverlayView.trailingAnchor.constraint(equalTo: arView.trailingAnchor),
+                tagOverlayView.topAnchor.constraint(equalTo: arView.topAnchor),
+                tagOverlayView.bottomAnchor.constraint(equalTo: arView.bottomAnchor)
+            ])
+        }
+
+        if isFloorOverlayAttached == false {
+            arView.scene.anchors.append(floorOverlayAnchor)
+            isFloorOverlayAttached = true
+        }
     }
 
     func handleOriginPlacementRequestIfNeeded() {
@@ -93,6 +123,9 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal, .vertical]
         configuration.environmentTexturing = .automatic
+        if usesAprilTagOrigin {
+            configureReferenceTagDetection(on: configuration)
+        }
 
         if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
             configuration.sceneReconstruction = .meshWithClassification
@@ -109,8 +142,99 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
             self?.session.updateMappingStatus(frame.worldMappingStatus)
         }
 
+        if usesAprilTagOrigin {
+            updateReferenceTagOverlay(in: frame)
+            setOriginFromReferenceTagIfNeeded(in: frame)
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.tagOverlayView.clear()
+            }
+        }
+
         if session.shouldUpdateLivePreview {
             processMeshAnchorsIfNeeded(in: arSession)
+        }
+    }
+
+    func configureReferenceTagDetection(on configuration: ARWorldTrackingConfiguration) {
+        guard let referenceImages = ARReferenceImage.referenceImages(inGroupNamed: "AprilTags", bundle: nil) else {
+            return
+        }
+
+        let tag3Images = referenceImages.filter { $0.name == StoredFloorMapConstants.referenceTagName }
+        guard tag3Images.isEmpty == false else {
+            return
+        }
+
+        configuration.detectionImages = Set(tag3Images)
+        configuration.maximumNumberOfTrackedImages = 1
+        configuration.automaticImageScaleEstimationEnabled = false
+    }
+
+    private func setOriginFromReferenceTagIfNeeded(in frame: ARFrame) {
+        guard session.hasOrigin == false else {
+            return
+        }
+
+        guard let tagAnchor = frame.anchors
+            .compactMap({ $0 as? ARImageAnchor })
+            .first(where: { $0.referenceImage.name == StoredFloorMapConstants.referenceTagName }) else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            self?.session.setOrigin(
+                transform: tagAnchor.transform,
+                referenceTagName: StoredFloorMapConstants.referenceTagName
+            )
+        }
+    }
+
+    private func updateReferenceTagOverlay(in frame: ARFrame) {
+        guard let arView else {
+            return
+        }
+
+        guard let tagAnchor = frame.anchors
+            .compactMap({ $0 as? ARImageAnchor })
+            .first(where: { $0.referenceImage.name == StoredFloorMapConstants.referenceTagName }) else {
+            DispatchQueue.main.async { [weak self] in
+                self?.tagOverlayView.clear()
+            }
+            return
+        }
+
+        let detection = AprilTagOverlayDetection(
+            corners: projectedCorners(for: tagAnchor, in: arView, frame: frame),
+            label: "#3"
+        )
+        DispatchQueue.main.async { [weak self] in
+            self?.tagOverlayView.update(detections: [detection])
+        }
+    }
+
+    private func projectedCorners(for anchor: ARImageAnchor, in arView: ARView, frame: ARFrame) -> [CGPoint] {
+        let physicalSize = anchor.referenceImage.physicalSize
+        let halfWidth = Float(physicalSize.width / 2)
+        let halfHeight = Float(physicalSize.height / 2)
+
+        let localCorners = [
+            SIMD4<Float>(-halfWidth, 0, -halfHeight, 1),
+            SIMD4<Float>(halfWidth, 0, -halfHeight, 1),
+            SIMD4<Float>(halfWidth, 0, halfHeight, 1),
+            SIMD4<Float>(-halfWidth, 0, halfHeight, 1)
+        ]
+
+        let orientation = arView.window?.windowScene?.interfaceOrientation ?? .portrait
+        let viewportSize = arView.bounds.size
+
+        return localCorners.map { localCorner in
+            let worldCorner = anchor.transform * localCorner
+            return frame.camera.projectPoint(
+                SIMD3<Float>(worldCorner.x, worldCorner.y, worldCorner.z),
+                orientation: orientation,
+                viewportSize: viewportSize
+            )
         }
     }
 
@@ -157,6 +281,7 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
                     floorTiles: [],
                     mappingStatus: mappingStatus
                 )
+                self?.renderFloorOverlay([])
             }
             return
         }
@@ -182,9 +307,32 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
                         floorTiles: floorMetrics.floorTiles.map { FloorTileSnapshot(center: $0.center) },
                         mappingStatus: mappingStatus
                     )
+                    self.renderFloorOverlay(floorMetrics.floorTiles)
                 }
                 self.isProcessingMeshUpdate = false
             }
+        }
+    }
+
+    private func renderFloorOverlay(_ floorTiles: [FloorTile]) {
+        floorOverlayAnchor.children.removeAll()
+
+        let visualSize = floorTileSize * floorOverlayTileScale
+        let material = SimpleMaterial(
+            color: UIColor(red: 1, green: 0.08, blue: 0.62, alpha: 0.86),
+            roughness: 0.65,
+            isMetallic: false
+        )
+
+        for tile in floorTiles.prefix(180) {
+            let mesh = MeshResource.generateBox(size: [visualSize, 0.003, visualSize])
+            let entity = ModelEntity(mesh: mesh, materials: [material])
+            entity.position = SIMD3<Float>(
+                tile.center.x,
+                tile.center.y + 0.006,
+                tile.center.z
+            )
+            floorOverlayAnchor.addChild(entity)
         }
     }
 

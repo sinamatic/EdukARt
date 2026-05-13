@@ -29,15 +29,11 @@ struct SceneViewContainer: UIViewRepresentable {
 
         arView.session.run(configuration)
 
-        arView.environment.sceneUnderstanding.options.insert(.collision)
         arView.environment.sceneUnderstanding.options.insert(.physics)
-        
-        /*
-        arView.environment.sceneUnderstanding.options.insert(.occlusion)
-        */ // robot disapperas behind real objects
         
         let anchor = context.coordinator.makeScene(from: game)
         arView.scene.anchors.append(anchor)
+        context.coordinator.loadInitialObstacles(from: game)
         
         game.canMoveInRealWorld = { [weak arView, weak coordinator = context.coordinator] currentPosition, candidatePosition in
             guard let arView, let coordinator else {
