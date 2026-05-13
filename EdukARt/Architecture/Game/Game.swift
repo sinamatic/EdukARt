@@ -15,6 +15,8 @@ final class Game: ObservableObject {
     @Published var itemBoxMessage: String?
     @Published var isBlocked = false
     @Published var realRobotTagName: String?
+    @Published var mapOriginMessage: String?
+    @Published var isWaitingForMapOrigin = false
 
     private enum CollectibleLayout {
         static let itemBoxSize = SIMD3<Float>(0.32, 0.32, 0.32)
@@ -56,6 +58,10 @@ final class Game: ObservableObject {
         self.currentController = currentController ?? JoystickController()
         self.currentRobot = robot
         self.selectedMap = selectedMap
+        if let selectedMap, selectedMap.referenceTagName != nil {
+            isWaitingForMapOrigin = true
+            mapOriginMessage = "Scanne AprilTag \(selectedMap.displayReferenceTagNumber), um die Karte auszurichten."
+        }
 
         startMovementLoop()
     }
@@ -120,6 +126,11 @@ final class Game: ObservableObject {
 
     func clearRealRobotTracking() {
         realRobotTagName = nil
+    }
+
+    func markMapOriginAligned() {
+        isWaitingForMapOrigin = false
+        mapOriginMessage = nil
     }
 
     private func canMove(to candidatePosition: SIMD3<Float>) -> Bool {
@@ -217,8 +228,8 @@ final class Game: ObservableObject {
     }
 
     nonisolated private static func makeCoinGrid(from map: StoredFloorMap) -> [Obstacle] {
-        let coinGridSpacing: Float = 0.5
-        let maxCoinCount = 80
+        let coinGridSpacing: Float = 0.75
+        let maxCoinCount = 36
         var occupiedGridCells = Set<String>()
         var coins: [Obstacle] = []
 

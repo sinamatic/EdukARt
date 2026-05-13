@@ -12,6 +12,7 @@ import RealityKit
 struct SceneViewContainer: UIViewRepresentable {
     @ObservedObject var game: Game
     let isDebugEnabled: Bool
+    let onCameraReady: () -> Void
 
     func makeCoordinator() -> SceneCoordinator {
         SceneCoordinator()
@@ -25,15 +26,29 @@ struct SceneViewContainer: UIViewRepresentable {
 
         let debugController = SceneDebugController()
         context.coordinator.debugController = debugController
-        debugController.configureSession(configuration)
-
-        arView.session.run(configuration)
+        let shouldWaitForMapOrigin = context.coordinator.configureMapOriginTracking(configuration, for: game.selectedMap)
+        context.coordinator.onCameraFrameAvailable = onCameraReady
+        if shouldWaitForMapOrigin {
+            configuration.planeDetection = []
+            configuration.environmentTexturing = .none
+            context.coordinator.prepareScene(from: game)
+        } else {
+            debugController.configureSession(configuration)
+        }
 
         arView.environment.sceneUnderstanding.options.insert(.physics)
+        arView.environment.sceneUnderstanding.options.insert(.collision)
+        context.coordinator.attach(to: arView)
+        arView.session.delegate = context.coordinator
+
+        arView.session.run(configuration)
         
-        let anchor = context.coordinator.makeScene(from: game)
-        arView.scene.anchors.append(anchor)
-        context.coordinator.loadInitialObstacles(from: game)
+        if shouldWaitForMapOrigin == false {
+            let anchor = context.coordinator.makeScene(from: game)
+            arView.scene.anchors.append(anchor)
+            context.coordinator.markSceneAnchorAdded()
+            context.coordinator.loadInitialObstacles(from: game)
+        }
         
         game.canMoveInRealWorld = { [weak arView, weak coordinator = context.coordinator] currentPosition, candidatePosition in
             guard let arView, let coordinator else {

@@ -11,9 +11,15 @@ struct GameView: View {
     @StateObject private var game: Game
     @State private var isDebugEnabled = false
     let onBack: () -> Void
+    let onCameraReady: () -> Void
 
-    init(selectedMap: StoredFloorMap? = nil, onBack: @escaping () -> Void = {}) {
+    init(
+        selectedMap: StoredFloorMap? = nil,
+        onCameraReady: @escaping () -> Void = {},
+        onBack: @escaping () -> Void = {}
+    ) {
         _game = StateObject(wrappedValue: Game(selectedMap: selectedMap))
+        self.onCameraReady = onCameraReady
         self.onBack = onBack
     }
 
@@ -22,7 +28,11 @@ struct GameView: View {
             let isLandscape = geometry.size.width > geometry.size.height
 
             ZStack {
-                SceneViewContainer(game: game, isDebugEnabled: isDebugEnabled)
+                SceneViewContainer(
+                    game: game,
+                    isDebugEnabled: isDebugEnabled,
+                    onCameraReady: onCameraReady
+                )
                     .ignoresSafeArea()
 
                 VStack {
@@ -95,6 +105,18 @@ struct GameView: View {
                     .background(.yellow.opacity(0.9))
                     .foregroundStyle(.black)
                     .clipShape(Capsule())
+            }
+
+            if let mapOriginMessage = game.mapOriginMessage {
+                Text(mapOriginMessage)
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.black.opacity(0.72))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(.horizontal, 24)
             }
 
             if let collisionMessage = game.collisionMessage {

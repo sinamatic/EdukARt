@@ -73,6 +73,7 @@ struct MapsView: View {
 
                                     detailRow(title: "Aufgenommen am", value: map.createdAt.formatted(date: .abbreviated, time: .omitted))
                                     detailRow(title: "Um", value: map.createdAt.formatted(date: .omitted, time: .shortened))
+                                    detailRow(title: "AprilTag", value: map.displayReferenceTagNumber)
                                     detailRow(title: "Speichergroesse", value: ByteCountFormatter.string(fromByteCount: Int64(mapStore.estimatedStorageSize(for: map)), countStyle: .file))
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)

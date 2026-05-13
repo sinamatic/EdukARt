@@ -13,6 +13,7 @@ struct RootView: View {
     @State private var loadingProgress: Double = 0
     @State private var hasStartedLaunchSequence = false
     @State private var selectedGameMap: StoredFloorMap?
+    @State private var isGameCameraReady = false
 
     var body: some View {
         Group {
@@ -26,8 +27,20 @@ struct RootView: View {
             case .gameLoading:
                 gameLoadingScreen
             case .game:
-                GameView(selectedMap: selectedGameMap) {
-                    phase = .menu
+                ZStack {
+                    GameView(
+                        selectedMap: selectedGameMap,
+                        onCameraReady: {
+                            isGameCameraReady = true
+                        }
+                    ) {
+                        isGameCameraReady = false
+                        phase = .menu
+                    }
+
+                    if isGameCameraReady == false {
+                        gameLoadingScreen
+                    }
                 }
             case .selectGameMap:
                 gameMapSelectionScreen
@@ -233,6 +246,10 @@ struct RootView: View {
                                 Text("\(map.floorTiles.count) Bodenkacheln")
                                     .font(.footnote.weight(.semibold))
                                     .foregroundStyle(brandGreen)
+
+                                Text("AprilTag \(map.displayReferenceTagNumber)")
+                                    .font(.footnote)
+                                    .foregroundStyle(.white.opacity(0.78))
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(18)
@@ -275,6 +292,7 @@ struct RootView: View {
     @MainActor
     private func runGameStartSequence() async {
         loadingProgress = 0
+        isGameCameraReady = false
         phase = .gameLoading
 
         let steps = 100
@@ -283,7 +301,6 @@ struct RootView: View {
             try? await Task.sleep(for: .milliseconds(42))
         }
 
-        try? await Task.sleep(for: .milliseconds(900))
         phase = .game
     }
 }

@@ -62,6 +62,6 @@ struct ControlPadView: View {
         let normalizedX = Float(offset.width / maxOffset)
         let normalizedY = Float(offset.height / maxOffset)
 
-        return ControlInput(direction: SIMD2<Float>(normalizedX, normalizedY))
+        return ControlInput(direction: SIMD2<Float>(normalizedY, -normalizedX))
     }
 }

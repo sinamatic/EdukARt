@@ -253,7 +253,21 @@ final class MapScanSession: ObservableObject {
             minimumAreaSquareMeters: minimumRequiredAreaSquareMeters,
             floorTileSize: StoredFloorMapConstants.tileSize,
             referenceTagName: referenceTagName,
+            referenceTagNumber: Self.referenceTagNumber(from: referenceTagName),
             floorTiles: storedTiles
         )
+    }
+
+    nonisolated private static func referenceTagNumber(from tagName: String?) -> Int? {
+        guard let tagName else {
+            return nil
+        }
+
+        let trailingDigits = tagName
+            .reversed()
+            .prefix(while: { $0.isNumber })
+            .reversed()
+
+        return Int(String(trailingDigits))
     }
 }

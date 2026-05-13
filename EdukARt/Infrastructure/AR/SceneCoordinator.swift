@@ -17,22 +17,70 @@ enum RealRobotTrackingConstants {
 }
 
 final class SceneCoordinator: NSObject, ARSessionDelegate {
-    private let anchorEntity = AnchorEntity(
-        plane: .horizontal,
-        classification: .any,
-        minimumBounds: SIMD2<Float>(0.5, 0.5)
-    )
+    private let anchorEntity = AnchorEntity(world: matrix_identity_float4x4)
     var debugController: SceneDebugController?
     private let playerEntity = Entity()
     private let playerModelPitchCorrection = simd_quatf(angle: -.pi / 2, axis: [1, 0, 0])
+    private let mapStartRobotOrientation = simd_quatf(angle: -.pi / 2, axis: [0, 1, 0])
+    private let tagOverlayView = AprilTagOverlayView()
     private var realWorldCollisionShape: ShapeResource?
+    private var coinObstacleProbeShape: ShapeResource?
     private var obstacleEntities: [UUID: Entity] = [:]
     private var collectibleTemplates: [String: Entity] = [:]
     private weak var game: Game?
+    private weak var arView: ARView?
     private var lastRealRobotDetectionDate = Date.distantPast
     private var realRobotOrientation: simd_quatf?
     private var hasScheduledInitialObstacles = false
     private var hasLoadedInitialObstacles = false
+    private var isSceneAnchorAdded = false
+    private var mapOriginReferenceTagName: String?
+    private var mapOriginReferenceTagNumber: String?
+    private var isWaitingForMapOrigin = false
+    private var hasAlignedMapOrigin = false
+    private var hasStartedGameplayTracking = false
+    private var hasNotifiedCameraFrameAvailable = false
+    var onCameraFrameAvailable: (() -> Void)?
+
+    func attach(to arView: ARView) {
+        self.arView = arView
+        attachTagOverlay(to: arView)
+    }
+
+    func configureMapOriginTracking(_ configuration: ARWorldTrackingConfiguration, for map: StoredFloorMap?) -> Bool {
+        guard let referenceTagName = map?.referenceTagName else {
+            mapOriginReferenceTagName = nil
+            mapOriginReferenceTagNumber = nil
+            isWaitingForMapOrigin = false
+            return false
+        }
+
+        guard let referenceImages = ARReferenceImage.referenceImages(inGroupNamed: "AprilTags", bundle: nil) else {
+            return false
+        }
+
+        let requiredImages = referenceImages.filter { $0.name == referenceTagName }
+        guard requiredImages.isEmpty == false else {
+            return false
+        }
+
+        mapOriginReferenceTagName = referenceTagName
+        mapOriginReferenceTagNumber = map?.displayReferenceTagNumber
+        isWaitingForMapOrigin = true
+        configuration.detectionImages = Set(requiredImages)
+        configuration.maximumNumberOfTrackedImages = 1
+        configuration.automaticImageScaleEstimationEnabled = false
+        return true
+    }
+
+    func prepareScene(from game: Game) {
+        self.game = game
+        addPlayer(from: game.currentRobot)
+    }
+
+    func markSceneAnchorAdded() {
+        isSceneAnchorAdded = true
+    }
     
     func makeScene(from game: Game) -> AnchorEntity {
         self.game = game
@@ -42,7 +90,12 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
     
     func updateScene(from game: Game, in arView: ARView) {
         if arView.scene.anchors.isEmpty {
+            guard isWaitingForMapOrigin == false || hasAlignedMapOrigin else {
+                return
+            }
+
             arView.scene.anchors.append(makeScene(from: game))
+            markSceneAnchorAdded()
             return
         }
         
@@ -76,7 +129,17 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
     }
 
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        notifyCameraFrameAvailableIfNeeded()
+
         guard let game else {
+            return
+        }
+
+        if updateMapOriginIfNeeded(in: frame) {
+            return
+        }
+
+        guard isWaitingForMapOrigin == false || hasAlignedMapOrigin else {
             return
         }
 
@@ -105,6 +168,170 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
         }
     }
 
+    private func notifyCameraFrameAvailableIfNeeded() {
+        guard hasNotifiedCameraFrameAvailable == false else {
+            return
+        }
+
+        hasNotifiedCameraFrameAvailable = true
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            self.onCameraFrameAvailable?()
+            if self.isWaitingForMapOrigin == false {
+                self.arView?.session.delegate = nil
+            }
+        }
+    }
+
+    private func updateMapOriginIfNeeded(in frame: ARFrame) -> Bool {
+        guard isWaitingForMapOrigin,
+              hasAlignedMapOrigin == false,
+              let mapOriginReferenceTagName else {
+            return false
+        }
+
+        guard let tagAnchor = frame.anchors
+            .compactMap({ $0 as? ARImageAnchor })
+            .first(where: { imageAnchor in
+                imageAnchor.isTracked &&
+                imageAnchor.referenceImage.name == mapOriginReferenceTagName
+            }) else {
+            Task { @MainActor [weak self] in
+                self?.tagOverlayView.clear()
+            }
+            return true
+        }
+
+        updateMapOriginOverlay(for: tagAnchor, in: frame)
+
+        anchorEntity.setTransformMatrix(tagAnchor.transform, relativeTo: nil)
+        playerEntity.position = .zero
+        playerEntity.orientation = mapStartRobotOrientation
+        hasAlignedMapOrigin = true
+
+        if let arView, isSceneAnchorAdded == false {
+            arView.scene.anchors.append(anchorEntity)
+            isSceneAnchorAdded = true
+        }
+
+        startGameplayTrackingIfNeeded()
+
+        if let game {
+            Task { @MainActor in
+                game.markMapOriginAligned()
+            }
+            scheduleInitialObstaclesIfNeeded(for: game)
+        }
+
+        finishMapOriginTracking()
+
+        return false
+    }
+
+    private func startGameplayTrackingIfNeeded() {
+        guard hasStartedGameplayTracking == false,
+              let arView else {
+            return
+        }
+
+        let configuration = ARWorldTrackingConfiguration()
+        configuration.planeDetection = [.horizontal]
+        configuration.environmentTexturing = .automatic
+        debugController?.configureSession(configuration)
+        arView.session.run(configuration, options: [])
+        hasStartedGameplayTracking = true
+    }
+
+    private func finishMapOriginTracking() {
+        isWaitingForMapOrigin = false
+        mapOriginReferenceTagName = nil
+        mapOriginReferenceTagNumber = nil
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            self.tagOverlayView.clear()
+            self.tagOverlayView.removeFromSuperview()
+            self.arView?.session.delegate = nil
+        }
+    }
+
+    private func attachTagOverlay(to arView: ARView) {
+        guard tagOverlayView.superview !== arView else {
+            return
+        }
+
+        tagOverlayView.translatesAutoresizingMaskIntoConstraints = false
+        tagOverlayView.isUserInteractionEnabled = false
+        arView.addSubview(tagOverlayView)
+
+        NSLayoutConstraint.activate([
+            tagOverlayView.leadingAnchor.constraint(equalTo: arView.leadingAnchor),
+            tagOverlayView.trailingAnchor.constraint(equalTo: arView.trailingAnchor),
+            tagOverlayView.topAnchor.constraint(equalTo: arView.topAnchor),
+            tagOverlayView.bottomAnchor.constraint(equalTo: arView.bottomAnchor)
+        ])
+    }
+
+    private func updateMapOriginOverlay(for anchor: ARImageAnchor, in frame: ARFrame) {
+        guard let arView else {
+            return
+        }
+
+        let detection = AprilTagOverlayDetection(
+            corners: projectedCorners(for: anchor, in: arView, frame: frame),
+            label: mapOriginReferenceTagNumber ?? displayNumber(for: anchor.referenceImage.name ?? "AprilTag")
+        )
+
+        Task { @MainActor [weak self] in
+            self?.tagOverlayView.update(detections: [detection])
+        }
+    }
+
+    private func projectedCorners(for anchor: ARImageAnchor, in arView: ARView, frame: ARFrame) -> [CGPoint] {
+        let physicalSize = anchor.referenceImage.physicalSize
+        let halfWidth = Float(physicalSize.width / 2)
+        let halfHeight = Float(physicalSize.height / 2)
+
+        let localCorners = [
+            SIMD4<Float>(-halfWidth, 0, -halfHeight, 1),
+            SIMD4<Float>(halfWidth, 0, -halfHeight, 1),
+            SIMD4<Float>(halfWidth, 0, halfHeight, 1),
+            SIMD4<Float>(-halfWidth, 0, halfHeight, 1)
+        ]
+
+        let orientation = arView.window?.windowScene?.interfaceOrientation ?? .portrait
+        let viewportSize = arView.bounds.size
+
+        return localCorners.map { localCorner in
+            let worldCorner = anchor.transform * localCorner
+            return frame.camera.projectPoint(
+                SIMD3<Float>(worldCorner.x, worldCorner.y, worldCorner.z),
+                orientation: orientation,
+                viewportSize: viewportSize
+            )
+        }
+    }
+
+    private func displayNumber(for tagName: String) -> String {
+        let trailingDigits = tagName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .reversed()
+            .prefix(while: { $0.isNumber })
+            .reversed()
+
+        guard trailingDigits.isEmpty == false else {
+            return tagName
+        }
+
+        return "#\(String(trailingDigits))"
+    }
+
     private func scheduleInitialObstaclesIfNeeded(for game: Game) {
         guard hasScheduledInitialObstacles == false else {
             return
@@ -112,7 +339,7 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
 
         hasScheduledInitialObstacles = true
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self, weak game] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self, weak game] in
             guard let self, let game else {
                 return
             }
@@ -254,6 +481,10 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
             switch obstacle.shape {
             case .box:
                 do {
+                    if shouldSkipCoinBecauseRealWorldIsOccupied(obstacle) {
+                        continue
+                    }
+
                     let collectibleEntity = try makeCollectibleEntity(named: obstacle.modelName)
                     collectibleEntity.orientation = playerModelPitchCorrection
 
@@ -298,6 +529,40 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
         let template = try Entity.load(named: modelName)
         collectibleTemplates[modelName] = template
         return template.clone(recursive: true)
+    }
+
+    private func shouldSkipCoinBecauseRealWorldIsOccupied(_ obstacle: Obstacle) -> Bool {
+        guard obstacle.modelName == "Coin",
+              let arView else {
+            return false
+        }
+
+        let probeShape: ShapeResource
+        if let coinObstacleProbeShape {
+            probeShape = coinObstacleProbeShape
+        } else {
+            let generatedShape = ShapeResource.generateBox(size: SIMD3<Float>(0.18, 0.18, 0.18))
+            coinObstacleProbeShape = generatedShape
+            probeShape = generatedShape
+        }
+
+        let localStart = obstacle.position + SIMD3<Float>(0, 0.45, 0)
+        let localEnd = obstacle.position + SIMD3<Float>(0, 0.12, 0)
+        let worldStart = anchorEntity.convert(position: localStart, to: nil)
+        let worldEnd = anchorEntity.convert(position: localEnd, to: nil)
+
+        let hits = arView.scene.convexCast(
+            convexShape: probeShape,
+            fromPosition: worldStart,
+            fromOrientation: simd_quatf(),
+            toPosition: worldEnd,
+            toOrientation: simd_quatf(),
+            query: .nearest,
+            mask: .sceneUnderstanding,
+            relativeTo: nil
+        )
+
+        return hits.isEmpty == false
     }
 
     private func syncObstacles(from obstacles: [Obstacle]) {

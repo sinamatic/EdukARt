@@ -18,7 +18,27 @@ struct StoredFloorMap: Identifiable, Codable, Equatable {
     let minimumAreaSquareMeters: Float
     let floorTileSize: Float
     let referenceTagName: String?
+    let referenceTagNumber: Int?
     let floorTiles: [StoredFloorTile]
+}
+
+extension StoredFloorMap {
+    var displayReferenceTagNumber: String {
+        if let referenceTagNumber {
+            return "#\(referenceTagNumber)"
+        }
+
+        guard let referenceTagName else {
+            return "Ohne Tag"
+        }
+
+        let trailingDigits = referenceTagName
+            .reversed()
+            .prefix(while: { $0.isNumber })
+            .reversed()
+
+        return trailingDigits.isEmpty ? referenceTagName : "#\(String(trailingDigits))"
+    }
 }
 
 struct StoredFloorTile: Codable, Equatable {
