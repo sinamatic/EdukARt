@@ -225,13 +225,44 @@ private final class MapPreviewCoordinator: NSObject, ARSessionDelegate {
                 continue
             }
 
-            let xValues = rowTiles.map { Int((Float($0.x) / map.floorTileSize).rounded()) }.sorted()
-            guard let minX = xValues.first, let maxX = xValues.last else {
-                continue
+            let tilesByX = Dictionary(grouping: rowTiles, by: { Int((Float($0.x) / map.floorTileSize).rounded()) })
+            let sortedXValues = tilesByX.keys.sorted()
+            var runStart: Int?
+            var previousX: Int?
+            var runHeights: [Float] = []
+
+            func flushRun() {
+                guard let runStart, let previousX, runHeights.isEmpty == false else {
+                    return
+                }
+
+                let averageY = runHeights.reduce(0, +) / Float(runHeights.count)
+                rowSpans.append(PreviewRowSpan(z: row, minX: runStart, maxX: previousX, y: averageY))
+                selfResetRun()
             }
 
-            let averageY = rowTiles.map(\.y).reduce(0, +) / Float(rowTiles.count)
-            rowSpans.append(PreviewRowSpan(z: row, minX: minX, maxX: maxX, y: averageY))
+            func selfResetRun() {
+                runStart = nil
+                previousX = nil
+                runHeights = []
+            }
+
+            for x in sortedXValues {
+                let heights = tilesByX[x]?.map(\.y) ?? []
+                let height = heights.isEmpty ? 0 : heights.reduce(0, +) / Float(heights.count)
+
+                if let currentPreviousX = previousX, x == currentPreviousX + 1 {
+                    previousX = x
+                    runHeights.append(height)
+                } else {
+                    flushRun()
+                    runStart = x
+                    previousX = x
+                    runHeights = [height]
+                }
+            }
+
+            flushRun()
         }
 
         var strips: [PreviewStrip] = []

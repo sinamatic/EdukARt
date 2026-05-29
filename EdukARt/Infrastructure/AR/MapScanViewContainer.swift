@@ -57,8 +57,8 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
     private let floorOverlayAnchor = AnchorEntity(world: .zero)
     private var isProcessingMeshUpdate = false
     private let floorTileSize: Float = StoredFloorMapConstants.tileSize
-    private let floorOverlayTileScale: Float = 0.42
-    private let lowestFloorTolerance: Float = 0.08
+    private let floorOverlayTileScale: Float = 0.72
+    private let floorHeightTolerance: Float = 0.02
     private let meshUpdateInterval: TimeInterval = 1.0
     private var lastMeshProcessingDate = Date.distantPast
     private var handledOriginPlacementRequest = 0
@@ -324,7 +324,7 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
             isMetallic: false
         )
 
-        for tile in floorTiles.prefix(180) {
+        for tile in floorTiles.prefix(900) {
             let mesh = MeshResource.generateBox(size: [visualSize, 0.003, visualSize])
             let entity = ModelEntity(mesh: mesh, materials: [material])
             entity.position = SIMD3<Float>(
@@ -344,62 +344,90 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
             let geometry = anchor.geometry
             let transform = anchor.transform
             let faceCount = geometry.faces.count
-            let sampleStep = max(faceCount / 350, 1)
+            let sampleStep = max(faceCount / 1400, 1)
 
             for faceIndex in stride(from: 0, to: faceCount, by: sampleStep) {
                 let classification = geometry.classificationOf(faceWithIndex: faceIndex)
-                let normal = geometry.worldNormalOf(faceWithIndex: faceIndex, transform: transform)
-                let upwardComponent = simd_dot(normal, SIMD3<Float>(0, 1, 0))
-
-                guard upwardComponent > 0 else {
+                guard classification == .floor else {
                     continue
                 }
 
+                let normal = geometry.worldNormalOf(faceWithIndex: faceIndex, transform: transform)
+                let upwardComponent = simd_dot(normal, SIMD3<Float>(0, 1, 0))
                 let slopeAngle = acos(max(-1, min(1, upwardComponent)))
-                let isFloorLike = classification == .floor || (classification == .none && slopeAngle < (.pi / 4))
-                guard isFloorLike else {
+                guard slopeAngle < (.pi / 12) else {
                     continue
                 }
 
                 let center = geometry.worldCenterOf(faceWithIndex: faceIndex, transform: transform)
                 lowestFaceHeight = min(lowestFaceHeight, center.y)
-                candidateFaces.append(
-                    FloorFace(center: center)
-                )
+                candidateFaces.append(FloorFace(center: center))
             }
         }
 
-        guard lowestFaceHeight.isFinite else {
+        guard lowestFaceHeight.isFinite,
+              let floorHeight = representativeFloorHeight(from: candidateFaces) else {
             return (0, nil, [])
         }
 
-        var tilesByCell: [FloorCellKey: FloorTile] = [:]
+        var cells: [FloorCellKey: FloorCellAccumulator] = [:]
 
-        for face in candidateFaces where face.center.y <= lowestFaceHeight + lowestFloorTolerance {
+        for face in candidateFaces where abs(face.center.y - floorHeight) <= floorHeightTolerance {
             let key = FloorCellKey(
                 x: Int((face.center.x / floorTileSize).rounded()),
                 z: Int((face.center.z / floorTileSize).rounded())
             )
 
-            let tileCenter = SIMD3<Float>(
-                Float(key.x) * floorTileSize,
-                face.center.y,
-                Float(key.z) * floorTileSize
-            )
-
-            if let existingTile = tilesByCell[key] {
-                if tileCenter.y < existingTile.center.y {
-                    tilesByCell[key] = FloorTile(key: key, center: tileCenter)
-                }
-            } else {
-                tilesByCell[key] = FloorTile(key: key, center: tileCenter)
-            }
-
+            cells[key, default: FloorCellAccumulator()].add(height: face.center.y)
         }
 
-        let simplifiedTiles = simplifyFloorTiles(from: tilesByCell)
-        let confirmedFloorArea = Float(simplifiedTiles.count) * floorTileSize * floorTileSize
-        return (confirmedFloorArea, lowestFaceHeight, simplifiedTiles)
+        let floorTiles = cells.compactMap { key, cell -> FloorTile? in
+            guard cell.sampleCount >= 1 else {
+                return nil
+            }
+
+            return FloorTile(
+                key: key,
+                center: SIMD3<Float>(
+                    Float(key.x) * floorTileSize,
+                    cell.averageHeight,
+                    Float(key.z) * floorTileSize
+                )
+            )
+        }
+        .sorted { lhs, rhs in
+            lhs.key.z == rhs.key.z ? lhs.key.x < rhs.key.x : lhs.key.z < rhs.key.z
+        }
+
+        let confirmedFloorArea = Float(floorTiles.count) * floorTileSize * floorTileSize
+        return (confirmedFloorArea, floorHeight, floorTiles)
+    }
+
+    private func representativeFloorHeight(from faces: [FloorFace]) -> Float? {
+        let sortedHeights = faces.map(\.center.y).sorted()
+        guard sortedHeights.isEmpty == false else {
+            return nil
+        }
+
+        let minimumClusterSize = max(3, sortedHeights.count / 80)
+
+        for startIndex in sortedHeights.indices {
+            var endIndex = startIndex
+            while endIndex + 1 < sortedHeights.count,
+                  sortedHeights[endIndex + 1] - sortedHeights[startIndex] <= floorHeightTolerance {
+                endIndex += 1
+            }
+
+            let clusterSize = endIndex - startIndex + 1
+            guard clusterSize >= minimumClusterSize else {
+                continue
+            }
+
+            let cluster = sortedHeights[startIndex...endIndex]
+            return cluster.reduce(0, +) / Float(cluster.count)
+        }
+
+        return sortedHeights.first
     }
 
     private func simplifyFloorTiles(from tilesByCell: [FloorCellKey: FloorTile]) -> [FloorTile] {
@@ -533,6 +561,20 @@ private extension ARMeshGeometry {
 
 private struct FloorFace {
     let center: SIMD3<Float>
+}
+
+private struct FloorCellAccumulator {
+    private(set) var heightSum: Float = 0
+    private(set) var sampleCount: Int = 0
+
+    var averageHeight: Float {
+        sampleCount == 0 ? 0 : heightSum / Float(sampleCount)
+    }
+
+    mutating func add(height: Float) {
+        heightSum += height
+        sampleCount += 1
+    }
 }
 
 private struct SimplifiedRow {

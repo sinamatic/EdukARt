@@ -7,7 +7,7 @@
 import Foundation
 
 enum StoredFloorMapConstants {
-    static let tileSize: Float = 0.25
+    static let tileSize: Float = 0.12
     static let referenceTagName = "tag36h11-1"
 }
 
