@@ -46,7 +46,7 @@ final class MapScanSession: ObservableObject {
     var titleText: String {
         switch phase {
         case .placingOrigin:
-            originMode == .aprilTag ? "AprilTag #3 suchen" : "Startpunkt setzen"
+            originMode == .aprilTag ? "AprilTag #1 suchen" : "Startpunkt setzen"
         case .scanningFloor:
             "Bodenflaeche scannen"
         case .reviewBeforeSave:
@@ -60,13 +60,13 @@ final class MapScanSession: ObservableObject {
         return switch phase {
         case .placingOrigin:
             if originMode == .aprilTag {
-                "Richte die Kamera auf AprilTag #3. Sobald der Tag erkannt wird, startet der Umgebungsscan automatisch von diesem Punkt aus."
+                "Richte die Kamera auf AprilTag #1. Sobald der Tag erkannt wird, startet der Umgebungsscan automatisch von diesem Punkt aus."
             } else {
                 "Richte die Kamera auf den Boden an der Stelle, an der die Karte beginnen soll. Tippe dann auf \"Startpunkt setzen\"."
             }
         case .scanningFloor:
             if originMode == .aprilTag {
-                "AprilTag #3 ist gesetzt. Scanne jetzt die Umgebung weiter. Es muessen mindestens 2 m² bestaetigt sein."
+                "AprilTag #1 ist gesetzt. Scanne jetzt die Umgebung weiter. Es muessen mindestens 2 m² bestaetigt sein."
             } else {
                 "Der Startpunkt ist gesetzt. Scanne jetzt die Umgebung weiter. Es muessen mindestens 2 m² bestaetigt sein."
             }
@@ -95,7 +95,7 @@ final class MapScanSession: ObservableObject {
     var originStatusText: String {
         switch originMode {
         case .aprilTag:
-            hasOrigin ? "Tag #3 gesetzt" : "Tag #3 suchen"
+            hasOrigin ? "Tag #1 gesetzt" : "Tag #1 suchen"
         case .manualFloorPoint:
             hasOrigin ? "Startpunkt gesetzt" : "Startpunkt offen"
         }
@@ -209,7 +209,7 @@ final class MapScanSession: ObservableObject {
 
         guard let map = makeStoredMap(named: name) else {
             saveMessage = originMode == .aprilTag
-                ? "Zum Speichern muss zuerst AprilTag #3 erkannt und mindestens 2 m² Boden erkannt sein."
+                ? "Zum Speichern muss zuerst AprilTag #1 erkannt und mindestens 2 m² Boden erkannt sein."
                 : "Zum Speichern muss zuerst der Startpunkt gesetzt und mindestens 2 m² Boden erkannt sein."
             return
         }

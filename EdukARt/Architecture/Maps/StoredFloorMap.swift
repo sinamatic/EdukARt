@@ -8,7 +8,7 @@ import Foundation
 
 enum StoredFloorMapConstants {
     static let tileSize: Float = 0.25
-    static let referenceTagName = "tag36h11-3"
+    static let referenceTagName = "tag36h11-1"
 }
 
 struct StoredFloorMap: Identifiable, Codable, Equatable {
@@ -23,21 +23,21 @@ struct StoredFloorMap: Identifiable, Codable, Equatable {
 }
 
 extension StoredFloorMap {
-    var displayReferenceTagNumber: String {
-        if let referenceTagNumber {
-            return "#\(referenceTagNumber)"
-        }
+    var activeReferenceTagName: String? {
+        referenceTagName == nil ? nil : StoredFloorMapConstants.referenceTagName
+    }
 
-        guard let referenceTagName else {
+    var displayReferenceTagNumber: String {
+        guard let activeReferenceTagName else {
             return "Ohne Tag"
         }
 
-        let trailingDigits = referenceTagName
+        let trailingDigits = activeReferenceTagName
             .reversed()
             .prefix(while: { $0.isNumber })
             .reversed()
 
-        return trailingDigits.isEmpty ? referenceTagName : "#\(String(trailingDigits))"
+        return trailingDigits.isEmpty ? activeReferenceTagName : "#\(String(trailingDigits))"
     }
 }
 

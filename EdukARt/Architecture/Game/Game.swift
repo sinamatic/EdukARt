@@ -11,6 +11,11 @@ import simd
 import UIKit
 
 final class Game: ObservableObject {
+    enum RobotMode {
+        case simulation
+        case real
+    }
+
     enum SpeedMode: String, CaseIterable, Identifiable {
         case slow = "Langsam"
         case normal = "Normal"
@@ -49,6 +54,9 @@ final class Game: ObservableObject {
     @Published var realRobotTagName: String?
     @Published var mapOriginMessage: String?
     @Published var isWaitingForMapOrigin = false
+    @Published var isChoosingRobotMode = false
+    @Published var isWaitingForRealRobot = false
+    @Published var robotMode: RobotMode?
     @Published var speedMode: SpeedMode = .normal
     @Published var robotYaw: Float = 0
 
@@ -97,6 +105,8 @@ final class Game: ObservableObject {
         if let selectedMap, selectedMap.referenceTagName != nil {
             isWaitingForMapOrigin = true
             mapOriginMessage = "Scanne AprilTag \(selectedMap.displayReferenceTagNumber), um die Karte auszurichten."
+        } else {
+            robotMode = .simulation
         }
 
         startMovementLoop()
@@ -125,7 +135,9 @@ final class Game: ObservableObject {
     }
 
     private func applyCurrentInput() {
-        guard isRealRobotTracked == false else {
+        guard isChoosingRobotMode == false,
+              isWaitingForRealRobot == false,
+              isRealRobotTracked == false else {
             isBlocked = false
             collisionMessage = nil
             return
@@ -138,7 +150,8 @@ final class Game: ObservableObject {
             robotYaw += rotationStep
         }
 
-        let candidatePosition = currentRobot.move(
+        let candidatePosition = makeMovementCandidate(
+            from: currentRobot.position,
             input: input,
             step: speedMode.metersPerSecond / movementTicksPerSecond
         )
@@ -163,8 +176,35 @@ final class Game: ObservableObject {
         }
     }
 
+    private func makeMovementCandidate(from position: SIMD3<Float>, input: ControlInput, step: Float) -> SIMD3<Float> {
+        var localDelta = SIMD3<Float>(0, 0, 0)
+
+        if input.isForwardPressed {
+            localDelta.z -= step
+        }
+
+        if input.isBackwardPressed {
+            localDelta.z += step
+        }
+
+        if input.isLeftPressed {
+            localDelta.x -= step
+        }
+
+        if input.isRightPressed {
+            localDelta.x += step
+        }
+
+        let yawRotation = simd_quatf(angle: robotYaw, axis: [0, 1, 0])
+        return position + yawRotation.act(localDelta)
+    }
+
     func syncRealRobot(tagName: String, position: SIMD3<Float>) {
         objectWillChange.send()
+        robotMode = .real
+        isWaitingForRealRobot = false
+        isChoosingRobotMode = false
+        mapOriginMessage = nil
         realRobotTagName = tagName
         currentRobot.position = position
         collectItemBoxesIfNeeded(at: position)
@@ -180,6 +220,22 @@ final class Game: ObservableObject {
     func markMapOriginAligned() {
         isWaitingForMapOrigin = false
         mapOriginMessage = nil
+        isChoosingRobotMode = true
+    }
+
+    func selectSimulationRobot() {
+        robotMode = .simulation
+        isChoosingRobotMode = false
+        isWaitingForRealRobot = false
+        realRobotTagName = nil
+    }
+
+    func selectRealRobot() {
+        robotMode = .real
+        isChoosingRobotMode = false
+        isWaitingForRealRobot = true
+        realRobotTagName = nil
+        mapOriginMessage = "Scanne AprilTag #1 am echten Roboter."
     }
 
     private func canMove(to candidatePosition: SIMD3<Float>) -> Bool {

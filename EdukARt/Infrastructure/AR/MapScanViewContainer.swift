@@ -161,12 +161,12 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
             return
         }
 
-        let tag3Images = referenceImages.filter { $0.name == StoredFloorMapConstants.referenceTagName }
-        guard tag3Images.isEmpty == false else {
+        let referenceTagImages = referenceImages.filter { $0.name == StoredFloorMapConstants.referenceTagName }
+        guard referenceTagImages.isEmpty == false else {
             return
         }
 
-        configuration.detectionImages = Set(tag3Images)
+        configuration.detectionImages = Set(referenceTagImages)
         configuration.maximumNumberOfTrackedImages = 1
         configuration.automaticImageScaleEstimationEnabled = false
     }
@@ -206,7 +206,7 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
 
         let detection = AprilTagOverlayDetection(
             corners: projectedCorners(for: tagAnchor, in: arView, frame: frame),
-            label: "#3"
+            label: "#1"
         )
         DispatchQueue.main.async { [weak self] in
             self?.tagOverlayView.update(detections: [detection])

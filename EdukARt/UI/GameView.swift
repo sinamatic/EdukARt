@@ -77,22 +77,54 @@ struct GameView: View {
 
                 VStack(spacing: 12) {
                     statusMessages
-                    speedControls
+                    if game.isChoosingRobotMode == false && game.isWaitingForRealRobot == false {
+                        speedControls
+                    }
                 }
                 .padding(.bottom, isLandscape ? 40 : 190)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
 
-                RotationPadView(onRotationChanged: game.updateRotationInput)
-                    .padding(.leading, isLandscape ? 32 : 28)
-                    .padding(.bottom, isLandscape ? 32 : 40)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                if game.isChoosingRobotMode == false && game.isWaitingForRealRobot == false && game.isRealRobotTracked == false {
+                    RotationPadView(onRotationChanged: game.updateRotationInput)
+                        .padding(.leading, isLandscape ? 32 : 28)
+                        .padding(.bottom, isLandscape ? 32 : 40)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
 
-                ControlPadView(onInputChanged: game.updateInput)
-                    .padding(.trailing, isLandscape ? 32 : 28)
-                    .padding(.bottom, isLandscape ? 32 : 40)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    ControlPadView(onInputChanged: game.updateInput)
+                        .padding(.trailing, isLandscape ? 32 : 28)
+                        .padding(.bottom, isLandscape ? 32 : 40)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                }
+
+                if game.isChoosingRobotMode {
+                    robotModeSelection
+                }
             }
         }
+    }
+
+    private var robotModeSelection: some View {
+        VStack(spacing: 16) {
+            Text("Roboter auswählen")
+                .font(.headline)
+                .foregroundStyle(.white)
+
+            HStack(spacing: 12) {
+                Button("Simulation") {
+                    game.selectSimulationRobot()
+                }
+                .buttonStyle(RobotModeButtonStyle(isRecommended: false))
+
+                Button("Echter Roboter") {
+                    game.selectRealRobot()
+                }
+                .buttonStyle(RobotModeButtonStyle(isRecommended: true))
+            }
+        }
+        .padding(20)
+        .background(.black.opacity(0.78))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, 24)
     }
 
     private var speedControls: some View {
@@ -159,5 +191,19 @@ struct GameView: View {
         }
 
         return "#\(String(trailingDigits))"
+    }
+}
+
+private struct RobotModeButtonStyle: ButtonStyle {
+    let isRecommended: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background(isRecommended ? .green.opacity(configuration.isPressed ? 0.65 : 0.9) : .white.opacity(configuration.isPressed ? 0.18 : 0.12))
+            .foregroundStyle(isRecommended ? .black : .white)
+            .clipShape(Capsule())
     }
 }

@@ -10,7 +10,7 @@ import RealityKit
 import UIKit
 
 enum RealRobotTrackingConstants {
-    static let robotTagName = "tag36h11-2"
+    static let robotTagName = "tag36h11-1"
     static let tagHeightOffset: Float = 0.10
     static let trackingLossGracePeriod: TimeInterval = 2.5
     static let imageForwardSign: Float = -1
@@ -46,12 +46,15 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
     private var realRobotOrientation: simd_quatf?
     private var hasScheduledInitialObstacles = false
     private var hasLoadedInitialObstacles = false
+    private var lastVisibleCoinSpawnDate = Date.distantPast
     private var isSceneAnchorAdded = false
     private var mapOriginReferenceTagName: String?
     private var mapOriginReferenceTagNumber: String?
     private var isWaitingForMapOrigin = false
     private var hasAlignedMapOrigin = false
     private var hasStartedGameplayTracking = false
+    private var isWaitingForRealRobotPlacement = false
+    private var hasPlacedRealRobot = false
     private var hasNotifiedCameraFrameAvailable = false
     var onCameraFrameAvailable: (() -> Void)?
 
@@ -61,7 +64,7 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
     }
 
     func configureMapOriginTracking(_ configuration: ARWorldTrackingConfiguration, for map: StoredFloorMap?) -> Bool {
-        guard let referenceTagName = map?.referenceTagName else {
+        guard let referenceTagName = map?.activeReferenceTagName else {
             mapOriginReferenceTagName = nil
             mapOriginReferenceTagNumber = nil
             isWaitingForMapOrigin = false
@@ -82,6 +85,7 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
         isWaitingForMapOrigin = true
         configuration.detectionImages = Set(requiredImages)
         configuration.maximumNumberOfTrackedImages = 1
+        configuration.isAutoFocusEnabled = true
         configuration.automaticImageScaleEstimationEnabled = false
         return true
     }
@@ -113,7 +117,12 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
         }
         
         setPlayerVisibility(isVisible: game.isRealRobotTracked == false)
-        updateWheelRotation(for: game.currentRobot.position, yaw: game.robotYaw)
+        if game.isWaitingForRealRobot {
+            startRealRobotPlacementTrackingIfNeeded()
+        }
+        if game.isRealRobotTracked == false {
+            updateWheelRotation(for: game.currentRobot.position, yaw: game.robotYaw)
+        }
         playerEntity.position = game.currentRobot.position
         if let realRobotOrientation {
             playerEntity.orientation = realRobotOrientation
@@ -160,6 +169,10 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
         }
 
         scheduleInitialObstaclesIfNeeded(for: game)
+
+        guard game.isWaitingForRealRobot || game.isRealRobotTracked else {
+            return
+        }
 
         guard let robotAnchor = frame.anchors
             .compactMap({ $0 as? ARImageAnchor })
@@ -256,10 +269,27 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
 
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal]
-        configuration.environmentTexturing = .automatic
+        configuration.environmentTexturing = .none
         debugController?.configureSession(configuration)
         arView.session.run(configuration, options: [])
         hasStartedGameplayTracking = true
+    }
+
+    private func startRealRobotPlacementTrackingIfNeeded() {
+        guard isWaitingForRealRobotPlacement == false,
+              let arView else {
+            return
+        }
+
+        let configuration = ARWorldTrackingConfiguration()
+        configuration.planeDetection = [.horizontal]
+        configuration.environmentTexturing = .none
+        configureRealRobotTracking(configuration)
+        debugController?.configureSession(configuration)
+        arView.session.delegate = self
+        arView.session.run(configuration, options: [])
+        isWaitingForRealRobotPlacement = true
+        lastRealRobotDetectionDate = Date()
     }
 
     private func finishMapOriginTracking() {
@@ -356,12 +386,13 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
 
         hasScheduledInitialObstacles = true
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self, weak game] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self, weak game] in
             guard let self, let game else {
                 return
             }
 
-            self.addObstaclesSequentially(Array(game.currentScene.level.obstacles))
+            self.hasLoadedInitialObstacles = true
+            self.addObstacles(from: Array(game.currentScene.level.obstacles))
         }
     }
 
@@ -504,8 +535,9 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
         self.lastWheelRobotPosition = robotPosition
         self.lastWheelRobotYaw = yaw
 
-        let forwardDistance = -delta.x
-        let lateralDistance = delta.z
+        let localDelta = simd_quatf(angle: -yaw, axis: [0, 1, 0]).act(delta)
+        let forwardDistance = -localDelta.x
+        let lateralDistance = localDelta.z
         let rotationDistance = yawDelta * 0.18
         guard abs(forwardDistance) > 0.0001 || abs(lateralDistance) > 0.0001 || abs(rotationDistance) > 0.0001 else {
             return
@@ -542,6 +574,10 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
     
     
     private func addObstacles(from obstacles: [Obstacle]) {
+        let canSpawnCoins = Date().timeIntervalSince(lastVisibleCoinSpawnDate) > 0.25
+        var spawnedCoinCount = 0
+        var didSpawnCoin = false
+
         for obstacle in obstacles {
             guard obstacleEntities[obstacle.id] == nil else {
                 continue
@@ -550,11 +586,20 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
             switch obstacle.shape {
             case .box:
                 do {
+                    if obstacle.modelName == "Coin" {
+                        guard canSpawnCoins,
+                              spawnedCoinCount < 3,
+                              isCoinVisibleEnoughToSpawn(obstacle) else {
+                            continue
+                        }
+                    }
+
                     if shouldSkipCoinBecauseRealWorldIsOccupied(obstacle) {
                         continue
                     }
 
                     let collectibleEntity = try makeCollectibleEntity(named: obstacle.modelName)
+                    collectibleEntity.name = obstacle.modelName
                     collectibleEntity.orientation = playerModelPitchCorrection
 
                     let bounds = collectibleEntity.visualBounds(relativeTo: collectibleEntity)
@@ -577,6 +622,8 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
                     anchorEntity.addChild(collectibleEntity)
                     obstacleEntities[obstacle.id] = collectibleEntity
                     if obstacle.modelName == "Coin" {
+                        spawnedCoinCount += 1
+                        didSpawnCoin = true
                         startCoinRotationAnimation(for: collectibleEntity, delay: coinAnimationDelay(for: obstacle))
                     } else {
                         startFloatingAnimation(for: collectibleEntity, basePosition: basePosition)
@@ -588,6 +635,9 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
             }
         }
 
+        if didSpawnCoin {
+            lastVisibleCoinSpawnDate = Date()
+        }
     }
 
     private func makeCollectibleEntity(named modelName: String) throws -> Entity {
@@ -634,6 +684,20 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
         return hits.isEmpty == false
     }
 
+    private func isCoinVisibleEnoughToSpawn(_ obstacle: Obstacle) -> Bool {
+        guard obstacle.modelName == "Coin",
+              let arView else {
+            return true
+        }
+
+        let worldPosition = anchorEntity.convert(position: obstacle.position, to: nil)
+        guard let screenPoint = arView.project(worldPosition) else {
+            return false
+        }
+
+        return arView.bounds.insetBy(dx: -80, dy: -80).contains(screenPoint)
+    }
+
     private func syncObstacles(from obstacles: [Obstacle]) {
         addObstacles(from: obstacles)
 
@@ -642,7 +706,11 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
 
         for removedID in removedIDs {
             if let entity = obstacleEntities.removeValue(forKey: removedID) {
-                animateRemoval(of: entity)
+                if entity.name == "Coin" {
+                    entity.removeFromParent()
+                } else {
+                    animateRemoval(of: entity)
+                }
             }
         }
     }

@@ -59,7 +59,7 @@ struct MapPreviewView: View {
                         .foregroundStyle(.white)
                     Text(map.referenceTagName == nil
                          ? "Richte die Kamera auf den Boden und platziere die gespeicherte Karte an der aktuellen Position."
-                         : "Richte die Kamera auf AprilTag #3. Die gespeicherte Karte wird automatisch an diesem Marker ausgerichtet.")
+                         : "Richte die Kamera auf AprilTag #1. Die gespeicherte Karte wird automatisch an diesem Marker ausgerichtet.")
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.84))
 
@@ -137,7 +137,7 @@ private final class MapPreviewCoordinator: NSObject, ARSessionDelegate {
     }
 
     func configureReferenceTagDetection(on configuration: ARWorldTrackingConfiguration) {
-        guard let requiredTagName = map.referenceTagName else {
+        guard let requiredTagName = map.activeReferenceTagName else {
             statusText.wrappedValue = "Auf Boden ausrichten"
             return
         }
@@ -158,7 +158,7 @@ private final class MapPreviewCoordinator: NSObject, ARSessionDelegate {
     }
 
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        guard let requiredTagName = map.referenceTagName else {
+        guard let requiredTagName = map.activeReferenceTagName else {
             return
         }
 
@@ -166,7 +166,7 @@ private final class MapPreviewCoordinator: NSObject, ARSessionDelegate {
             .compactMap({ $0 as? ARImageAnchor })
             .first(where: { $0.referenceImage.name == requiredTagName }) else {
             if renderedAnchorIdentifier == nil {
-                statusText.wrappedValue = "Suche AprilTag #3"
+                statusText.wrappedValue = "Suche AprilTag #1"
             }
             return
         }
@@ -177,7 +177,7 @@ private final class MapPreviewCoordinator: NSObject, ARSessionDelegate {
 
         renderedAnchorIdentifier = tagAnchor.identifier
         renderMap(relativeTo: tagAnchor.transform)
-        statusText.wrappedValue = "Karte an Tag #3 ausgerichtet"
+        statusText.wrappedValue = "Karte an Tag #1 ausgerichtet"
     }
 
     private func placeMapAtScreenCenter() {
