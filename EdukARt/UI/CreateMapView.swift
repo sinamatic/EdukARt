@@ -22,6 +22,7 @@ struct CreateMapView: View {
     @State private var mapName = ""
     @State private var scanUsesAprilTag = true
     let onClose: () -> Void
+    let onStartGame: (StoredFloorMap) -> Void
 
     var body: some View {
         ZStack {
@@ -236,6 +237,13 @@ struct CreateMapView: View {
                     .buttonStyle(PrimaryScanButtonStyle())
                     .disabled(mapScanSession.canSaveMap == false)
                     .opacity(mapScanSession.canSaveMap || mapScanSession.isSaving || mapScanSession.hasSavedCurrentScan ? 1 : 0.55)
+
+                    if let savedMap = mapScanSession.savedMap {
+                        Button("Start Game with this map") {
+                            onStartGame(savedMap)
+                        }
+                        .buttonStyle(PrimaryScanButtonStyle())
+                    }
                 }
 
                 if let saveMessage = mapScanSession.saveMessage {

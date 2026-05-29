@@ -34,6 +34,7 @@ final class MapScanSession: ObservableObject {
     @Published private(set) var originPlacementRequest = 0
     @Published private(set) var isSaving = false
     @Published private(set) var hasSavedCurrentScan = false
+    @Published private(set) var savedMap: StoredFloorMap?
     @Published var saveMessage: String?
 
     let minimumRequiredAreaSquareMeters: Float = 2
@@ -165,6 +166,7 @@ final class MapScanSession: ObservableObject {
         currentFloorTiles = []
         isSaving = false
         hasSavedCurrentScan = false
+        savedMap = nil
         saveMessage = nil
     }
 
@@ -220,10 +222,12 @@ final class MapScanSession: ObservableObject {
             try store.save(map)
             isSaving = false
             hasSavedCurrentScan = true
+            savedMap = map
             phase = .saved
             saveMessage = "Karte \"\(map.name)\" gespeichert."
         } catch {
             isSaving = false
+            savedMap = nil
             saveMessage = "Speichern fehlgeschlagen: \(error.localizedDescription)"
         }
     }

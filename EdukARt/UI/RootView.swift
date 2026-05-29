@@ -45,9 +45,18 @@ struct RootView: View {
             case .selectGameMap:
                 gameMapSelectionScreen
             case .createMap:
-                CreateMapView(mapStore: mapStore) {
-                    phase = .menu
-                }
+                CreateMapView(
+                    mapStore: mapStore,
+                    onClose: {
+                        phase = .menu
+                    },
+                    onStartGame: { map in
+                        selectedGameMap = map
+                        Task {
+                            await runGameStartSequence()
+                        }
+                    }
+                )
             case .viewMaps:
                 MapsView(mapStore: mapStore) {
                     phase = .menu
