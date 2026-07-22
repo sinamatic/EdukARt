@@ -123,6 +123,7 @@ final class AprilTagSearchCoordinator: NSObject, ARSessionDelegate {
         Task { @MainActor [weak self] in
             self?.session.setFailureMessage(error.localizedDescription)
             self?.overlayView.clear()
+            
         }
     }
 
