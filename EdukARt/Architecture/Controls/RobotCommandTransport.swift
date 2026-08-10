@@ -9,35 +9,41 @@ protocol RobotCommandTransport: AnyObject {
     var targetHost: String { get }
     var targetPort: UInt16 { get }
 
-    func sendDrive(input: ControlInput, rotation: Float)
-    func sendEnable()
-    func sendStop()
+    func send(topic: String, messageType: String, message: [String: ROSValue])
+    func call(service: String, serviceType: String, request: [String: ROSValue])
 }
 
-struct RobotRemoteCommand: Codable {
-    let type: String
-    let x: Float
-    let y: Float
-    let rotation: Float
-    let timestamp: TimeInterval
+indirect enum ROSValue: Encodable {
+    case bool(Bool)
+    case double(Double)
+    case string(String)
+    case object([String: ROSValue])
 
-    static func drive(input: ControlInput, rotation: Float) -> RobotRemoteCommand {
-        RobotRemoteCommand(
-            type: "drive",
-            x: input.direction.x,
-            y: input.direction.y,
-            rotation: rotation,
-            timestamp: Date().timeIntervalSince1970
-        )
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .bool(let value):
+            try container.encode(value)
+        case .double(let value):
+            try container.encode(value)
+        case .string(let value):
+            try container.encode(value)
+        case .object(let value):
+            try container.encode(value)
+        }
     }
+}
 
-    static func action(_ type: String) -> RobotRemoteCommand {
-        RobotRemoteCommand(
-            type: type,
-            x: 0,
-            y: 0,
-            rotation: 0,
-            timestamp: Date().timeIntervalSince1970
-        )
-    }
+struct ROSPublishCommand: Encodable {
+    let kind = "publish"
+    let topic: String
+    let messageType: String
+    let message: [String: ROSValue]
+}
+
+struct ROSServiceCommand: Encodable {
+    let kind = "service"
+    let service: String
+    let serviceType: String
+    let request: [String: ROSValue]
 }

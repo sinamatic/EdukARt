@@ -9,6 +9,7 @@ import SwiftUI
 
 struct RootView: View {
     @StateObject private var mapStore = MapStore()
+    @StateObject private var robotRemoteController = RobotRemoteController()
     @State private var phase: LaunchPhase = .logo
     @State private var loadingProgress: Double = 0
     @State private var hasStartedLaunchSequence = false
@@ -24,6 +25,11 @@ struct RootView: View {
                 loadingScreen
             case .menu:
                 menuScreen
+            case .remoteControl:
+                RobotRemoteControlScreen(controller: robotRemoteController) {
+                    robotRemoteController.disconnect()
+                    phase = .menu
+                }
             case .gameLoading:
                 gameLoadingScreen
             case .game:
@@ -160,6 +166,11 @@ struct RootView: View {
                 Spacer()
 
                 VStack(spacing: 14) {
+                    Button("Remote Control Robot") {
+                        phase = .remoteControl
+                    }
+                    .buttonStyle(StartScreenButtonStyle(fillColor: .black.opacity(0.62), foregroundColor: .white))
+
                     Button("Start Game") {
                         if mapStore.maps.isEmpty {
                             selectedGameMap = nil
@@ -311,6 +322,10 @@ struct RootView: View {
         }
 
         phase = .game
+        try? await Task.sleep(for: .seconds(1))
+        if isGameCameraReady == false {
+            isGameCameraReady = true
+        }
     }
 }
 
@@ -318,6 +333,7 @@ private enum LaunchPhase {
     case logo
     case loading
     case menu
+    case remoteControl
     case gameLoading
     case game
     case selectGameMap
@@ -356,3 +372,4 @@ private struct CompactOverlayButtonStyle: ButtonStyle {
             .clipShape(Capsule())
     }
 }
+

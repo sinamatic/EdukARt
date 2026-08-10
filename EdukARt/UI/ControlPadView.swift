@@ -9,7 +9,13 @@ import SwiftUI
 import simd
 
 struct ControlPadView: View {
+    enum AxisMapping {
+        case game
+        case natural
+    }
+
     let onInputChanged: (ControlInput) -> Void
+    var axisMapping: AxisMapping = .game
 
     @State private var knobOffset: CGSize = .zero
 
@@ -62,7 +68,12 @@ struct ControlPadView: View {
         let normalizedX = Float(offset.width / maxOffset)
         let normalizedY = Float(offset.height / maxOffset)
 
-        return ControlInput(direction: SIMD2<Float>(normalizedY, -normalizedX))
+        switch axisMapping {
+        case .game:
+            return ControlInput(direction: SIMD2<Float>(normalizedY, -normalizedX))
+        case .natural:
+            return ControlInput(direction: SIMD2<Float>(normalizedX, normalizedY))
+        }
     }
 }
 
