@@ -8,6 +8,7 @@ import ARKit
 import RealityKit
 import SwiftUI
 import UIKit
+import Vision
 
 struct AprilTagDetectionViewContainer: UIViewRepresentable {
     @ObservedObject var session: AprilTagDetectionSession
@@ -36,7 +37,11 @@ final class AprilTagDetectionCoordinator: NSObject, ARSessionDelegate {
 
     private weak var arView: ARView?
     private let overlayView = AprilTagOverlayView()
+    private let rectangleDetectionQueue = DispatchQueue(label: "AprilTagDetectionCoordinator.rectangles", qos: .userInitiated)
     private var hasStartedSession = false
+    private var isDetectingRectangles = false
+    private var lastRectangleDetectionDate = Date.distantPast
+    private let rectangleDetectionInterval: TimeInterval = 0.25
 
     init(session: AprilTagDetectionSession) {
         self.session = session
@@ -73,13 +78,7 @@ final class AprilTagDetectionCoordinator: NSObject, ARSessionDelegate {
             return
         }
 
-        let configuration = ARWorldTrackingConfiguration()
-        configuration.planeDetection = []
-        configuration.environmentTexturing = .none
-        configuration.detectionImages = referenceImages
-        configuration.maximumNumberOfTrackedImages = referenceImages.count
-        configuration.isAutoFocusEnabled = true
-        configuration.automaticImageScaleEstimationEnabled = false
+        let configuration = makeImageDetectionConfiguration(referenceImages: referenceImages)
 
         Task { @MainActor [weak self] in
             self?.session.setSearchingMessage()
@@ -112,10 +111,7 @@ final class AprilTagDetectionCoordinator: NSObject, ARSessionDelegate {
                 self?.overlayView.update(detections: detections)
             }
         } else {
-            Task { @MainActor [weak self] in
-                self?.session.updateDetection(tagNames: [], isTracked: false)
-                self?.overlayView.clear()
-            }
+            detectRectangleCandidatesIfNeeded(in: frame, viewportSize: arView.bounds.size)
         }
     }
 
@@ -131,6 +127,112 @@ final class AprilTagDetectionCoordinator: NSObject, ARSessionDelegate {
         Task { @MainActor [weak self] in
             self?.session.setFailureMessage("Camera interrupted")
             self?.overlayView.clear()
+        }
+    }
+
+    private func makeImageDetectionConfiguration(referenceImages: Set<ARReferenceImage>) -> ARConfiguration {
+        if ARImageTrackingConfiguration.isSupported {
+            let configuration = ARImageTrackingConfiguration()
+            configuration.trackingImages = referenceImages
+            configuration.maximumNumberOfTrackedImages = referenceImages.count
+            configuration.isAutoFocusEnabled = true
+            return configuration
+        }
+
+        let configuration = ARWorldTrackingConfiguration()
+        configuration.planeDetection = []
+        configuration.environmentTexturing = .none
+        configuration.detectionImages = referenceImages
+        configuration.maximumNumberOfTrackedImages = referenceImages.count
+        configuration.isAutoFocusEnabled = true
+        configuration.automaticImageScaleEstimationEnabled = true
+        return configuration
+    }
+
+    private func detectRectangleCandidatesIfNeeded(in frame: ARFrame, viewportSize: CGSize) {
+        guard isDetectingRectangles == false else {
+            return
+        }
+
+        guard Date().timeIntervalSince(lastRectangleDetectionDate) >= rectangleDetectionInterval else {
+            Task { @MainActor [weak self] in
+                self?.session.updateDetection(tagNames: [], isTracked: false)
+            }
+            return
+        }
+
+        isDetectingRectangles = true
+        lastRectangleDetectionDate = Date()
+
+        let pixelBuffer = frame.capturedImage
+        let orientation = exifOrientation(for: UIDevice.current.orientation)
+
+        rectangleDetectionQueue.async { [weak self] in
+            let request = VNDetectRectanglesRequest()
+            request.maximumObservations = 4
+            request.minimumSize = 0.04
+            request.minimumAspectRatio = 0.72
+            request.maximumAspectRatio = 1.28
+            request.quadratureTolerance = 18
+            request.minimumConfidence = 0.42
+
+            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)
+
+            do {
+                try handler.perform([request])
+                let observations = request.results ?? []
+                let detections = observations.map {
+                    AprilTagOverlayDetection(
+                        corners: self?.screenCorners(for: $0, viewportSize: viewportSize) ?? [],
+                        label: "Candidate"
+                    )
+                }
+                .filter { $0.corners.count == 4 }
+
+                Task { @MainActor [weak self] in
+                    self?.isDetectingRectangles = false
+                    self?.session.updateDetection(tagNames: [], isTracked: false)
+
+                    if detections.isEmpty {
+                        self?.overlayView.clear()
+                    } else {
+                        self?.overlayView.update(detections: detections)
+                    }
+                }
+            } catch {
+                Task { @MainActor [weak self] in
+                    self?.isDetectingRectangles = false
+                    self?.session.updateDetection(tagNames: [], isTracked: false)
+                    self?.overlayView.clear()
+                }
+            }
+        }
+    }
+
+    private func screenCorners(for observation: VNRectangleObservation, viewportSize: CGSize) -> [CGPoint] {
+        [
+            observation.topLeft,
+            observation.topRight,
+            observation.bottomRight,
+            observation.bottomLeft
+        ].map { normalizedPoint in
+            CGPoint(
+                x: normalizedPoint.x * viewportSize.width,
+                y: (1 - normalizedPoint.y) * viewportSize.height
+            )
+        }
+    }
+
+    private func exifOrientation(for deviceOrientation: UIDeviceOrientation) -> CGImagePropertyOrientation {
+        switch deviceOrientation {
+        case .portraitUpsideDown:
+            return .left
+        case .landscapeLeft:
+            return .up
+        case .landscapeRight:
+            return .down
+        default:
+            return .right
         }
     }
 

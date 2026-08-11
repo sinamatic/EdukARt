@@ -23,7 +23,7 @@ final class AprilTagDetectionSession: ObservableObject {
             return "Detected: \(detectedTagNumbersText). Keep the camera steady to track the markers."
         }
 
-        return "Point the camera at a printed AprilTag. Known tags are highlighted with their number."
+        return "Point the camera at a printed AprilTag. Square candidates are marked first; detected tags show their number."
     }
 
     var statusText: String {
@@ -50,14 +50,14 @@ final class AprilTagDetectionSession: ObservableObject {
         detectedTagNames = tagNames
         detectedTagName = tagNames.first
         self.isTagTracked = isTracked
-        statusMessage = tagNames.isEmpty ? "Searching for AprilTags" : "AprilTag detected"
+        statusMessage = tagNames.isEmpty ? "Looking for square tag candidates" : "AprilTag detected"
     }
 
     func setSearchingMessage() {
         detectedTagName = nil
         detectedTagNames = []
         isTagTracked = false
-        statusMessage = "Searching for AprilTags"
+        statusMessage = "Looking for square tag candidates"
     }
 
     func setMissingAssetsMessage() {

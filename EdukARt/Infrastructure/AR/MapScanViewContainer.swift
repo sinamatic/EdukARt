@@ -19,19 +19,7 @@ struct MapScanViewContainer: UIViewRepresentable {
 
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false)
-        let configuration = ARWorldTrackingConfiguration()
-        configuration.planeDetection = [.horizontal, .vertical]
-        configuration.environmentTexturing = .automatic
-        if usesAprilTagOrigin {
-            context.coordinator.configureReferenceTagDetection(on: configuration)
-        }
-
-        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
-            configuration.sceneReconstruction = .meshWithClassification
-        } else if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
-            configuration.sceneReconstruction = .mesh
-        }
-
+        let configuration = context.coordinator.makeInitialConfiguration()
         arView.debugOptions.insert(.showSceneUnderstanding)
         arView.session.delegate = context.coordinator
         arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
@@ -64,6 +52,7 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
     private var handledOriginPlacementRequest = 0
     private var isSessionPaused = false
     private var isFloorOverlayAttached = false
+    private var hasStartedFloorScanningSession = false
 
     init(session: MapScanSession, usesAprilTagOrigin: Bool) {
         self.session = session
@@ -116,16 +105,47 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
             return
         }
 
+        if session.hasOrigin, hasStartedFloorScanningSession == false {
+            arView.session.run(makeFloorScanningConfiguration(), options: [])
+            hasStartedFloorScanningSession = true
+            isSessionPaused = false
+            return
+        }
+
         guard isSessionPaused else {
             return
         }
 
+        arView.session.run(makeFloorScanningConfiguration(), options: [])
+        isSessionPaused = false
+    }
+
+    func makeInitialConfiguration() -> ARWorldTrackingConfiguration {
+        if usesAprilTagOrigin {
+            return makeAprilTagSearchConfiguration()
+        }
+
+        let configuration = ARWorldTrackingConfiguration()
+        configuration.planeDetection = [.horizontal]
+        configuration.environmentTexturing = .none
+        configuration.isAutoFocusEnabled = true
+        return configuration
+    }
+
+    private func makeAprilTagSearchConfiguration() -> ARWorldTrackingConfiguration {
+        let configuration = ARWorldTrackingConfiguration()
+        configuration.planeDetection = []
+        configuration.environmentTexturing = .none
+        configuration.isAutoFocusEnabled = true
+        configureReferenceTagDetection(on: configuration)
+        return configuration
+    }
+
+    private func makeFloorScanningConfiguration() -> ARWorldTrackingConfiguration {
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal, .vertical]
         configuration.environmentTexturing = .automatic
-        if usesAprilTagOrigin {
-            configureReferenceTagDetection(on: configuration)
-        }
+        configuration.isAutoFocusEnabled = true
 
         if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
             configuration.sceneReconstruction = .meshWithClassification
@@ -133,8 +153,7 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
             configuration.sceneReconstruction = .mesh
         }
 
-        arView.session.run(configuration, options: [])
-        isSessionPaused = false
+        return configuration
     }
 
     func session(_ arSession: ARSession, didUpdate frame: ARFrame) {
@@ -168,7 +187,7 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
 
         configuration.detectionImages = Set(referenceTagImages)
         configuration.maximumNumberOfTrackedImages = 1
-        configuration.automaticImageScaleEstimationEnabled = false
+        configuration.automaticImageScaleEstimationEnabled = true
     }
 
     private func setOriginFromReferenceTagIfNeeded(in frame: ARFrame) {
