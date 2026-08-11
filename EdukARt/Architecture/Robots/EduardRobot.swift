@@ -20,26 +20,4 @@ final class SimulatedEduard: RobotTarget {
         self.name = name
         self.position = position
     }
-
-    func move(input: ControlInput, step: Float) -> SIMD3<Float> {
-        var candidatePosition = position
-
-        if input.isForwardPressed {
-            candidatePosition.z -= step
-        }
-
-        if input.isBackwardPressed {
-            candidatePosition.z += step
-        }
-
-        if input.isLeftPressed {
-            candidatePosition.x -= step
-        }
-
-        if input.isRightPressed {
-            candidatePosition.x += step
-        }
-
-        return candidatePosition
-    }
 }
