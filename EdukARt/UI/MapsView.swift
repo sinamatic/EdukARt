@@ -41,7 +41,7 @@ struct MapsView: View {
 
             VStack(spacing: 20) {
                 HStack {
-                    Button("Zurueck") {
+                    Button("Back") {
                         onClose()
                     }
                     .buttonStyle(MapOverlayButtonStyle())

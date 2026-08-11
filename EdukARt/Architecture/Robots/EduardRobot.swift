@@ -1,12 +1,15 @@
 //
-//  SimulatedEduard.swift
+//  EduardRobot.swift
 //  EdukARt
 //
+//  - Beschreibt Eduard als 3D-Roboter in der AR-/Spielwelt.
+//  - Nutzt dieselben Modellnamen und Kollisionsmasse fuer Simulation und echten Roboter.
+//  - Die Position wird entweder per Steuerkreuz simuliert oder per AprilTag synchronisiert.
 
 import Foundation
 import simd
 
-final class SimulatedEduard: RobotTarget {
+final class EduardRobot {
     let name: String
     let chassisModelName: String = "eduard-red-chassis"
     let frontLeftWheelModelName: String = "Mechanum_frontLeft"

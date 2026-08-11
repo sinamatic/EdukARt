@@ -130,7 +130,7 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
             playerEntity.orientation = simulatedRobotBaseOrientation * simd_quatf(angle: game.robotYaw, axis: [0, 1, 0])
         }
         if hasLoadedInitialObstacles {
-            syncObstacles(from: game.currentScene.level.obstacles)
+            syncObstacles(from: game.obstacles)
         }
     }
 
@@ -392,7 +392,7 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
             }
 
             self.hasLoadedInitialObstacles = true
-            self.addObstacles(from: Array(game.currentScene.level.obstacles))
+            self.addObstacles(from: game.obstacles)
         }
     }
 
@@ -456,7 +456,7 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
     }
     
     
-    private func addPlayer(from player: any RobotTarget) {
+    private func addPlayer(from player: EduardRobot) {
         guard playerEntity.children.isEmpty else {
             playerEntity.position = player.position
             return

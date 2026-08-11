@@ -33,7 +33,7 @@ struct MapPreviewView: View {
 
             VStack {
                 HStack {
-                    Button("Zurueck") {
+                    Button("Back") {
                         onBack()
                     }
                     .buttonStyle(MapPreviewButtonStyle())

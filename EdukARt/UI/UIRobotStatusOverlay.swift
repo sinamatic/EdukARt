@@ -9,23 +9,26 @@ struct UIRobotStatusOverlay: View {
     @ObservedObject var controller: EduardRemoteControlController
 
     var body: some View {
-        HStack(spacing: 8) {
-            trafficLight
-
+        HStack(spacing: 7) {
             Button {
-                controller.sendDisable()
+                if controller.isEnabled {
+                    controller.sendDisable()
+                } else {
+                    controller.sendEnable()
+                }
             } label: {
                 Image(systemName: "power")
                     .font(.subheadline.weight(.bold))
                     .frame(width: 34, height: 34)
-                    .accessibilityLabel("Disable")
+                    .accessibilityLabel(controller.isEnabled ? "Disable" : "Enable")
             }
             .buttonStyle(RobotStatusIconButtonStyle(isEnabled: controller.isEnabled))
-            .disabled(controller.isConnected == false)
-            .opacity(controller.isConnected ? 1 : 0.45)
+
+            trafficLight
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
+        .padding(.leading, 7)
+        .padding(.trailing, 8)
+        .padding(.vertical, 6)
         .background(.black.opacity(0.58))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .accessibilityElement(children: .combine)
@@ -33,7 +36,7 @@ struct UIRobotStatusOverlay: View {
     }
 
     private var trafficLight: some View {
-        HStack(spacing: 5) {
+        VStack(spacing: 4) {
             statusDot(color: .red, isActive: controller.connectionState == .disconnected)
             statusDot(color: .yellow, isActive: controller.connectionState == .connected)
             statusDot(color: .green, isActive: controller.connectionState == .enabled)
@@ -42,11 +45,11 @@ struct UIRobotStatusOverlay: View {
 
     private func statusDot(color: Color, isActive: Bool) -> some View {
         Circle()
-            .fill(color.opacity(isActive ? 1 : 0.24))
-            .frame(width: 8, height: 8)
+            .fill(color.opacity(isActive ? 1 : 0.1))
+            .frame(width: 7, height: 7)
             .overlay(
                 Circle()
-                    .stroke(.white.opacity(isActive ? 0.62 : 0.18), lineWidth: 1)
+                    .stroke(.white.opacity(isActive ? 0.62 : 0.1), lineWidth: 1)
             )
     }
 }

@@ -1,12 +1,15 @@
 //
-//  WiFiRobotCommandTransport.swift
+//  EduardWiFiCommandTransport.swift
 //  EdukARt
 //
+//  - Oeffnet eine UDP-Verbindung zum Eduard-Roboter im WLAN.
+//  - Codiert Eduard-ROS-Kommandos als JSON.
+//  - Sendet jedes JSON-Paket mit abschliessendem Newline an das Python-Skript.
 
 import Foundation
 import Network
 
-final class WiFiRobotCommandTransport: RobotCommandTransport {
+final class EduardWiFiCommandTransport: EduardROSCommandTransport {
     let targetHost: String
     let targetPort: UInt16
 
@@ -27,8 +30,8 @@ final class WiFiRobotCommandTransport: RobotCommandTransport {
         connection.cancel()
     }
 
-    func send(topic: String, messageType: String, message: [String: ROSValue]) {
-        let command = ROSPublishCommand(
+    func send(topic: String, messageType: String, message: [String: EduardROSValue]) {
+        let command = EduardROSPublishCommand(
             topic: topic,
             messageType: messageType,
             message: message
@@ -37,8 +40,8 @@ final class WiFiRobotCommandTransport: RobotCommandTransport {
         send(command)
     }
 
-    func call(service: String, serviceType: String, request: [String: ROSValue]) {
-        let command = ROSServiceCommand(
+    func call(service: String, serviceType: String, request: [String: EduardROSValue]) {
+        let command = EduardROSServiceCommand(
             service: service,
             serviceType: serviceType,
             request: request

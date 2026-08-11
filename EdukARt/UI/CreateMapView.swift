@@ -57,7 +57,7 @@ struct CreateMapView: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
-            Button("Zurueck") {
+            Button("Back") {
                 if mode == .selection {
                     onClose()
                 } else {

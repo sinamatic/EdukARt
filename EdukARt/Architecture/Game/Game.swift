@@ -64,13 +64,13 @@ final class Game: ObservableObject {
         static let itemBoxSize = SIMD3<Float>(0.32, 0.32, 0.32)
     }
 
-    let currentScene: any GameScene
-    let currentController: any ControlSource
-    let currentRobot: any RobotTarget
+    let currentRobot: EduardRobot
     let selectedMap: StoredFloorMap?
+    private(set) var obstacles: [Obstacle]
 
     private let movementTicksPerSecond: Float = 60
     private let normalRotationRadiansPerSecond: Float = .pi / 2
+    private var movementInput = SIMD2<Float>.zero
     private var rotationInput: Float = 0
     private var movementTimer: Timer?
     private var itemBoxMessageClearWorkItem: DispatchWorkItem?
@@ -82,26 +82,16 @@ final class Game: ObservableObject {
 
     init(
         selectedMap: StoredFloorMap? = nil,
-        currentScene: (any GameScene)? = nil,
-        currentController: (any ControlSource)? = nil,
-        currentRobot: (any RobotTarget)? = nil
+        currentRobot: EduardRobot? = nil
     ) {
-        let robot = currentRobot ?? SimulatedEduard(
+        let robot = currentRobot ?? EduardRobot(
             name: "Eduard",
             position: SIMD3<Float>(0, 0, 0)
         )
-        let scene = currentScene ?? BasicScene(
-            level: Level(
-                name: "Basic Level",
-                difficulty: .basic,
-                obstacles: selectedMap.map(Self.makeCoinGrid(from:)) ?? Self.makeLinearCollectibles(around: robot.position)
-            )
-        )
 
-        self.currentScene = scene
-        self.currentController = currentController ?? JoystickController()
         self.currentRobot = robot
         self.selectedMap = selectedMap
+        self.obstacles = selectedMap.map(Self.makeCoinGrid(from:)) ?? Self.makeLinearCollectibles(around: robot.position)
         if let selectedMap, selectedMap.referenceTagName != nil {
             isWaitingForMapOrigin = true
             mapOriginMessage = "Scanne AprilTag \(selectedMap.displayReferenceTagNumber), um die Karte auszurichten."
@@ -116,12 +106,8 @@ final class Game: ObservableObject {
         movementTimer?.invalidate()
     }
 
-    var level: Level {
-        currentScene.level
-    }
-
-    func updateInput(_ input: ControlInput) {
-        (currentController as? JoystickController)?.updateInput(input)
+    func updateInput(_ input: SIMD2<Float>) {
+        movementInput = input
     }
 
     func updateRotationInput(_ input: Float) {
@@ -143,7 +129,6 @@ final class Game: ObservableObject {
             return
         }
 
-        let input = currentController.readInput()
         let rotationStep = rotationInput * normalRotationRadiansPerSecond * speedMode.speedScale / movementTicksPerSecond
         if abs(rotationStep) > 0.0001 {
             objectWillChange.send()
@@ -152,12 +137,11 @@ final class Game: ObservableObject {
 
         let candidatePosition = makeMovementCandidate(
             from: currentRobot.position,
-            input: input,
+            input: movementInput,
             step: speedMode.metersPerSecond / movementTicksPerSecond
         )
-        let hasMovementInput = input != .idle
 
-        guard hasMovementInput else {
+        guard movementInput != .zero else {
             isBlocked = false
             collisionMessage = nil
             return
@@ -167,7 +151,6 @@ final class Game: ObservableObject {
             objectWillChange.send()
             currentRobot.position = candidatePosition
             collectItemBoxesIfNeeded(at: candidatePosition)
-            currentScene.update()
             isBlocked = false
             collisionMessage = nil
         } else {
@@ -176,22 +159,22 @@ final class Game: ObservableObject {
         }
     }
 
-    private func makeMovementCandidate(from position: SIMD3<Float>, input: ControlInput, step: Float) -> SIMD3<Float> {
+    private func makeMovementCandidate(from position: SIMD3<Float>, input: SIMD2<Float>, step: Float) -> SIMD3<Float> {
         var localDelta = SIMD3<Float>(0, 0, 0)
 
-        if input.isForwardPressed {
+        if input.y < -0.5 {
             localDelta.z -= step
         }
 
-        if input.isBackwardPressed {
+        if input.y > 0.5 {
             localDelta.z += step
         }
 
-        if input.isLeftPressed {
+        if input.x < -0.5 {
             localDelta.x -= step
         }
 
-        if input.isRightPressed {
+        if input.x > 0.5 {
             localDelta.x += step
         }
 
@@ -208,7 +191,6 @@ final class Game: ObservableObject {
         realRobotTagName = tagName
         currentRobot.position = position
         collectItemBoxesIfNeeded(at: position)
-        currentScene.update()
         isBlocked = false
         collisionMessage = nil
     }
@@ -243,7 +225,7 @@ final class Game: ObservableObject {
         let playerMin = candidatePosition - playerHalfSize
         let playerMax = candidatePosition + playerHalfSize
 
-        for obstacle in currentScene.level.obstacles {
+        for obstacle in obstacles {
             guard obstacle.isCollectible == false else {
                 continue
             }
@@ -271,7 +253,7 @@ final class Game: ObservableObject {
     }
 
     private func collectItemBoxesIfNeeded(at playerPosition: SIMD3<Float>) {
-        let collectedIDs = currentScene.level.obstacles.compactMap { obstacle -> UUID? in
+        let collectedIDs = obstacles.compactMap { obstacle -> UUID? in
             guard obstacle.isCollectible else {
                 return nil
             }
@@ -283,9 +265,7 @@ final class Game: ObservableObject {
             return
         }
 
-        var level = currentScene.level
-        level.obstacles.removeAll { collectedIDs.contains($0.id) }
-        currentScene.level = level
+        obstacles.removeAll { collectedIDs.contains($0.id) }
         triggerItemBoxFeedback()
     }
 

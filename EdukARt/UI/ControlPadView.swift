@@ -14,7 +14,7 @@ struct ControlPadView: View {
         case natural
     }
 
-    let onInputChanged: (ControlInput) -> Void
+    let onInputChanged: (SIMD2<Float>) -> Void
     var axisMapping: AxisMapping = .game
 
     @State private var knobOffset: CGSize = .zero
@@ -45,7 +45,7 @@ struct ControlPadView: View {
                 }
                 .onEnded { _ in
                     knobOffset = .zero
-                    onInputChanged(.idle)
+                    onInputChanged(.zero)
                 }
         )
     }
@@ -64,15 +64,15 @@ struct ControlPadView: View {
         )
     }
 
-    private func makeInput(from offset: CGSize) -> ControlInput {
+    private func makeInput(from offset: CGSize) -> SIMD2<Float> {
         let normalizedX = Float(offset.width / maxOffset)
         let normalizedY = Float(offset.height / maxOffset)
 
         switch axisMapping {
         case .game:
-            return ControlInput(direction: SIMD2<Float>(normalizedY, -normalizedX))
+            return SIMD2<Float>(normalizedY, -normalizedX)
         case .natural:
-            return ControlInput(direction: SIMD2<Float>(normalizedX, normalizedY))
+            return SIMD2<Float>(normalizedX, normalizedY)
         }
     }
 }
