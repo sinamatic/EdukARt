@@ -128,6 +128,22 @@ struct RootView: View {
                         onBack: {
                             phase = .menu
                         },
+                        onCreateMap: {
+                            phase = .createGameMap
+                        },
+                        onStartGame: { map in
+                            selectedGameMap = map
+                            Task {
+                                await runGameStartSequence()
+                            }
+                        }
+                    )
+                case .createGameMap:
+                    CreateMapView(
+                        mapStore: mapStore,
+                        onClose: {
+                            phase = .selectGameMap
+                        },
                         onStartGame: { map in
                             selectedGameMap = map
                             Task {
@@ -155,7 +171,12 @@ struct RootView: View {
     }
 
     private var showsRobotStatusOverlay: Bool {
-        phase != .logo
+        switch phase {
+        case .logo, .selectGameMap, .createGameMap:
+            return false
+        case .menu, .remoteControl, .gameLoading, .game:
+            return true
+        }
     }
 
     private var robotStatusOverlayTopPadding: CGFloat {
@@ -229,4 +250,5 @@ private enum AppPhase {
     case gameLoading
     case game
     case selectGameMap
+    case createGameMap
 }
