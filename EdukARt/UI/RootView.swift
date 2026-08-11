@@ -79,7 +79,7 @@ enum EdukARtUI {
 struct RootView: View {
     @StateObject private var mapStore = MapStore()
     @StateObject private var robotRemoteController = EduardRemoteControlController()
-    @State private var phase: LaunchPhase = .logo
+    @State private var phase: AppPhase = .logo
     @State private var loadingProgress: Double = EdukARtUI.Timing.initialProgress
     @State private var hasStartedLaunchSequence = false
     @State private var selectedGameMap: StoredFloorMap?
@@ -90,11 +90,16 @@ struct RootView: View {
             Group {
                 switch phase {
                 case .logo:
-                    logoScreen
-                case .loading:
-                    loadingScreen
+                    UILogo()
                 case .menu:
-                    menuScreen
+                    UIMenuMain(
+                        onStartGame: {
+                            phase = .selectGameMap
+                        },
+                        onRobotControl: {
+                            phase = .remoteControl
+                        }
+                    )
                 case .remoteControl:
                     RobotRemoteControlScreen(controller: robotRemoteController) {
                         phase = .menu
@@ -118,11 +123,9 @@ struct RootView: View {
                         }
                     }
                 case .selectGameMap:
-                    gameMapSelectionScreen
-                case .createMap:
-                    CreateMapView(
+                    UIStartGameChooseMap(
                         mapStore: mapStore,
-                        onClose: {
+                        onBack: {
                             phase = .menu
                         },
                         onStartGame: { map in
@@ -132,10 +135,6 @@ struct RootView: View {
                             }
                         }
                     )
-                case .viewMaps:
-                    MapsView(mapStore: mapStore) {
-                        phase = .menu
-                    }
                 }
             }
 
@@ -168,50 +167,6 @@ struct RootView: View {
         }
     }
 
-    private var logoScreen: some View {
-        ZStack {
-            Color.black
-                .ignoresSafeArea()
-
-            Image("EduArtSinamaticIcon")
-                .resizable()
-                .scaledToFit()
-                .frame(width: EdukARtUI.Layout.logoSize, height: EdukARtUI.Layout.logoSize)
-        }
-    }
-
-    private var loadingScreen: some View {
-        ZStack {
-            Image("EdukARtKeyvisual")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
-
-            Color.black.opacity(EdukARtUI.Opacity.loadingOverlay)
-                .ignoresSafeArea()
-
-            VStack {
-                Spacer()
-
-                VStack(spacing: EdukARtUI.Layout.loadingPanelSpacing) {
-                    Text("Loading \(Int(loadingProgress * Double(EdukARtUI.Timing.progressSteps)))%")
-                        .font(.system(size: EdukARtUI.Layout.loadingFontSize, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-
-                    ProgressView(value: loadingProgress)
-                        .tint(.white)
-                        .scaleEffect(x: EdukARtUI.Layout.progressScaleX, y: EdukARtUI.Layout.progressScaleY, anchor: .center)
-                }
-                .padding(.horizontal, EdukARtUI.Layout.loadingPanelHorizontalPadding)
-                .padding(.vertical, EdukARtUI.Layout.loadingPanelVerticalPadding)
-                .background(.black.opacity(EdukARtUI.Opacity.loadingPanel))
-                .clipShape(RoundedRectangle(cornerRadius: EdukARtUI.Layout.loadingPanelCornerRadius, style: .continuous))
-                .padding(.horizontal, EdukARtUI.Layout.loadingPanelHorizontalPadding)
-                .padding(.bottom, EdukARtUI.Layout.loadingPanelBottomPadding)
-            }
-        }
-    }
-
     private var gameLoadingScreen: some View {
         ZStack {
             Image("EdukARtKeyvisual")
@@ -241,156 +196,9 @@ struct RootView: View {
         }
     }
 
-    private var menuScreen: some View {
-        ZStack {
-            Image("EdukARtKeyvisual")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
-
-            Color.black.opacity(EdukARtUI.Opacity.menuOverlay)
-                .ignoresSafeArea()
-
-            VStack(spacing: EdukARtUI.Layout.menuOuterSpacing) {
-                Spacer()
-
-                VStack(spacing: EdukARtUI.Layout.menuButtonSpacing) {
-                    Button("Remote Control Robot") {
-                        phase = .remoteControl
-                    }
-                    .buttonStyle(StartScreenButtonStyle(fillColor: .black.opacity(EdukARtUI.Opacity.primaryMenuButton), foregroundColor: .white))
-
-                    Button("Start Game") {
-                        if mapStore.maps.isEmpty {
-                            selectedGameMap = nil
-                            Task {
-                                await runGameStartSequence()
-                            }
-                        } else {
-                            phase = .selectGameMap
-                        }
-                    }
-                    .buttonStyle(StartScreenButtonStyle(fillColor: EdukARtUI.Colors.brandGreen))
-
-                    Button("Create Map") {
-                        phase = .createMap
-                    }
-                    .buttonStyle(StartScreenButtonStyle(fillColor: Color.white.opacity(EdukARtUI.Opacity.lightMenuButton), foregroundColor: EdukARtUI.Colors.brandGreen))
-
-                    Button("View Maps") {
-                        phase = .viewMaps
-                    }
-                    .buttonStyle(StartScreenButtonStyle(fillColor: .black.opacity(EdukARtUI.Opacity.secondaryMenuButton), foregroundColor: .white))
-                }
-                .padding(.top, EdukARtUI.Layout.menuTopPadding)
-
-                Spacer()
-            }
-            .padding(.horizontal, EdukARtUI.Layout.menuHorizontalPadding)
-            .padding(.vertical, EdukARtUI.Layout.menuVerticalPadding)
-        }
-    }
-
-    private var gameMapSelectionScreen: some View {
-        ZStack {
-            Image("EdukARtKeyvisual")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
-
-            Color.black.opacity(EdukARtUI.Opacity.mapSelectionOverlay)
-                .ignoresSafeArea()
-
-            VStack(spacing: EdukARtUI.Layout.mapSelectionSpacing) {
-                HStack {
-                    Button("Back") {
-                        phase = .menu
-                    }
-                    .buttonStyle(CompactOverlayButtonStyle())
-
-                    Spacer()
-                }
-
-                Text("Karte fuer Spiel waehlen")
-                    .font(.largeTitle.weight(.bold))
-                    .foregroundStyle(.white)
-
-                Text("Die Coins werden im Raster auf der gespeicherten Bodenflaeche platziert.")
-                    .font(.subheadline)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(EdukARtUI.Opacity.secondaryText))
-
-                List {
-                    Button {
-                        selectedGameMap = nil
-                        Task {
-                            await runGameStartSequence()
-                        }
-                    } label: {
-                        Text("Ohne Karte starten")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(EdukARtUI.Layout.listItemPadding)
-                            .background(Color.white.opacity(EdukARtUI.Opacity.listItemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: EdukARtUI.Layout.listItemCornerRadius, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .listRowInsets(EdgeInsets(top: EdukARtUI.Layout.listRowVerticalInset, leading: .zero, bottom: EdukARtUI.Layout.listRowVerticalInset, trailing: .zero))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-
-                    ForEach(mapStore.maps) { map in
-                        Button {
-                            selectedGameMap = map
-                            Task {
-                                await runGameStartSequence()
-                            }
-                        } label: {
-                            VStack(alignment: .leading, spacing: EdukARtUI.Layout.listItemContentSpacing) {
-                                Text(map.name)
-                                    .font(.headline)
-                                    .foregroundStyle(.white)
-
-                                Text("\(map.floorTiles.count) Bodenkacheln")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(EdukARtUI.Colors.brandGreen)
-
-                                Text("AprilTag \(map.displayReferenceTagNumber)")
-                                    .font(.footnote)
-                                    .foregroundStyle(.white.opacity(EdukARtUI.Opacity.tertiaryText))
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(EdukARtUI.Layout.listItemPadding)
-                            .background(Color.white.opacity(EdukARtUI.Opacity.listItemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: EdukARtUI.Layout.listItemCornerRadius, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .listRowInsets(EdgeInsets(top: EdukARtUI.Layout.listRowVerticalInset, leading: .zero, bottom: EdukARtUI.Layout.listRowVerticalInset, trailing: .zero))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                    }
-                }
-                .scrollContentBackground(.hidden)
-                .listStyle(.plain)
-            }
-            .padding(.horizontal, EdukARtUI.Layout.mapSelectionHorizontalPadding)
-            .padding(.top, EdukARtUI.Layout.mapSelectionTopPadding)
-            .padding(.bottom, EdukARtUI.Layout.mapSelectionBottomPadding)
-        }
-    }
-
     @MainActor
     private func runLaunchSequence() async {
         try? await Task.sleep(for: .seconds(EdukARtUI.Timing.launchLogoDurationSeconds))
-        phase = .loading
-
-        let steps = EdukARtUI.Timing.progressSteps
-        for step in EdukARtUI.Timing.firstProgressStep...steps {
-            loadingProgress = Double(step) / Double(steps)
-            try? await Task.sleep(for: .milliseconds(EdukARtUI.Timing.launchProgressStepMilliseconds))
-        }
-
         phase = .menu
     }
 
@@ -414,46 +222,11 @@ struct RootView: View {
     }
 }
 
-private enum LaunchPhase {
+private enum AppPhase {
     case logo
-    case loading
     case menu
     case remoteControl
     case gameLoading
     case game
     case selectGameMap
-    case createMap
-    case viewMaps
-}
-
-private struct StartScreenButtonStyle: ButtonStyle {
-    let fillColor: Color
-    var foregroundColor: Color = .white
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: EdukARtUI.Layout.startButtonFontSize, weight: .bold, design: .rounded))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, EdukARtUI.Layout.startButtonVerticalPadding)
-            .background(
-                RoundedRectangle(cornerRadius: EdukARtUI.Layout.startButtonCornerRadius, style: .continuous)
-                    .fill(fillColor)
-                    .opacity(configuration.isPressed ? EdukARtUI.Opacity.pressedButton : EdukARtUI.Layout.defaultButtonScale)
-            )
-            .foregroundStyle(foregroundColor)
-            .scaleEffect(configuration.isPressed ? EdukARtUI.Layout.pressedButtonScale : EdukARtUI.Layout.defaultButtonScale)
-            .animation(.easeOut(duration: EdukARtUI.Timing.buttonPressAnimationDuration), value: configuration.isPressed)
-    }
-}
-
-private struct CompactOverlayButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, EdukARtUI.Layout.compactButtonHorizontalPadding)
-            .padding(.vertical, EdukARtUI.Layout.compactButtonVerticalPadding)
-            .background(.black.opacity(configuration.isPressed ? EdukARtUI.Opacity.pressedCompactButton : EdukARtUI.Opacity.compactButton))
-            .foregroundStyle(.white)
-            .clipShape(Capsule())
-    }
 }

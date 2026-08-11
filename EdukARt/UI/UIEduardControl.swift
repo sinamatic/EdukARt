@@ -50,9 +50,9 @@ struct RobotRemoteControlView: View {
     let isLandscape: Bool
     var usesFullScreenLayout = false
 
-    @State private var areSettingsExpanded = true
-    @State private var areLightsExpanded = true
-    @State private var isRemoteControlExpanded = false
+    @State private var areSettingsExpanded = false
+    @State private var areLightsExpanded = false
+    @State private var isRemoteControlExpanded = true
 
     var body: some View {
         Group {
