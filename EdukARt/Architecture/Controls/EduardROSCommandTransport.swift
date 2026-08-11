@@ -18,8 +18,10 @@ protocol EduardROSCommandTransport: AnyObject {
 
 indirect enum EduardROSValue: Encodable {
     case bool(Bool)
+    case int(Int)
     case double(Double)
     case string(String)
+    case array([EduardROSValue])
     case object([String: EduardROSValue])
 
     func encode(to encoder: Encoder) throws {
@@ -27,9 +29,13 @@ indirect enum EduardROSValue: Encodable {
         switch self {
         case .bool(let value):
             try container.encode(value)
+        case .int(let value):
+            try container.encode(value)
         case .double(let value):
             try container.encode(value)
         case .string(let value):
+            try container.encode(value)
+        case .array(let value):
             try container.encode(value)
         case .object(let value):
             try container.encode(value)

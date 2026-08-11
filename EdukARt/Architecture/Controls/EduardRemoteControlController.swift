@@ -71,6 +71,8 @@ final class EduardRemoteControlController: ObservableObject {
     @Published var driveMode: DriveMode = .mechanum
     @Published private(set) var statusMessage = "Connect the iPhone to the EduardBlue3 WiFi network first."
 
+    let lightController: LightController
+
     var connectionState: ConnectionState {
         if isEnabled {
             return .enabled
@@ -107,6 +109,7 @@ final class EduardRemoteControlController: ObservableObject {
 
     init(transport: EduardROSCommandTransport = EduardWiFiCommandTransport()) {
         self.transport = transport
+        lightController = LightController(transport: transport)
     }
 
     deinit {
@@ -125,6 +128,7 @@ final class EduardRemoteControlController: ObservableObject {
     func disconnect() {
         commandTimer?.invalidate()
         commandTimer = nil
+        lightController.stop()
         activeJoystickDirection = .idle
         activeRotationDirection = nil
         isConnected = false
@@ -175,6 +179,16 @@ final class EduardRemoteControlController: ObservableObject {
             sendRemoteControlledMode()
             statusMessage = "\(mode.rawValue) mode active."
         }
+    }
+
+    func sendLightMode(_ mode: LightController.StandardMode) {
+        guard isConnected else {
+            statusMessage = "Confirm the WiFi connection before changing lights."
+            return
+        }
+
+        lightController.send(mode)
+        statusMessage = "Light mode: \(mode.title)."
     }
 
     func updateJoystickInput(x: Float, y: Float) {

@@ -51,6 +51,8 @@ struct RobotRemoteControlView: View {
     var usesFullScreenLayout = false
 
     @State private var areSettingsExpanded = true
+    @State private var areLightsExpanded = true
+    @State private var isRemoteControlExpanded = false
 
     var body: some View {
         Group {
@@ -74,39 +76,77 @@ struct RobotRemoteControlView: View {
                 areSettingsExpanded = false
             }
         }
+        .onChange(of: areSettingsExpanded) { _, isExpanded in
+            guard isExpanded else {
+                return
+            }
+
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isRemoteControlExpanded = false
+            }
+        }
+        .onChange(of: areLightsExpanded) { _, isExpanded in
+            guard isExpanded else {
+                return
+            }
+
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isRemoteControlExpanded = false
+            }
+        }
+        .onChange(of: isRemoteControlExpanded) { _, isExpanded in
+            guard isExpanded == false else {
+                return
+            }
+
+            controller.stopJoystick()
+        }
     }
 
     private var landscapeLayout: some View {
         HStack(alignment: .top, spacing: 24) {
-            VStack(alignment: .leading, spacing: 18) {
-                headerSection
-                settingsSection
-                driveModePicker
-                Spacer()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    headerSection
+                    settingsSection
+                    lightSection
+                    remoteControlSection
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .frame(maxWidth: 360, maxHeight: .infinity, alignment: .topLeading)
+            .scrollIndicators(.hidden)
+            .scrollDisabled(isRemoteControlExpanded)
 
             Spacer(minLength: 24)
 
             VStack {
                 Spacer()
-                driveControls
+                remoteDriveControls
                 Spacer()
             }
-            .frame(width: 260)
+            .frame(width: 290)
             .frame(maxHeight: .infinity)
         }
     }
 
     private var portraitLayout: some View {
         VStack(alignment: .leading, spacing: 18) {
-            headerSection
-            settingsSection
-            driveModePicker
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    headerSection
+                    settingsSection
+                    lightSection
+                    remoteControlSection
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .scrollIndicators(.hidden)
+            .scrollDisabled(isRemoteControlExpanded)
 
             Spacer(minLength: 24)
 
-            driveControls
+            remoteDriveControls
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.bottom, 28)
         }
@@ -136,6 +176,62 @@ struct RobotRemoteControlView: View {
         }
         .pickerStyle(.segmented)
         .tint(.white)
+    }
+
+    private var lightSection: some View {
+        LightControlPanel(
+            lightController: controller.lightController,
+            isExpanded: $areLightsExpanded,
+            isConnected: controller.isConnected,
+            onToggleExpansion: {
+                toggleLightsSection()
+            },
+            onSelectMode: { mode in
+                controller.sendLightMode(mode)
+            }
+        )
+    }
+
+    private var remoteControlSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                toggleRemoteControlSection()
+            } label: {
+                HStack {
+                    Text("Remote Control")
+                        .font(.subheadline.weight(.bold))
+
+                    Spacer()
+
+                    Text(controller.driveMode.rawValue)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.72))
+
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.bold))
+                        .rotationEffect(.degrees(isRemoteControlExpanded ? 0 : -90))
+                }
+                .foregroundStyle(.white)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isRemoteControlExpanded {
+                driveModePicker
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(14)
+        .background(.white.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var remoteDriveControls: some View {
+        if isRemoteControlExpanded {
+            driveControls
+                .transition(.opacity)
+        }
     }
 
     private var driveControls: some View {
@@ -172,9 +268,7 @@ struct RobotRemoteControlView: View {
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    areSettingsExpanded.toggle()
-                }
+                toggleSettingsSection()
             } label: {
                 HStack {
                     Text("Settings")
@@ -272,6 +366,37 @@ struct RobotRemoteControlView: View {
         )
     }
 
+    private func toggleSettingsSection() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            areSettingsExpanded.toggle()
+
+            if areSettingsExpanded {
+                isRemoteControlExpanded = false
+            }
+        }
+    }
+
+    private func toggleLightsSection() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            areLightsExpanded.toggle()
+
+            if areLightsExpanded {
+                isRemoteControlExpanded = false
+            }
+        }
+    }
+
+    private func toggleRemoteControlSection() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isRemoteControlExpanded.toggle()
+
+            if isRemoteControlExpanded {
+                areSettingsExpanded = false
+                areLightsExpanded = false
+            }
+        }
+    }
+
     private func openWiFiSettings() {
         guard let wiFiSettingsURL = URL(string: "App-Prefs:root=WIFI") else {
             if let appSettingsURL = URL(string: UIApplication.openSettingsURLString) {
@@ -288,6 +413,245 @@ struct RobotRemoteControlView: View {
 
             UIApplication.shared.open(appSettingsURL)
         }
+    }
+}
+
+private struct LightControlPanel: View {
+    @ObservedObject var lightController: LightController
+    @Binding var isExpanded: Bool
+    let isConnected: Bool
+    let onToggleExpansion: () -> Void
+    let onSelectMode: (LightController.StandardMode) -> Void
+
+    private struct LightModeSection: Identifiable {
+        let id: String
+        let title: String
+        let modes: [LightController.StandardMode]
+    }
+
+    private let sections = [
+        LightModeSection(
+            id: "car",
+            title: "Car Mode (front / back separation)",
+            modes: [.enabled, .loading]
+        ),
+        LightModeSection(
+            id: "all",
+            title: "All Lights Mode",
+            modes: [.solid, .rainbowSolid, .connectionLost, .rotation, .running, .rainbow]
+        ),
+        LightModeSection(
+            id: "signals",
+            title: "Car Blinker Mode (left / right separation)",
+            modes: [.flashLeft, .flashRight]
+        )
+    ]
+
+    private let columns = [
+        GridItem(.flexible(minimum: 96), spacing: 8),
+        GridItem(.flexible(minimum: 96), spacing: 8)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                onToggleExpansion()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "lightbulb.2")
+                        .font(.subheadline.weight(.semibold))
+
+                    Text("Lights")
+                        .font(.subheadline.weight(.bold))
+
+                    Spacer()
+
+                    Text(lightController.activeMode.title)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                        .foregroundStyle(isConnected ? .yellow : .white.opacity(0.42))
+
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.bold))
+                        .rotationEffect(.degrees(isExpanded ? 0 : -90))
+                }
+                .foregroundStyle(.white)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(sections) { section in
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(section.title)
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white.opacity(0.68))
+
+                            if section.id == "all" {
+                                allLightsColorPicker
+                            }
+
+                            if section.id == "signals" {
+                                signalColorPicker
+                            }
+
+                            LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                                ForEach(section.modes) { mode in
+                                    Button {
+                                        onSelectMode(mode)
+                                    } label: {
+                                        VStack(spacing: 6) {
+                                            Image(systemName: mode.systemImageName)
+                                                .font(.headline.weight(.semibold))
+                                                .frame(height: 20)
+
+                                            Text(mode.title)
+                                                .font(.caption2.weight(.semibold))
+                                                .multilineTextAlignment(.center)
+                                                .lineLimit(2)
+                                                .minimumScaleFactor(0.78)
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 58)
+                                    }
+                                    .buttonStyle(LightModeButtonStyle(
+                                        isSelected: lightController.activeMode == mode,
+                                        isEnabled: isConnected && mode.isFirmwareImplemented
+                                    ))
+                                    .disabled(isConnected == false || mode.isFirmwareImplemented == false)
+                                }
+                            }
+                        }
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(14)
+        .background(.white.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var allLightsColorPicker: some View {
+        colorPicker(
+            title: "Color",
+            rgbColor: lightController.allLightsColor
+        ) { color in
+            setAllLightsColor(color)
+        }
+    }
+
+    private var signalColorPicker: some View {
+        colorPicker(
+            title: "Blinker Color",
+            rgbColor: lightController.signalColor
+        ) { color in
+            setSignalColor(color)
+        }
+    }
+
+    private func colorPicker(
+        title: String,
+        rgbColor: LightController.RGBColor,
+        onChange: @escaping (Color) -> Void
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+
+            Spacer()
+
+            ColorPicker("", selection: Binding(
+                get: {
+                    color(from: rgbColor)
+                },
+                set: { color in
+                    onChange(color)
+                }
+            ))
+            .labelsHidden()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.white.opacity(isConnected ? 0.12 : 0.06))
+        .foregroundStyle(.white.opacity(isConnected ? 1 : 0.42))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .disabled(isConnected == false)
+    }
+
+    private func color(from rgbColor: LightController.RGBColor) -> Color {
+        Color(
+            red: Double(rgbColor.red) / 255.0,
+            green: Double(rgbColor.green) / 255.0,
+            blue: Double(rgbColor.blue) / 255.0
+        )
+    }
+
+    private func setAllLightsColor(_ color: Color) {
+        let uiColor = UIColor(color)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        guard uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return
+        }
+
+        lightController.setAllLightsColor(
+            red: Int((red * 255).rounded()),
+            green: Int((green * 255).rounded()),
+            blue: Int((blue * 255).rounded())
+        )
+    }
+
+    private func setSignalColor(_ color: Color) {
+        let uiColor = UIColor(color)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        guard uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return
+        }
+
+        lightController.setSignalColor(
+            red: Int((red * 255).rounded()),
+            green: Int((green * 255).rounded()),
+            blue: Int((blue * 255).rounded())
+        )
+    }
+}
+
+private struct LightModeButtonStyle: ButtonStyle {
+    let isSelected: Bool
+    let isEnabled: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 8)
+            .background(fillColor.opacity(configuration.isPressed ? 0.72 : 1))
+            .foregroundStyle(foregroundColor)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var fillColor: Color {
+        if isSelected && isEnabled {
+            return .yellow.opacity(0.9)
+        }
+
+        return .white.opacity(isEnabled ? 0.14 : 0.05)
+    }
+
+    private var foregroundColor: Color {
+        if isSelected && isEnabled {
+            return .black
+        }
+
+        return .white.opacity(isEnabled ? 1 : 0.34)
     }
 }
 
@@ -326,10 +690,10 @@ private struct RobotJoystickView: View {
 
     @State private var knobOffset: CGSize = .zero
 
-    private let baseSize: CGFloat = 190
-    private let knobSize: CGFloat = 62
-    private let maxOffset: CGFloat = 64
-    private let crosshairLength: CGFloat = 24
+    private let baseSize: CGFloat = 220
+    private let knobSize: CGFloat = 82
+    private let maxOffset: CGFloat = 76
+    private let crosshairLength: CGFloat = 28
     private let crosshairThickness: CGFloat = 4
 
     var body: some View {
@@ -343,10 +707,7 @@ private struct RobotJoystickView: View {
 
             crosshair
 
-            Circle()
-                .fill(.white.opacity(0.92))
-                .frame(width: knobSize, height: knobSize)
-                .shadow(color: .black.opacity(0.32), radius: 8, x: 0, y: 5)
+            robotKnob
                 .offset(knobOffset)
         }
         .frame(width: baseSize, height: baseSize)
@@ -393,6 +754,16 @@ private struct RobotJoystickView: View {
                 .frame(width: crosshairLength, height: crosshairThickness)
                 .offset(x: baseSize / 2 - 30)
         }
+    }
+
+    private var robotKnob: some View {
+        Image("EdukARtIllustration")
+            .resizable()
+            .scaledToFit()
+            .padding(2)
+            .frame(width: knobSize, height: knobSize)
+            .shadow(color: .black.opacity(0.32), radius: 8, x: 0, y: 5)
+            .accessibilityLabel("Eduard joystick handle")
     }
 
     private func limitedKnobOffset(for translation: CGSize) -> CGSize {
