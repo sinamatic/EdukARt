@@ -1,5 +1,5 @@
 //
-//  AprilTagSearchSession.swift
+//  AprilTagDetectionSession.swift
 //  EdukARt
 //
 //
@@ -8,34 +8,34 @@ import Combine
 import Foundation
 
 @MainActor
-final class AprilTagSearchSession: ObservableObject {
+final class AprilTagDetectionSession: ObservableObject {
     @Published private(set) var detectedTagName: String?
     @Published private(set) var detectedTagNames: [String] = []
     @Published private(set) var isTagTracked = false
-    @Published var statusMessage = "AprilTags werden geladen"
+    @Published var statusMessage = "Loading AprilTags"
 
     var titleText: String {
-        "AprilTag suchen"
+        "AprilTag Detection"
     }
 
     var instructionText: String {
         if detectedTagNames.isEmpty == false {
-            return "Erkannt: \(detectedTagNumbersText). Richte die Kamera ruhig auf die Marker, um Rahmen und Nummern stabil zu sehen."
+            return "Detected: \(detectedTagNumbersText). Keep the camera steady to track the markers."
         }
 
-        return "Richte die Kamera auf einen ausgedruckten AprilTag. Sobald ein bekannter Tag erkannt wird, erscheint ein Rahmen mit seiner Nummer."
+        return "Point the camera at a printed AprilTag. Known tags are highlighted with their number."
     }
 
     var statusText: String {
         if isTagTracked, detectedTagNames.isEmpty == false {
-            return "Erkannt: \(detectedTagNumbersText)"
+            return "Detected: \(detectedTagNumbersText)"
         }
 
         if statusMessage.isEmpty == false {
             return statusMessage
         }
 
-        return "Suche laeuft"
+        return "Searching"
     }
 
     var detectedTagNumbersText: String {
@@ -50,28 +50,28 @@ final class AprilTagSearchSession: ObservableObject {
         detectedTagNames = tagNames
         detectedTagName = tagNames.first
         self.isTagTracked = isTracked
-        statusMessage = tagNames.isEmpty ? "Suche AprilTag" : "AprilTag erkannt"
+        statusMessage = tagNames.isEmpty ? "Searching for AprilTags" : "AprilTag detected"
     }
 
     func setSearchingMessage() {
         detectedTagName = nil
         detectedTagNames = []
         isTagTracked = false
-        statusMessage = "Suche AprilTag"
+        statusMessage = "Searching for AprilTags"
     }
 
     func setMissingAssetsMessage() {
         detectedTagName = nil
         detectedTagNames = []
         isTagTracked = false
-        statusMessage = "Keine AprilTags im Asset Catalog gefunden"
+        statusMessage = "No AprilTags found in the asset catalog"
     }
 
     func setFailureMessage(_ message: String) {
         detectedTagName = nil
         detectedTagNames = []
         isTagTracked = false
-        statusMessage = "Fehler: \(message)"
+        statusMessage = "Error: \(message)"
     }
 
     func displayNumber(for tagName: String) -> String {

@@ -157,7 +157,7 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
     }
 
     func configureReferenceTagDetection(on configuration: ARWorldTrackingConfiguration) {
-        guard let referenceImages = ARReferenceImage.referenceImages(inGroupNamed: "AprilTags", bundle: nil) else {
+        guard let referenceImages = ARReferenceImage.supportedAprilTags() else {
             return
         }
 
@@ -206,7 +206,7 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
 
         let detection = AprilTagOverlayDetection(
             corners: projectedCorners(for: tagAnchor, in: arView, frame: frame),
-            label: "#1"
+            label: "#0"
         )
         DispatchQueue.main.async { [weak self] in
             self?.tagOverlayView.update(detections: [detection])
@@ -247,7 +247,7 @@ final class MapScanCoordinator: NSObject, ARSessionDelegate {
         let results = arView.raycast(from: center, allowing: .estimatedPlane, alignment: .horizontal)
         guard let firstResult = results.first else {
             Task { @MainActor [weak self] in
-                self?.session.saveMessage = "Kein Boden unter dem Fadenkreuz gefunden. Richte die Kamera auf den Boden und versuche es erneut."
+                self?.session.saveMessage = "No floor found under the crosshair. Point at the floor and try again."
             }
             return
         }

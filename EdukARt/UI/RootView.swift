@@ -33,6 +33,7 @@ enum EdukARtUI {
         static let robotStatusTrailingPadding: CGFloat = 24
         static let robotStatusRemoteTopPadding: CGFloat = 15
         static let robotStatusDefaultTopPadding: CGFloat = 56
+        static let robotStatusVerticalPadding: CGFloat = 6
         static let logoSize: CGFloat = 220
         static let loadingPanelSpacing: CGFloat = 14
         static let loadingPanelHorizontalPadding: CGFloat = 28
@@ -49,7 +50,8 @@ enum EdukARtUI {
         static let menuVerticalPadding: CGFloat = 40
         static let mapSelectionSpacing: CGFloat = 20
         static let mapSelectionHorizontalPadding: CGFloat = 24
-        static let mapSelectionTopPadding: CGFloat = 34
+        static let mapSelectionTopPadding: CGFloat = robotStatusDefaultTopPadding + robotStatusVerticalPadding
+        static let mapSelectionContentTopPadding: CGFloat = 200
         static let mapSelectionBottomPadding: CGFloat = 24
         static let listItemPadding: CGFloat = 18
         static let listItemContentSpacing: CGFloat = 8
@@ -172,18 +174,20 @@ struct RootView: View {
 
     private var showsRobotStatusOverlay: Bool {
         switch phase {
-        case .logo, .selectGameMap, .createGameMap:
+        case .logo:
             return false
-        case .menu, .remoteControl, .gameLoading, .game:
+        case .menu, .remoteControl, .gameLoading, .game, .selectGameMap, .createGameMap:
             return true
         }
     }
 
     private var robotStatusOverlayTopPadding: CGFloat {
         switch phase {
-        case .remoteControl:
+        case .remoteControl, .createGameMap:
             return EdukARtUI.Layout.robotStatusRemoteTopPadding
-        default:
+        case .menu, .gameLoading, .game, .selectGameMap:
+            return EdukARtUI.Layout.robotStatusDefaultTopPadding
+        case .logo:
             return EdukARtUI.Layout.robotStatusDefaultTopPadding
         }
     }

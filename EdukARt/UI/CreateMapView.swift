@@ -12,12 +12,12 @@ struct CreateMapView: View {
         case selection
         case scanWithAprilTag
         case scanWithoutAprilTag
-        case searchAprilTag
+        case detectAprilTag
     }
 
     @ObservedObject var mapStore: MapStore
     @StateObject private var mapScanSession = MapScanSession()
-    @StateObject private var aprilTagSearchSession = AprilTagSearchSession()
+    @StateObject private var aprilTagDetectionSession = AprilTagDetectionSession()
     @State private var mode: Mode = .selection
     @State private var mapName = ""
     @State private var scanUsesAprilTag = true
@@ -29,8 +29,8 @@ struct CreateMapView: View {
             if mode == .scanWithAprilTag || mode == .scanWithoutAprilTag {
                 MapScanViewContainer(session: mapScanSession, usesAprilTagOrigin: scanUsesAprilTag)
                     .ignoresSafeArea()
-            } else if mode == .searchAprilTag {
-                AprilTagSearchViewContainer(session: aprilTagSearchSession)
+            } else if mode == .detectAprilTag {
+                AprilTagDetectionViewContainer(session: aprilTagDetectionSession)
                     .ignoresSafeArea()
             } else {
                 Color.black
@@ -64,12 +64,7 @@ struct CreateMapView: View {
                     mode = .selection
                 }
             }
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(.black.opacity(0.65))
-            .foregroundStyle(.white)
-            .clipShape(Capsule())
+            .buttonStyle(RemoteBackButtonStyle())
 
             Spacer(minLength: 12)
 
@@ -78,8 +73,10 @@ struct CreateMapView: View {
                     statusPill(mapScanSession.statusText)
                     statusPill(mapScanSession.originStatusText)
                 }
-            } else if mode == .searchAprilTag {
-                statusPill(aprilTagSearchSession.statusText)
+                .padding(.trailing, 96)
+            } else if mode == .detectAprilTag {
+                statusPill(aprilTagDetectionSession.statusText)
+                    .padding(.trailing, 96)
             }
         }
     }
@@ -91,7 +88,7 @@ struct CreateMapView: View {
                 selectionCard
             case .scanWithAprilTag, .scanWithoutAprilTag:
                 scanCard
-            case .searchAprilTag:
+            case .detectAprilTag:
                 aprilTagCard
             }
         }
@@ -103,11 +100,11 @@ struct CreateMapView: View {
                 .font(.title2.weight(.bold))
                 .foregroundStyle(.white)
 
-            Text("Waehle zuerst, wie du die Karte starten moechtest.")
+            Text("Choose how to start the map.")
                 .font(.body)
                 .foregroundStyle(.white.opacity(0.92))
 
-            Button("Create Map with Apriltag (recommended)") {
+            Button("Create Map with AprilTag") {
                 scanUsesAprilTag = true
                 mapScanSession.configureOriginMode(.aprilTag)
                 mode = .scanWithAprilTag
@@ -121,8 +118,8 @@ struct CreateMapView: View {
             }
             .buttonStyle(SecondaryScanButtonStyle())
 
-            Button("Search April Tag") {
-                mode = .searchAprilTag
+            Button("AprilTag Detection") {
+                mode = .detectAprilTag
             }
             .buttonStyle(SecondaryScanButtonStyle())
         }
@@ -134,28 +131,28 @@ struct CreateMapView: View {
 
     private var aprilTagCard: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text(aprilTagSearchSession.titleText)
+            Text(aprilTagDetectionSession.titleText)
                 .font(.title2.weight(.bold))
                 .foregroundStyle(.white)
 
-            Text(aprilTagSearchSession.instructionText)
+            Text(aprilTagDetectionSession.instructionText)
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(.white.opacity(0.92))
 
-            if aprilTagSearchSession.detectedTagNames.isEmpty == false, aprilTagSearchSession.isTagTracked {
+            if aprilTagDetectionSession.detectedTagNames.isEmpty == false, aprilTagDetectionSession.isTagTracked {
                 statusRow(
-                    title: "Erkannte Tags",
-                    value: aprilTagSearchSession.detectedTagNumbersText
+                    title: "Detected tags",
+                    value: aprilTagDetectionSession.detectedTagNumbersText
                 )
             }
 
             statusRow(
                 title: "Status",
-                value: aprilTagSearchSession.statusText
+                value: aprilTagDetectionSession.statusText
             )
 
-            Button("Zur Auswahl zurueck") {
+            Button("Back to options") {
                 mode = .selection
             }
             .buttonStyle(PrimaryScanButtonStyle())
@@ -179,29 +176,29 @@ struct CreateMapView: View {
                     .foregroundStyle(.white.opacity(0.92))
 
                 statusRow(
-                    title: "Bodenflaeche bestaetigt",
+                    title: "Floor area",
                     value: String(format: "%.1f m²", mapScanSession.confirmedFloorArea)
                 )
 
                 statusRow(
-                    title: "Mindestflaeche",
+                    title: "Required area",
                     value: String(format: "%.1f m²", mapScanSession.minimumRequiredAreaSquareMeters)
                 )
 
                 statusRow(
-                    title: "Fortschritt",
+                    title: "Progress",
                     value: "\(Int(mapScanSession.floorProgress * 100))%"
                 )
 
                 if let lowestFloorHeight = mapScanSession.lowestFloorHeight {
                     statusRow(
-                        title: "Tiefster Boden",
+                        title: "Lowest floor",
                         value: String(format: "%.2f m", lowestFloorHeight)
                     )
                 }
 
                 statusRow(
-                    title: scanUsesAprilTag ? "AprilTag" : "Startpunkt",
+                    title: scanUsesAprilTag ? "AprilTag" : "Start point",
                     value: mapScanSession.originStatusText
                 )
 
@@ -209,21 +206,21 @@ struct CreateMapView: View {
                     .tint(.green)
 
                 if scanUsesAprilTag == false, mapScanSession.hasOrigin == false {
-                    Button("Startpunkt setzen") {
+                    Button("Set start point") {
                         mapScanSession.requestOriginPlacement()
                     }
                     .buttonStyle(PrimaryScanButtonStyle())
                 }
 
                 if mapScanSession.canFinishScan {
-                    Button("Fertig") {
+                    Button("Done") {
                         mapScanSession.finishScan()
                     }
                     .buttonStyle(PrimaryScanButtonStyle())
                 }
 
                 if mapScanSession.isReviewingScan {
-                    TextField("Kartenname", text: $mapName)
+                    TextField("Map name", text: $mapName)
                         .textInputAutocapitalization(.words)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 12)

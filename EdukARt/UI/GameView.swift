@@ -37,15 +37,10 @@ struct GameView: View {
 
                 VStack {
                     HStack {
-                        Button("Zurück") {
+                        Button("Back") {
                             onBack()
                         }
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(.black.opacity(0.65))
-                        .foregroundStyle(.white)
-                        .clipShape(Capsule())
+                        .buttonStyle(RemoteBackButtonStyle())
 
                         Spacer()
 

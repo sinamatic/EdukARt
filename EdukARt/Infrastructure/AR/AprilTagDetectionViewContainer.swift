@@ -1,5 +1,5 @@
 //
-//  AprilTagSearchViewContainer.swift
+//  AprilTagDetectionViewContainer.swift
 //  EdukARt
 //
 //
@@ -9,11 +9,11 @@ import RealityKit
 import SwiftUI
 import UIKit
 
-struct AprilTagSearchViewContainer: UIViewRepresentable {
-    @ObservedObject var session: AprilTagSearchSession
+struct AprilTagDetectionViewContainer: UIViewRepresentable {
+    @ObservedObject var session: AprilTagDetectionSession
 
-    func makeCoordinator() -> AprilTagSearchCoordinator {
-        AprilTagSearchCoordinator(session: session)
+    func makeCoordinator() -> AprilTagDetectionCoordinator {
+        AprilTagDetectionCoordinator(session: session)
     }
 
     func makeUIView(context: Context) -> ARView {
@@ -31,14 +31,14 @@ struct AprilTagSearchViewContainer: UIViewRepresentable {
     }
 }
 
-final class AprilTagSearchCoordinator: NSObject, ARSessionDelegate {
-    var session: AprilTagSearchSession
+final class AprilTagDetectionCoordinator: NSObject, ARSessionDelegate {
+    var session: AprilTagDetectionSession
 
     private weak var arView: ARView?
     private let overlayView = AprilTagOverlayView()
     private var hasStartedSession = false
 
-    init(session: AprilTagSearchSession) {
+    init(session: AprilTagDetectionSession) {
         self.session = session
     }
 
@@ -65,7 +65,7 @@ final class AprilTagSearchCoordinator: NSObject, ARSessionDelegate {
             return
         }
 
-        guard let referenceImages = ARReferenceImage.referenceImages(inGroupNamed: "AprilTags", bundle: nil),
+        guard let referenceImages = ARReferenceImage.supportedAprilTags(),
               referenceImages.isEmpty == false else {
             Task { @MainActor [weak self] in
                 self?.session.setMissingAssetsMessage()
@@ -77,7 +77,7 @@ final class AprilTagSearchCoordinator: NSObject, ARSessionDelegate {
         configuration.planeDetection = []
         configuration.environmentTexturing = .none
         configuration.detectionImages = referenceImages
-        configuration.maximumNumberOfTrackedImages = min(referenceImages.count, 3)
+        configuration.maximumNumberOfTrackedImages = referenceImages.count
         configuration.isAutoFocusEnabled = true
         configuration.automaticImageScaleEstimationEnabled = false
 
@@ -129,7 +129,7 @@ final class AprilTagSearchCoordinator: NSObject, ARSessionDelegate {
 
     func sessionWasInterrupted(_ session: ARSession) {
         Task { @MainActor [weak self] in
-            self?.session.setFailureMessage("Kamera wurde unterbrochen")
+            self?.session.setFailureMessage("Camera interrupted")
             self?.overlayView.clear()
         }
     }
@@ -260,4 +260,28 @@ final class AprilTagOverlayView: UIView {
 struct AprilTagOverlayDetection {
     let corners: [CGPoint]
     let label: String
+}
+
+extension ARReferenceImage {
+    static func supportedAprilTags() -> Set<ARReferenceImage>? {
+        guard let referenceImages = ARReferenceImage.referenceImages(inGroupNamed: "AprilTags", bundle: nil) else {
+            return nil
+        }
+
+        let supportedImages = referenceImages.filter { referenceImage in
+            guard let name = referenceImage.name else {
+                return false
+            }
+
+            let expectedSize = StoredFloorMapConstants.referenceTagPhysicalSizeMeters
+            let physicalSize = referenceImage.physicalSize
+            let hasExpectedSize =
+                abs(Float(physicalSize.width) - expectedSize) < 0.001 &&
+                abs(Float(physicalSize.height) - expectedSize) < 0.001
+
+            return StoredFloorMapConstants.supportedReferenceTagNames.contains(name) && hasExpectedSize
+        }
+
+        return Set(supportedImages)
+    }
 }

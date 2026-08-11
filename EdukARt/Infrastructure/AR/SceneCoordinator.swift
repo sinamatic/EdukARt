@@ -10,10 +10,10 @@ import RealityKit
 import UIKit
 
 enum RealRobotTrackingConstants {
-    static let robotTagName = "tag36h11-1"
+    static let robotTagName = StoredFloorMapConstants.referenceTagName
     static let tagHeightOffset: Float = 0.10
     static let trackingLossGracePeriod: TimeInterval = 2.5
-    static let imageForwardSign: Float = -1
+    static let imageForwardSign: Float = 1
 }
 
 final class SceneCoordinator: NSObject, ARSessionDelegate {
@@ -21,7 +21,7 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
     var debugController: SceneDebugController?
     private let playerEntity = Entity()
     private let playerModelPitchCorrection = simd_quatf(angle: -.pi / 2, axis: [1, 0, 0])
-    private let mapStartRobotOrientation = simd_quatf(angle: -.pi / 2, axis: [0, 1, 0])
+    private let mapStartRobotOrientation = simd_quatf()
     private let tagOverlayView = AprilTagOverlayView()
     private let wheelRadiansPerMeter: Float = (1000 / (3.14 * 100)) * (2 * .pi)
     private let wheelSpinAxis = SIMD3<Float>(1, 0, 0)
@@ -71,7 +71,7 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
             return false
         }
 
-        guard let referenceImages = ARReferenceImage.referenceImages(inGroupNamed: "AprilTags", bundle: nil) else {
+        guard let referenceImages = ARReferenceImage.supportedAprilTags() else {
             return false
         }
 
@@ -139,7 +139,7 @@ final class SceneCoordinator: NSObject, ARSessionDelegate {
     }
 
     func configureRealRobotTracking(_ configuration: ARWorldTrackingConfiguration) {
-        guard let referenceImages = ARReferenceImage.referenceImages(inGroupNamed: "AprilTags", bundle: nil) else {
+        guard let referenceImages = ARReferenceImage.supportedAprilTags() else {
             return
         }
 

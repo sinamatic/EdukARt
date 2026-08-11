@@ -8,7 +8,9 @@ import Foundation
 
 enum StoredFloorMapConstants {
     static let tileSize: Float = 0.12
-    static let referenceTagName = "tag36h11-1"
+    static let supportedReferenceTagNames = Set((0...3).map { "tag36h11-\($0)" })
+    static let referenceTagName = "tag36h11-0"
+    static let referenceTagPhysicalSizeMeters: Float = 0.13
 }
 
 struct StoredFloorMap: Identifiable, Codable, Equatable {
@@ -29,7 +31,7 @@ extension StoredFloorMap {
 
     var displayReferenceTagNumber: String {
         guard let activeReferenceTagName else {
-            return "Ohne Tag"
+            return "No tag"
         }
 
         let trailingDigits = activeReferenceTagName

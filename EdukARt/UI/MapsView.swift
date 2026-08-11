@@ -22,10 +22,10 @@ struct MapsView: View {
                 listView
             }
         }
-        .alert("Loeschen fehlgeschlagen", isPresented: deleteErrorBinding) {
+        .alert("Delete failed", isPresented: deleteErrorBinding) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(deleteErrorMessage ?? "Unbekannter Fehler")
+            Text(deleteErrorMessage ?? "Unknown error")
         }
     }
 
@@ -44,17 +44,17 @@ struct MapsView: View {
                     Button("Back") {
                         onClose()
                     }
-                    .buttonStyle(MapOverlayButtonStyle())
+                    .buttonStyle(RemoteBackButtonStyle())
 
                     Spacer()
                 }
 
-                Text("Karten")
+                Text("Maps")
                     .font(.largeTitle.weight(.bold))
                     .foregroundStyle(.white)
 
                 if mapStore.maps.isEmpty {
-                    Text("Noch keine Karten gespeichert.")
+                    Text("No maps saved yet.")
                         .foregroundStyle(.white.opacity(0.82))
                 } else {
                     List {
@@ -71,10 +71,10 @@ struct MapsView: View {
                                         .font(.footnote.weight(.semibold))
                                         .foregroundStyle(.green)
 
-                                    detailRow(title: "Aufgenommen am", value: map.createdAt.formatted(date: .abbreviated, time: .omitted))
-                                    detailRow(title: "Um", value: map.createdAt.formatted(date: .omitted, time: .shortened))
+                                    detailRow(title: "Created on", value: map.createdAt.formatted(date: .abbreviated, time: .omitted))
+                                    detailRow(title: "At", value: map.createdAt.formatted(date: .omitted, time: .shortened))
                                     detailRow(title: "AprilTag", value: map.displayReferenceTagNumber)
-                                    detailRow(title: "Speichergroesse", value: ByteCountFormatter.string(fromByteCount: Int64(mapStore.estimatedStorageSize(for: map)), countStyle: .file))
+                                    detailRow(title: "Storage size", value: ByteCountFormatter.string(fromByteCount: Int64(mapStore.estimatedStorageSize(for: map)), countStyle: .file))
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(18)
@@ -86,7 +86,7 @@ struct MapsView: View {
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button("Loeschen", role: .destructive) {
+                                Button("Delete", role: .destructive) {
                                     delete(map)
                                 }
                             }
@@ -137,17 +137,5 @@ struct MapsView: View {
                 .multilineTextAlignment(.trailing)
                 .foregroundStyle(.white.opacity(0.9))
         }
-    }
-}
-
-private struct MapOverlayButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(.black.opacity(0.65))
-            .foregroundStyle(.white)
-            .clipShape(Capsule())
     }
 }

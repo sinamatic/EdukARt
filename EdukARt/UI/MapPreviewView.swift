@@ -12,7 +12,7 @@ import UIKit
 struct MapPreviewView: View {
     let map: StoredFloorMap
     let onBack: () -> Void
-    @State private var statusText = "Karte ausrichten"
+    @State private var statusText = "Align map"
     @State private var placementRequest = 0
 
     var body: some View {
@@ -36,7 +36,7 @@ struct MapPreviewView: View {
                     Button("Back") {
                         onBack()
                     }
-                    .buttonStyle(MapPreviewButtonStyle())
+                    .buttonStyle(RemoteBackButtonStyle())
 
                     Spacer()
 
@@ -58,13 +58,13 @@ struct MapPreviewView: View {
                         .font(.title2.weight(.bold))
                         .foregroundStyle(.white)
                     Text(map.referenceTagName == nil
-                         ? "Richte die Kamera auf den Boden und platziere die gespeicherte Karte an der aktuellen Position."
-                         : "Richte die Kamera auf AprilTag #1. Die gespeicherte Karte wird automatisch an diesem Marker ausgerichtet.")
+                         ? "Point the camera at the floor and place the saved map at the current position."
+                         : "Point the camera at AprilTag #0. The saved map aligns to that marker.")
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.84))
 
                     if map.referenceTagName == nil {
-                        Button("Karte hier platzieren") {
+                        Button("Place map here") {
                             placementRequest += 1
                         }
                         .buttonStyle(MapPreviewPlaceButtonStyle())
@@ -138,17 +138,17 @@ private final class MapPreviewCoordinator: NSObject, ARSessionDelegate {
 
     func configureReferenceTagDetection(on configuration: ARWorldTrackingConfiguration) {
         guard let requiredTagName = map.activeReferenceTagName else {
-            statusText.wrappedValue = "Auf Boden ausrichten"
+            statusText.wrappedValue = "Align to floor"
             return
         }
 
-        guard let referenceImages = ARReferenceImage.referenceImages(inGroupNamed: "AprilTags", bundle: nil) else {
+        guard let referenceImages = ARReferenceImage.supportedAprilTags() else {
             return
         }
 
         let requiredImages = referenceImages.filter { $0.name == requiredTagName }
         guard requiredImages.isEmpty == false else {
-            statusText.wrappedValue = "AprilTag-Asset fehlt"
+            statusText.wrappedValue = "AprilTag asset missing"
             return
         }
 
@@ -166,7 +166,7 @@ private final class MapPreviewCoordinator: NSObject, ARSessionDelegate {
             .compactMap({ $0 as? ARImageAnchor })
             .first(where: { $0.referenceImage.name == requiredTagName }) else {
             if renderedAnchorIdentifier == nil {
-                statusText.wrappedValue = "Suche AprilTag #1"
+                statusText.wrappedValue = "Find AprilTag #0"
             }
             return
         }
@@ -177,7 +177,7 @@ private final class MapPreviewCoordinator: NSObject, ARSessionDelegate {
 
         renderedAnchorIdentifier = tagAnchor.identifier
         renderMap(relativeTo: tagAnchor.transform)
-        statusText.wrappedValue = "Karte an Tag #1 ausgerichtet"
+        statusText.wrappedValue = "Map aligned to tag #0"
     }
 
     private func placeMapAtScreenCenter() {
@@ -188,12 +188,12 @@ private final class MapPreviewCoordinator: NSObject, ARSessionDelegate {
         let center = CGPoint(x: arView.bounds.midX, y: arView.bounds.midY)
         let results = arView.raycast(from: center, allowing: .estimatedPlane, alignment: .horizontal)
         guard let firstResult = results.first else {
-            statusText.wrappedValue = "Kein Boden gefunden"
+            statusText.wrappedValue = "No floor found"
             return
         }
 
         renderMap(relativeTo: firstResult.worldTransform)
-        statusText.wrappedValue = "Karte platziert"
+        statusText.wrappedValue = "Map placed"
     }
 
     private func renderMap(relativeTo originTransform: simd_float4x4) {
@@ -328,18 +328,6 @@ private struct PreviewRowSpan {
 private struct PreviewStrip {
     let center: SIMD3<Float>
     let size: SIMD3<Float>
-}
-
-private struct MapPreviewButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(.black.opacity(0.65))
-            .foregroundStyle(.white)
-            .clipShape(Capsule())
-    }
 }
 
 private struct MapPreviewPlaceButtonStyle: ButtonStyle {

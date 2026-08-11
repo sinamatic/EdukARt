@@ -94,7 +94,7 @@ final class Game: ObservableObject {
         self.obstacles = selectedMap.map(Self.makeCoinGrid(from:)) ?? Self.makeLinearCollectibles(around: robot.position)
         if let selectedMap, selectedMap.referenceTagName != nil {
             isWaitingForMapOrigin = true
-            mapOriginMessage = "Scanne AprilTag \(selectedMap.displayReferenceTagNumber), um die Karte auszurichten."
+            mapOriginMessage = "Scan AprilTag \(selectedMap.displayReferenceTagNumber) to align the map."
         } else {
             robotMode = .simulation
         }
@@ -217,7 +217,7 @@ final class Game: ObservableObject {
         isChoosingRobotMode = false
         isWaitingForRealRobot = true
         realRobotTagName = nil
-        mapOriginMessage = "Scanne AprilTag #1 am echten Roboter."
+        mapOriginMessage = "Scan AprilTag #0 on the real robot."
     }
 
     private func canMove(to candidatePosition: SIMD3<Float>) -> Bool {

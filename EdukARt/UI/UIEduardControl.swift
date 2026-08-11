@@ -673,7 +673,7 @@ private struct RemoteControlButtonStyle: ButtonStyle {
     }
 }
 
-private struct RemoteBackButtonStyle: ButtonStyle {
+struct RemoteBackButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold))

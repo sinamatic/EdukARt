@@ -23,70 +23,73 @@ struct UIStartGameChooseMap: View {
             Color.black.opacity(EdukARtUI.Opacity.mapSelectionOverlay)
                 .ignoresSafeArea()
 
-            VStack(spacing: EdukARtUI.Layout.mapSelectionSpacing) {
+            VStack(spacing: 0) {
                 HStack {
                     Button("Back") {
                         onBack()
                     }
-                    .buttonStyle(CompactOverlayButtonStyle())
+                    .buttonStyle(RemoteBackButtonStyle())
 
-                    Button(isEditingMaps ? "Fertig" : "Bearbeiten") {
+                    Button(isEditingMaps ? "Done" : "Edit") {
                         isEditingMaps.toggle()
                     }
-                    .buttonStyle(CompactOverlayButtonStyle())
+                    .buttonStyle(RemoteBackButtonStyle())
 
                     Spacer()
                 }
 
-                Text("Karte fuer Spiel waehlen")
-                    .font(.largeTitle.weight(.bold))
-                    .foregroundStyle(.white)
+                VStack(spacing: EdukARtUI.Layout.mapSelectionSpacing) {
+                    Text("Choose Game Map")
+                        .font(.largeTitle.weight(.bold))
+                        .foregroundStyle(.white)
 
-                Text("Die Coins werden im Raster auf der gespeicherten Bodenflaeche platziert.")
-                    .font(.subheadline)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(EdukARtUI.Opacity.secondaryText))
+                    Text("Coins are placed on the saved floor grid.")
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(EdukARtUI.Opacity.secondaryText))
 
-                List {
-                    Button {
-                        onStartGame(nil)
-                    } label: {
-                        Text("Ohne Karte starten")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(EdukARtUI.Layout.listItemPadding)
-                            .background(Color.white.opacity(EdukARtUI.Opacity.listItemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: EdukARtUI.Layout.listItemCornerRadius, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .listRowInsets(EdgeInsets(top: EdukARtUI.Layout.listRowVerticalInset, leading: .zero, bottom: EdukARtUI.Layout.listRowVerticalInset, trailing: .zero))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-
-                    ForEach(mapStore.maps) { map in
-                        mapRow(for: map)
+                    List {
+                        Button {
+                            onStartGame(nil)
+                        } label: {
+                            Text("Start without map")
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(EdukARtUI.Layout.listItemPadding)
+                                .background(Color.white.opacity(EdukARtUI.Opacity.listItemBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: EdukARtUI.Layout.listItemCornerRadius, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top: EdukARtUI.Layout.listRowVerticalInset, leading: .zero, bottom: EdukARtUI.Layout.listRowVerticalInset, trailing: .zero))
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
-                    }
-                }
-                .scrollContentBackground(.hidden)
-                .listStyle(.plain)
 
-                Button("Create Map") {
-                    onCreateMap()
+                        ForEach(mapStore.maps) { map in
+                            mapRow(for: map)
+                            .listRowInsets(EdgeInsets(top: EdukARtUI.Layout.listRowVerticalInset, leading: .zero, bottom: EdukARtUI.Layout.listRowVerticalInset, trailing: .zero))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+                    .scrollContentBackground(.hidden)
+                    .listStyle(.plain)
+
+                    Button("Create Map") {
+                        onCreateMap()
+                    }
+                    .buttonStyle(StartScreenButtonStyle(fillColor: EdukARtUI.Colors.brandGreen))
                 }
-                .buttonStyle(StartScreenButtonStyle(fillColor: EdukARtUI.Colors.brandGreen))
+                .padding(.top, EdukARtUI.Layout.mapSelectionContentTopPadding)
             }
             .padding(.horizontal, EdukARtUI.Layout.mapSelectionHorizontalPadding)
             .padding(.top, EdukARtUI.Layout.mapSelectionTopPadding)
             .padding(.bottom, EdukARtUI.Layout.mapSelectionBottomPadding)
         }
-        .alert("Loeschen fehlgeschlagen", isPresented: deleteErrorBinding) {
+        .alert("Delete failed", isPresented: deleteErrorBinding) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(deleteErrorMessage ?? "Unbekannter Fehler")
+            Text(deleteErrorMessage ?? "Unknown error")
         }
     }
 
@@ -100,7 +103,7 @@ struct UIStartGameChooseMap: View {
                         .font(.headline)
                         .foregroundStyle(.white)
 
-                    Text("\(map.floorTiles.count) Bodenkacheln")
+                    Text("\(map.floorTiles.count) floor tiles")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(EdukARtUI.Colors.brandGreen)
 
@@ -113,7 +116,7 @@ struct UIStartGameChooseMap: View {
             .buttonStyle(.plain)
 
             if isEditingMaps {
-                Button("Loeschen", role: .destructive) {
+                Button("Delete", role: .destructive) {
                     delete(map)
                 }
                 .font(.footnote.weight(.bold))

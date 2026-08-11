@@ -47,13 +47,13 @@ final class MapScanSession: ObservableObject {
     var titleText: String {
         switch phase {
         case .placingOrigin:
-            originMode == .aprilTag ? "AprilTag #1 suchen" : "Startpunkt setzen"
+            originMode == .aprilTag ? "Find AprilTag #0" : "Set start point"
         case .scanningFloor:
-            "Bodenflaeche scannen"
+            "Scan floor"
         case .reviewBeforeSave:
-            "Scan pruefen"
+            "Review scan"
         case .saved:
-            "Karte bereit"
+            "Map ready"
         }
     }
 
@@ -61,44 +61,44 @@ final class MapScanSession: ObservableObject {
         return switch phase {
         case .placingOrigin:
             if originMode == .aprilTag {
-                "Richte die Kamera auf AprilTag #1. Sobald der Tag erkannt wird, startet der Umgebungsscan automatisch von diesem Punkt aus."
+                "Point the camera at AprilTag #0. The scan starts from that point when the tag is detected."
             } else {
-                "Richte die Kamera auf den Boden an der Stelle, an der die Karte beginnen soll. Tippe dann auf \"Startpunkt setzen\"."
+                "Point the camera at the floor where the map should start, then tap \"Set start point\"."
             }
         case .scanningFloor:
             if originMode == .aprilTag {
-                "AprilTag #1 ist gesetzt. Scanne jetzt die Umgebung weiter. Es muessen mindestens 2 m² bestaetigt sein."
+                "AprilTag #0 is set. Scan at least 2 m² of floor."
             } else {
-                "Der Startpunkt ist gesetzt. Scanne jetzt die Umgebung weiter. Es muessen mindestens 2 m² bestaetigt sein."
+                "The start point is set. Scan at least 2 m² of floor."
             }
         case .reviewBeforeSave:
-            "Der Scan ist eingefroren. Pruefe die aufgenommene Flaeche und vergebe dann einen Namen, bevor du speicherst."
+            "The scan is paused. Check the area, enter a name, and save it."
         case .saved:
-            "Die Mindestflaeche ist erreicht. Wenn die Flaeche stimmt, kannst du die Karte speichern."
+            "The map is saved and ready to use."
         }
     }
 
     var statusText: String {
         return switch mappingStatus {
         case .notAvailable:
-            "Mapping startet"
+            "Mapping starting"
         case .limited:
-            "Mapping begrenzt"
+            "Mapping limited"
         case .extending:
-            "Mapping erweitert sich"
+            "Mapping expanding"
         case .mapped:
-            "Mapping stabil"
+            "Mapping stable"
         @unknown default:
-            "Mapping unbekannt"
+            "Mapping unknown"
         }
     }
 
     var originStatusText: String {
         switch originMode {
         case .aprilTag:
-            hasOrigin ? "Tag #1 gesetzt" : "Tag #1 suchen"
+            hasOrigin ? "Tag #0 set" : "Find tag #0"
         case .manualFloorPoint:
-            hasOrigin ? "Startpunkt gesetzt" : "Startpunkt offen"
+            hasOrigin ? "Start point set" : "Start point open"
         }
     }
 
@@ -125,14 +125,14 @@ final class MapScanSession: ObservableObject {
 
     var saveButtonTitle: String {
         if isSaving {
-            return "Speichert..."
+            return "Saving..."
         }
 
         if hasSavedCurrentScan {
-            return "Gespeichert"
+            return "Saved"
         }
 
-        return "Karte speichern"
+        return "Save map"
     }
 
     func updateMappingStatus(_ mappingStatus: ARFrame.WorldMappingStatus) {
@@ -176,7 +176,7 @@ final class MapScanSession: ObservableObject {
         }
 
         phase = .reviewBeforeSave
-        saveMessage = "Scan eingefroren. Du kannst der Karte jetzt einen Namen geben und speichern."
+        saveMessage = "Scan paused. Name and save the map."
     }
 
     var shouldUpdateLivePreview: Bool {
@@ -205,14 +205,14 @@ final class MapScanSession: ObservableObject {
 
     func saveMap(named name: String, into store: MapStore) {
         guard hasSavedCurrentScan == false else {
-            saveMessage = "Diese Aufnahme wurde bereits gespeichert."
+            saveMessage = "This scan has already been saved."
             return
         }
 
         guard let map = makeStoredMap(named: name) else {
             saveMessage = originMode == .aprilTag
-                ? "Zum Speichern muss zuerst AprilTag #1 erkannt und mindestens 2 m² Boden erkannt sein."
-                : "Zum Speichern muss zuerst der Startpunkt gesetzt und mindestens 2 m² Boden erkannt sein."
+                ? "Detect AprilTag #0 and scan at least 2 m² before saving."
+                : "Set the start point and scan at least 2 m² before saving."
             return
         }
 
@@ -224,11 +224,11 @@ final class MapScanSession: ObservableObject {
             hasSavedCurrentScan = true
             savedMap = map
             phase = .saved
-            saveMessage = "Karte \"\(map.name)\" gespeichert."
+            saveMessage = "Saved \"\(map.name)\"."
         } catch {
             isSaving = false
             savedMap = nil
-            saveMessage = "Speichern fehlgeschlagen: \(error.localizedDescription)"
+            saveMessage = "Save failed: \(error.localizedDescription)"
         }
     }
 
@@ -248,7 +248,7 @@ final class MapScanSession: ObservableObject {
         }
 
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedName = trimmedName.isEmpty ? "Karte \(Date.now.formatted(date: .abbreviated, time: .shortened))" : trimmedName
+        let resolvedName = trimmedName.isEmpty ? "Map \(Date.now.formatted(date: .abbreviated, time: .shortened))" : trimmedName
 
         return StoredFloorMap(
             id: UUID(),

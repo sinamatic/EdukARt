@@ -28,7 +28,7 @@ struct UIRobotStatusOverlay: View {
         }
         .padding(.leading, 7)
         .padding(.trailing, 8)
-        .padding(.vertical, 6)
+        .padding(.vertical, EdukARtUI.Layout.robotStatusVerticalPadding)
         .background(.black.opacity(0.58))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .accessibilityElement(children: .combine)
