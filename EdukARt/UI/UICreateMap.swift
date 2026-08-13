@@ -8,6 +8,8 @@ import simd
 
 struct UICreateMap: View {
     
+    @ObservedObject var mapStore: MapStore
+    
     @State private var mapName = ""
     @State private var saveMessage = ""
     @State private var previewMap: GameMap?
@@ -136,7 +138,7 @@ struct UICreateMap: View {
         _ map: GameMap
     ) -> some View {
         
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             
             Text(map.name)
                 .font(.headline)
@@ -146,6 +148,10 @@ struct UICreateMap: View {
                 "Reference Tag: #\(map.referenceTagID)"
             )
             .font(.subheadline)
+            
+            
+            UI2DMapPreview(map: map)
+                .frame(height: 300)
             
             
             ForEach(map.aprilTags) { tag in
@@ -163,8 +169,20 @@ struct UICreateMap: View {
             }
             
             
+            Button("Save Map") {
+                saveMap(map)
+            }
+            
+            
             Button("Back to Scan") {
                 previewMap = nil
+                saveMessage = ""
+            }
+            
+            
+            if saveMessage.isEmpty == false {
+                Text(saveMessage)
+                    .font(.caption)
             }
         }
         .foregroundStyle(.white)
@@ -230,5 +248,16 @@ struct UICreateMap: View {
             referenceTagID: referenceTag.id,
             aprilTags: mapTags
         )
+    }
+    
+    
+    private func saveMap(_ map: GameMap) {
+        
+        do {
+            try mapStore.save(map)
+            saveMessage = "Map saved."
+        } catch {
+            saveMessage = "Map could not be saved."
+        }
     }
 }

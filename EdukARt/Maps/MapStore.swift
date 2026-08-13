@@ -12,6 +12,7 @@ final class MapStore: ObservableObject {
     
     private let fileManager = FileManager.default
     
+    
     init() {
         load()
     }
@@ -24,39 +25,51 @@ final class MapStore: ObservableObject {
     
     
     func delete(_ map: GameMap) throws {
-        maps.removeAll { $0.id == map.id }
+        maps.removeAll {
+            $0.id == map.id
+        }
+        
         try persist()
     }
     
     
     private func load() {
-        guard let data = try? Data(contentsOf: storageURL) else {
+        guard let data = try? Data(
+            contentsOf: storageURL
+        ) else {
             return
         }
         
-        maps = (try? JSONDecoder().decode([GameMap].self, from: data)) ?? []
+        maps =
+            (try? JSONDecoder().decode(
+                [GameMap].self,
+                from: data
+            )) ?? []
     }
     
     
     private func persist() throws {
-        let folderURL = storageURL.deletingLastPathComponent()
+        let data =
+            try JSONEncoder().encode(maps)
         
-        try fileManager.createDirectory(
-            at: folderURL,
-            withIntermediateDirectories: true
+        try data.write(
+            to: storageURL,
+            options: .atomic
         )
-        
-        let data = try JSONEncoder().encode(maps)
-        try data.write(to: storageURL)
     }
     
     
     private var storageURL: URL {
-        let documentsURL = fileManager.urls(
-            for: .documentDirectory,
-            in: .userDomainMask
-        ).first!
         
-        return documentsURL.appendingPathComponent("game-maps.json")
+        let documentsURL =
+            fileManager.urls(
+                for: .documentDirectory,
+                in: .userDomainMask
+            ).first!
+        
+        return documentsURL
+            .appendingPathComponent(
+                "game-maps.json"
+            )
     }
 }

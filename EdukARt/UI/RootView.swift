@@ -122,7 +122,9 @@ struct RootView: View {
             
             
         case .createMap:
-            UICreateMap()
+            UICreateMap(
+                mapStore: mapStore
+            )
             
             
         case .game:
