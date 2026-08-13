@@ -15,6 +15,7 @@ struct RootView: View {
     @State private var phase: AppPhase = .logo
     @State private var selectedMap: GameMap?
     
+    
     var body: some View {
         Group {
             if phase == .logo {
@@ -116,7 +117,7 @@ struct RootView: View {
                 },
                 onSelectMap: { map in
                     selectedMap = map
-                    phase = .game
+                    phase = .localizeMap
                 }
             )
             
@@ -125,6 +126,17 @@ struct RootView: View {
             UICreateMap(
                 mapStore: mapStore
             )
+        
+        case .localizeMap:
+            if let selectedMap {
+                
+                UIMapLocalization(
+                    map: selectedMap,
+                    onBack: {
+                        phase = .selectMap
+                    }
+                )
+            }
             
             
         case .game:
@@ -159,6 +171,11 @@ struct RootView: View {
                 phase = .selectMap
             }
             
+        case .localizeMap:
+            return {
+                phase = .selectMap
+            }
+            
         case .game:
             return {
                 phase = .selectMap
@@ -187,6 +204,8 @@ struct RootView: View {
         case remoteControl
         case selectMap
         case createMap
+        case localizeMap
         case game
+       
     }
 }
