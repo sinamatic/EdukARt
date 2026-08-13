@@ -37,11 +37,26 @@ struct UIMapLocalization: View {
                 }
             }
             .padding()
+            
+            
+            if referenceWorldTransform != nil {
+                VStack {
+                    Spacer()
+                    
+                    UIRobotJoystick { input in
+                        print(
+                            "Joystick:",
+                            input.x,
+                            input.y
+                        )
+                    }
+                    .padding(.bottom, 30)
+                }
+            }
         }
         .onReceive(
             detectionSession.$detectedTags
         ) { tags in
-            
             detectReferenceTag(in: tags)
         }
     }
