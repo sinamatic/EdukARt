@@ -7,6 +7,21 @@ import ARKit
 import Combine
 import SwiftAprilTag
 
+
+enum AprilTagSource {
+    case iPhone
+    case robotCamera
+}
+
+
+struct DetectedAprilTag: Identifiable {
+    let id: Int
+    let distance: Double
+    let source: AprilTagSource
+    let worldPosition: SIMD3<Float>
+}
+
+
 final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDelegate {
     
     @Published private(set) var detectedTags: [DetectedAprilTag] = []
@@ -40,11 +55,12 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
         
         frameCounter += 1
         
-        // Nicht jedes einzelne Kamerabild auswerten.
+        // Only analyze every third camera frame.
         guard frameCounter % 3 == 0 else {
             return
         }
         
+        // Do not start a new detection while the previous one is running.
         guard isDetecting == false else {
             return
         }
@@ -54,11 +70,16 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
         let pixelBuffer = frame.capturedImage
         let intrinsics = frame.camera.intrinsics
         
+        // Position and orientation of the iPhone camera in the AR world.
+        let cameraTransform = frame.camera.transform
+        
+        
         DispatchQueue.global(qos: .userInitiated).async {
             
             defer {
                 self.isDetecting = false
             }
+            
             
             guard let detections = try? self.detector.detect(
                 pixelBuffer: pixelBuffer,
@@ -67,6 +88,7 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
                 return
             }
             
+            
             let cameraIntrinsics = CameraIntrinsics(
                 fx: Double(intrinsics.columns.0.x),
                 fy: Double(intrinsics.columns.1.y),
@@ -74,18 +96,49 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
                 cy: Double(intrinsics.columns.2.y)
             )
             
-            let tags = detections.map { detection in
+            
+            let tags = detections.compactMap { detection -> DetectedAprilTag? in
                 
-                let pose = detection.estimatePose(
+                guard let pose = detection.estimatePose(
                     intrinsics: cameraIntrinsics,
                     tagSize: self.tagSize
+                ) else {
+                    return nil
+                }
+                
+                
+                let translation = pose.translation
+                
+                guard translation.count >= 3 else {
+                    return nil
+                }
+                
+                
+                let x = Double(translation[0])
+                let y = Double(translation[1])
+                let z = Double(translation[2])
+                
+                let distance = Foundation.sqrt(
+                    x * x +
+                    y * y +
+                    z * z
                 )
+                
+                
+                let worldPosition = self.worldPosition(
+                    from: pose,
+                    cameraTransform: cameraTransform
+                )
+                
                 
                 return DetectedAprilTag(
                     id: detection.id,
-                    distance: self.distance(from: pose)
+                    distance: distance,
+                    source: .iPhone,
+                    worldPosition: worldPosition
                 )
             }
+            
             
             DispatchQueue.main.async {
                 self.detectedTags = tags
@@ -94,24 +147,44 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
     }
     
     
-    private func distance(from pose: TagPose?) -> Double? {
+    private func worldPosition(
+        from pose: TagPose,
+        cameraTransform: simd_float4x4
+    ) -> SIMD3<Float> {
         
-        guard let translation = pose?.translation,
-              translation.count == 3 else {
-            return nil
-        }
+        let translation = pose.translation
         
-        let x = Double(translation[0])
-        let y = Double(translation[1])
-        let z = Double(translation[2])
+        let x = Float(translation[0])
+        let y = Float(translation[1])
+        let z = Float(translation[2])
         
-        return sqrt(x * x + y * y + z * z)
+        
+        // SwiftAprilTag:
+        // x = right
+        // y = down
+        // z = forward
+        //
+        // ARKit:
+        // x = right
+        // y = up
+        // -z = forward
+        
+        let tagPositionInCamera = SIMD4<Float>(
+            x,
+            -y,
+            -z,
+            1
+        )
+        
+        
+        let tagPositionInWorld =
+            cameraTransform * tagPositionInCamera
+        
+        
+        return SIMD3<Float>(
+            tagPositionInWorld.x,
+            tagPositionInWorld.y,
+            tagPositionInWorld.z
+        )
     }
-}
-
-
-struct DetectedAprilTag: Identifiable {
-    
-    let id: Int
-    let distance: Double?
 }

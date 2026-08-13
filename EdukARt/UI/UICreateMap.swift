@@ -10,6 +10,7 @@ struct UICreateMap: View {
     @StateObject private var detectionSession =
         AprilTagDetectionSession()
     
+    
     var body: some View {
         ZStack {
             
@@ -22,6 +23,7 @@ struct UICreateMap: View {
             VStack {
                 
                 Spacer()
+                
                 
                 VStack(spacing: 10) {
                     
@@ -37,20 +39,38 @@ struct UICreateMap: View {
                         
                         ForEach(detectionSession.detectedTags) { tag in
                             
-                            HStack {
+                            VStack(alignment: .leading, spacing: 4) {
                                 
-                                Text("Tag #\(tag.id)")
-                                
-                                Spacer()
-                                
-                                if let distance = tag.distance {
+                                HStack {
+                                    Text("Tag #\(tag.id)")
+                                        .font(.headline)
+                                    
+                                    Spacer()
+                                    
                                     Text(
                                         String(
                                             format: "%.2f m",
-                                            distance
+                                            tag.distance
                                         )
                                     )
                                 }
+                                
+                                
+                                Text(sourceName(tag.source))
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.7))
+                                
+                                
+                                Text(
+                                    String(
+                                        format: "World x: %.2f   y: %.2f   z: %.2f",
+                                        tag.worldPosition.x,
+                                        tag.worldPosition.y,
+                                        tag.worldPosition.z
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.8))
                             }
                         }
                     }
@@ -63,6 +83,20 @@ struct UICreateMap: View {
                 )
                 .padding()
             }
+        }
+    }
+    
+    
+    private func sourceName(
+        _ source: AprilTagSource
+    ) -> String {
+        
+        switch source {
+        case .iPhone:
+            return "iPhone"
+            
+        case .robotCamera:
+            return "Robot Camera"
         }
     }
 }
