@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		9064E6CE302E2CAC002DD8FE /* SwiftAprilTag in Frameworks */ = {isa = PBXBuildFile; productRef = 9064E6CD302E2CAC002DD8FE /* SwiftAprilTag */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		90C38F1F2F98194300AC16FE /* EdukARt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EdukARt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		90C38F342F98195F00AC16FE /* EdukARt.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = EdukARt.xcodeproj; sourceTree = "<group>"; };
@@ -37,6 +41,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9064E6CE302E2CAC002DD8FE /* SwiftAprilTag in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -86,6 +91,7 @@
 			);
 			name = EdukARt;
 			packageProductDependencies = (
+				9064E6CD302E2CAC002DD8FE /* SwiftAprilTag */,
 			);
 			productName = EdukARt;
 			productReference = 90C38F1F2F98194300AC16FE /* EdukARt.app */;
@@ -115,6 +121,9 @@
 			);
 			mainGroup = 90C38F162F98194300AC16FE;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				9064E6CC302E2CAC002DD8FE /* XCRemoteSwiftPackageReference "SwiftAprilTag" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 90C38F202F98194300AC16FE /* Products */;
 			projectDirPath = "";
@@ -365,6 +374,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9064E6CC302E2CAC002DD8FE /* XCRemoteSwiftPackageReference "SwiftAprilTag" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/keyqcloud/SwiftAprilTag.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9064E6CD302E2CAC002DD8FE /* SwiftAprilTag */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9064E6CC302E2CAC002DD8FE /* XCRemoteSwiftPackageReference "SwiftAprilTag" */;
+			productName = SwiftAprilTag;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 90C38F172F98194300AC16FE /* Project object */;
 }

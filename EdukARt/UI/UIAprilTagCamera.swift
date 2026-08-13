@@ -11,6 +11,7 @@ struct UIAprilTagCamera: UIViewRepresentable {
     
     @ObservedObject var detectionSession: AprilTagDetectionSession
     
+    
     func makeUIView(context: Context) -> ARView {
         
         let arView = ARView(
@@ -20,13 +21,6 @@ struct UIAprilTagCamera: UIViewRepresentable {
         )
         
         let configuration = ARWorldTrackingConfiguration()
-        
-        if let referenceImages = ARReferenceImage.referenceImages(
-            inGroupNamed: "AprilTags",
-            bundle: nil
-        ) {
-            configuration.detectionImages = referenceImages
-        }
         
         arView.session.delegate = detectionSession
         

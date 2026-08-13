@@ -28,18 +28,30 @@ struct UICreateMap: View {
                     Text("Scan AprilTags")
                         .font(.headline)
                     
-                    if detectionSession.detectedTagNames.isEmpty {
+                    
+                    if detectionSession.detectedTags.isEmpty {
                         
                         Text("No AprilTags detected")
                         
                     } else {
                         
-                        ForEach(
-                            detectionSession.detectedTagNames,
-                            id: \.self
-                        ) { name in
+                        ForEach(detectionSession.detectedTags) { tag in
                             
-                            Text(name)
+                            HStack {
+                                
+                                Text("Tag #\(tag.id)")
+                                
+                                Spacer()
+                                
+                                if let distance = tag.distance {
+                                    Text(
+                                        String(
+                                            format: "%.2f m",
+                                            distance
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -49,7 +61,7 @@ struct UICreateMap: View {
                 .clipShape(
                     RoundedRectangle(cornerRadius: 12)
                 )
-                .padding(.bottom, 30)
+                .padding()
             }
         }
     }
