@@ -2,11 +2,12 @@
 //  UIRobotStatusOverlay.swift
 //  EdukARt
 //
+//
 
 import SwiftUI
 
 struct UIRobotStatusOverlay: View {
-    @ObservedObject var controller: EduardRemoteControlController
+    @ObservedObject var controller: RobotController
 
     var body: some View {
         HStack(spacing: 7) {
@@ -28,11 +29,12 @@ struct UIRobotStatusOverlay: View {
         }
         .padding(.leading, 7)
         .padding(.trailing, 8)
-        .padding(.vertical, EdukARtUI.Layout.robotStatusVerticalPadding)
+        .padding(.vertical, 5)
         .background(.black.opacity(0.58))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Robot Status: \(controller.connectionState.title)")
+        
     }
 
     private var trafficLight: some View {

@@ -7,18 +7,26 @@
 
 import SwiftUI
 
-struct BackButton: View {
+struct UIBackButton: View {
+    
     let action: () -> Void
-
+    
     var body: some View {
-        Button("Back") {
+        Button {
             action()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.left")
+
+                Text("Back")
+            }
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.black.opacity(0.65))
+            .foregroundStyle(.white)
+            .clipShape(Capsule())
         }
-        .font(.subheadline.weight(.semibold))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.white.opacity(0.12))
-        .foregroundStyle(.white)
-        .clipShape(Capsule())
+        .buttonStyle(.plain)
     }
 }

@@ -6,59 +6,71 @@
 import SwiftUI
 
 struct UIMenuMain: View {
+    
     let onStartGame: () -> Void
     let onRobotControl: () -> Void
-
+    
     var body: some View {
         ZStack {
+            
             Image("EdukARtKeyvisual")
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
-
-            Color.black.opacity(EdukARtUI.Opacity.menuOverlay)
+            
+            Color.black
+                .opacity(0.66)
                 .ignoresSafeArea()
-
-            VStack(spacing: EdukARtUI.Layout.menuOuterSpacing) {
+            
+            VStack(spacing: 14) {
                 Spacer()
-
-                VStack(spacing: EdukARtUI.Layout.menuButtonSpacing) {
-                    Button("Start Game") {
-                        onStartGame()
-                    }
-                    .buttonStyle(StartScreenButtonStyle(fillColor: EdukARtUI.Colors.brandGreen))
-
-                    Button("Robot Control") {
-                        onRobotControl()
-                    }
-                    .buttonStyle(StartScreenButtonStyle(fillColor: .black.opacity(EdukARtUI.Opacity.primaryMenuButton), foregroundColor: .white))
+                
+                Button("Start Game") {
+                    onStartGame()
                 }
-                .padding(.top, EdukARtUI.Layout.menuTopPadding)
-
+                .buttonStyle(
+                    MainMenuButtonStyle(
+                        backgroundColor: UIGlobals.brandGreen
+                    )
+                )
+                
+                Button("Robot Control") {
+                    onRobotControl()
+                }
+                .buttonStyle(
+                    MainMenuButtonStyle(
+                        backgroundColor: .black.opacity(0.62)
+                    )
+                )
+                
                 Spacer()
             }
-            .padding(.horizontal, EdukARtUI.Layout.menuHorizontalPadding)
-            .padding(.vertical, EdukARtUI.Layout.menuVerticalPadding)
+            .padding(.horizontal, 30)
+            .padding(.vertical, 40)
         }
     }
 }
 
-struct StartScreenButtonStyle: ButtonStyle {
-    let fillColor: Color
-    var foregroundColor: Color = .white
 
+private struct MainMenuButtonStyle: ButtonStyle {
+    
+    let backgroundColor: Color
+    
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: EdukARtUI.Layout.startButtonFontSize, weight: .bold, design: .rounded))
+            .font(.system(size: 20, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, EdukARtUI.Layout.startButtonVerticalPadding)
+            .padding(.vertical, 18)
             .background(
-                RoundedRectangle(cornerRadius: EdukARtUI.Layout.startButtonCornerRadius, style: .continuous)
-                    .fill(fillColor)
-                    .opacity(configuration.isPressed ? EdukARtUI.Opacity.pressedButton : EdukARtUI.Layout.defaultButtonScale)
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(backgroundColor)
+                    .opacity(configuration.isPressed ? 0.82 : 1)
             )
-            .foregroundStyle(foregroundColor)
-            .scaleEffect(configuration.isPressed ? EdukARtUI.Layout.pressedButtonScale : EdukARtUI.Layout.defaultButtonScale)
-            .animation(.easeOut(duration: EdukARtUI.Timing.buttonPressAnimationDuration), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(
+                .easeOut(duration: 0.12),
+                value: configuration.isPressed
+            )
     }
 }
