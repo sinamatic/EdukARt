@@ -3,6 +3,8 @@
 //  EdukARt
 //
 
+
+
 import ARKit
 import Combine
 import SwiftAprilTag
@@ -19,8 +21,8 @@ struct DetectedAprilTag: Identifiable {
     let distance: Double
     let source: AprilTagSource
     let worldPosition: SIMD3<Float>
+    let worldTransform: simd_float4x4
 }
-
 
 final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDelegate {
     
@@ -125,9 +127,15 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
                 )
                 
                 
-                let worldPosition = self.worldPosition(
+                let worldTransform = self.worldTransform(
                     from: pose,
                     cameraTransform: cameraTransform
+                )
+
+                let worldPosition = SIMD3<Float>(
+                    worldTransform.columns.3.x,
+                    worldTransform.columns.3.y,
+                    worldTransform.columns.3.z
                 )
                 
                 
@@ -135,7 +143,8 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
                     id: detection.id,
                     distance: distance,
                     source: .iPhone,
-                    worldPosition: worldPosition
+                    worldPosition: worldPosition,
+                    worldTransform: worldTransform
                 )
             }
             
@@ -186,5 +195,34 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
             tagPositionInWorld.y,
             tagPositionInWorld.z
         )
+    }
+    
+    private func worldTransform(
+        from pose: TagPose,
+        cameraTransform: simd_float4x4
+    ) -> simd_float4x4 {
+        
+        var tagTransform = pose.transform
+        
+        // SwiftAprilTag:
+        // x = right
+        // y = down
+        // z = forward
+        //
+        // ARKit:
+        // x = right
+        // y = up
+        // z = backwards
+        
+        let coordinateConversion = simd_float4x4(
+            SIMD4<Float>(1,  0,  0, 0),
+            SIMD4<Float>(0, -1,  0, 0),
+            SIMD4<Float>(0,  0, -1, 0),
+            SIMD4<Float>(0,  0,  0, 1)
+        )
+        
+        tagTransform = coordinateConversion * tagTransform
+        
+        return cameraTransform * tagTransform
     }
 }
