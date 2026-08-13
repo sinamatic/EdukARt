@@ -9,13 +9,10 @@ import SwiftUI
 
 @main
 struct EduKARTApp: App {
-    var body: some Scene {
+    var body: some Scene
+    {
         WindowGroup {
-            start()
+            RootView()
         }
-    }
-
-    func start() -> some View {
-        RootView()
     }
 }
