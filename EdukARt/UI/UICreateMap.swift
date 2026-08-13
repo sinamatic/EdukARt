@@ -30,6 +30,22 @@ struct UICreateMap: View {
                     Text("Scan AprilTags")
                         .font(.headline)
                     
+                    // show permanent added tags
+                    Text(
+                        "\(detectionSession.scannedTags.count) map tags scanned"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.7))
+                    
+                    // temporary show all saved IDs
+                    Text(
+                        detectionSession.scannedTags
+                            .map { "#\($0.id)" }
+                            .joined(separator: ", ")
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.7))
+                    
                     
                     if detectionSession.detectedTags.isEmpty {
                         

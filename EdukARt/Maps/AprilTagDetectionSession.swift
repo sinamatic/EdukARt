@@ -27,6 +27,7 @@ struct DetectedAprilTag: Identifiable {
 final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDelegate {
     
     @Published private(set) var detectedTags: [DetectedAprilTag] = []
+    @Published private(set) var scannedTags: [DetectedAprilTag] = []
     
     private let detector: Detector
     
@@ -151,6 +152,7 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
             
             DispatchQueue.main.async {
                 self.detectedTags = tags
+                self.saveScannedTags(tags)
             }
         }
     }
@@ -224,5 +226,38 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
         tagTransform = coordinateConversion * tagTransform
         
         return cameraTransform * tagTransform
+    }
+    
+    private func saveScannedTags(_ tags: [DetectedAprilTag]) {
+        
+        for tag in tags {
+            
+            // Tag #0 belongs to the robot.
+            guard tag.id != 0 else {
+                continue
+            }
+            
+            // overwrites scanned tags with better / newer values
+            // To Do make mean value from more measurements
+            if let index = scannedTags.firstIndex(
+                where: { $0.id == tag.id }
+            ) {
+                
+                scannedTags[index] = tag
+                
+            } else {
+                
+                scannedTags.append(tag)
+            }
+        }
+        
+        scannedTags.sort {
+            $0.id < $1.id
+        }
+    }
+    
+    func resetScan() {
+        detectedTags = []
+        scannedTags = []
     }
 }
