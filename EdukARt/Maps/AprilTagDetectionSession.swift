@@ -34,7 +34,7 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
     private var isDetecting = false
     private var frameCounter = 0
     
-    private let tagSize = 0.104
+    private let tagSize = 0.096
     
     
     override init() {
@@ -132,7 +132,7 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
                     from: pose,
                     cameraTransform: cameraTransform
                 )
-
+                
                 let worldPosition = SIMD3<Float>(
                     worldTransform.columns.3.x,
                     worldTransform.columns.3.y,
@@ -189,7 +189,7 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
         
         
         let tagPositionInWorld =
-            cameraTransform * tagPositionInCamera
+        cameraTransform * tagPositionInCamera
         
         
         return SIMD3<Float>(
@@ -259,5 +259,9 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
     func resetScan() {
         detectedTags = []
         scannedTags = []
+    }
+
+    func stop() {
+        isDetecting = false
     }
 }

@@ -14,19 +14,24 @@ struct GameMap: Identifiable, Codable {
     let referenceTagID: Int
     var aprilTags: [MapAprilTag]
     
+    var trackPoints: [MapPoint]
+    
     
     init(
         name: String,
         referenceTagID: Int,
-        aprilTags: [MapAprilTag]
+        aprilTags: [MapAprilTag],
+        trackPoints: [MapPoint] = []
     ) {
         id = UUID()
         self.name = name
         createdAt = Date()
         self.referenceTagID = referenceTagID
         self.aprilTags = aprilTags
+        self.trackPoints = trackPoints
     }
 }
+
 
 
 struct MapAprilTag: Identifiable, Codable {
@@ -37,9 +42,3 @@ struct MapAprilTag: Identifiable, Codable {
     let y: Float
     let z: Float
 }
-
-// ToDo April Tags
-// RoomOutline
-// Obstackles, Track, TrackWidth, PlacedItems
-
-

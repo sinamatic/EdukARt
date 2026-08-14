@@ -41,4 +41,10 @@ struct UIAprilTagCamera: UIViewRepresentable {
         context: Context
     ) {
     }
+    static func dismantleUIView(
+        _ uiView: ARView,
+        coordinator: ()
+    ) {
+        uiView.session.pause()
+    }
 }

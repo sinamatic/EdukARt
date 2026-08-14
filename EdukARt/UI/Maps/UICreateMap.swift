@@ -10,37 +10,58 @@ struct UICreateMap: View {
     
     @ObservedObject var mapStore: MapStore
     
-    @State private var mapName = ""
-    @State private var saveMessage = ""
-    @State private var previewMap: GameMap?
-    
     @StateObject private var detectionSession =
         AprilTagDetectionSession()
+    
+    @State private var scanFinished = false
+    @State private var mapName = ""
+    @State private var previewMap: GameMap?
+    @State private var saveMessage = ""
     
     
     var body: some View {
         ZStack {
             
-            UIAprilTagCamera(
-                detectionSession: detectionSession
-            )
-            .ignoresSafeArea()
+            if scanFinished == false {
+                
+                UIAprilTagCamera(
+                    detectionSession: detectionSession
+                )
+                .ignoresSafeArea()
+                
+            } else {
+                
+                Color.black
+                    .ignoresSafeArea()
+            }
             
             
             VStack {
                 
-                if let previewMap {
-                    previewCard(previewMap)
-                } else {
-                    scanCard
-                }
-                
                 Spacer()
+                
+                
+                if scanFinished == false {
+                    
+                    scanCard
+                    
+                } else if let previewMap {
+                    
+                    UITrackEditor(
+                        map: previewMap
+                    )
+                    
+                } else {
+                    
+                    mapNameCard
+                }
             }
             .padding()
         }
     }
     
+    
+    // MARK: - Scan
     
     private var scanCard: some View {
         VStack(spacing: 10) {
@@ -76,6 +97,7 @@ struct UICreateMap: View {
                     VStack(alignment: .leading, spacing: 4) {
                         
                         HStack {
+                            
                             Text("Tag #\(tag.id)")
                                 .font(.headline)
                             
@@ -110,8 +132,40 @@ struct UICreateMap: View {
             }
             
             
+            Button("Finish Scan") {
+                scanFinished = true
+            }
+            .disabled(
+                detectionSession.scannedTags.isEmpty
+            )
+        }
+        .foregroundStyle(.white)
+        .padding(20)
+        .background(.black.opacity(0.7))
+        .clipShape(
+            RoundedRectangle(cornerRadius: 12)
+        )
+    }
+    
+    
+    // MARK: - Map Name
+    
+    private var mapNameCard: some View {
+        VStack(spacing: 12) {
+            
+            Text("Map Name")
+                .font(.headline)
+            
+            
+            Text(
+                "\(detectionSession.scannedTags.count) tags scanned"
+            )
+            .font(.caption)
+            .foregroundStyle(.white.opacity(0.7))
+            
+            
             TextField(
-                "Map name",
+                "Enter map name",
                 text: $mapName
             )
             .textFieldStyle(.roundedBorder)
@@ -121,62 +175,14 @@ struct UICreateMap: View {
                 previewMap = createMap()
             }
             .disabled(
-                mapName.isEmpty ||
-                detectionSession.scannedTags.isEmpty
+                mapName.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).isEmpty
             )
-        }
-        .foregroundStyle(.white)
-        .padding(20)
-        .background(.black.opacity(0.5))
-        .clipShape(
-            RoundedRectangle(cornerRadius: 12)
-        )
-    }
-    
-    
-    private func previewCard(
-        _ map: GameMap
-    ) -> some View {
-        
-        VStack(alignment: .leading, spacing: 12) {
-            
-            Text(map.name)
-                .font(.headline)
-            
-            
-            Text(
-                "Reference Tag: #\(map.referenceTagID)"
-            )
-            .font(.subheadline)
-            
-            
-            UI2DMapPreview(map: map)
-                .frame(height: 300)
-            
-            
-            ForEach(map.aprilTags) { tag in
-                
-                Text(
-                    String(
-                        format: "#%d  x: %.2f  y: %.2f  z: %.2f",
-                        tag.id,
-                        tag.x,
-                        tag.y,
-                        tag.z
-                    )
-                )
-                .font(.caption)
-            }
-            
-            
-            Button("Save Map") {
-                saveMap(map)
-            }
             
             
             Button("Back to Scan") {
-                previewMap = nil
-                saveMessage = ""
+                scanFinished = false
             }
             
             
@@ -187,12 +193,14 @@ struct UICreateMap: View {
         }
         .foregroundStyle(.white)
         .padding(20)
-        .background(.black.opacity(0.5))
+        .background(.black.opacity(0.75))
         .clipShape(
             RoundedRectangle(cornerRadius: 12)
         )
     }
     
+    
+    // MARK: - Source
     
     private func sourceName(
         _ source: AprilTagSource
@@ -208,9 +216,12 @@ struct UICreateMap: View {
     }
     
     
+    // MARK: - Create Map
+    
     private func createMap() -> GameMap? {
         
         let scannedTags = detectionSession.scannedTags
+        
         
         guard scannedTags.isEmpty == false else {
             return nil
@@ -248,16 +259,5 @@ struct UICreateMap: View {
             referenceTagID: referenceTag.id,
             aprilTags: mapTags
         )
-    }
-    
-    
-    private func saveMap(_ map: GameMap) {
-        
-        do {
-            try mapStore.save(map)
-            saveMessage = "Map saved."
-        } catch {
-            saveMessage = "Map could not be saved."
-        }
     }
 }
