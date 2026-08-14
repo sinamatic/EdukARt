@@ -8,8 +8,8 @@ import SwiftUI
 struct UITrackEditor: View {
     
     let map: GameMap
-    
-    @State private var trackPoints: [MapPoint] = []
+    @Binding var trackPoints: [MapPoint]
+    let onSave: () -> Void
     
     var body: some View {
         VStack(spacing: 16) {
@@ -124,7 +124,14 @@ struct UITrackEditor: View {
                 Button("Clear") {
                     trackPoints.removeAll()
                 }
+                
+                Spacer()
+                
+                Button("Save Map") {
+                    onSave()
+                }
             }
+            
             
             
             Text("\(trackPoints.count) track points")
@@ -132,9 +139,7 @@ struct UITrackEditor: View {
                 .foregroundStyle(.secondary)
         }
         .padding()
-        .onAppear {
-            trackPoints = map.trackPoints
-        }
+
     }
     
     
@@ -186,7 +191,7 @@ struct UITrackEditor: View {
             normalizedX * (bounds.maxX - bounds.minX)
         
         let y =
-            bounds.maxY -
+            bounds.minY +
             normalizedY * (bounds.maxY - bounds.minY)
         
         
@@ -211,7 +216,7 @@ struct UITrackEditor: View {
             (bounds.maxX - bounds.minX)
         
         let normalizedY =
-            (bounds.maxY - y) /
+            (y - bounds.minY) /
             (bounds.maxY - bounds.minY)
         
         

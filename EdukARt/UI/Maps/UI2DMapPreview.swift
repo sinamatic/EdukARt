@@ -25,6 +25,44 @@ struct UI2DMapPreview: View {
                 
                 Color.black.opacity(0.3)
                 
+                if map.trackPoints.count > 1 {
+                    
+                    Path { path in
+                        
+                        let first = map.trackPoints[0]
+                        
+                        path.move(
+                            to: screenPoint(
+                                x: first.x,
+                                y: first.y,
+                                bounds: bounds,
+                                scale: scale
+                            )
+                        )
+                        
+                        
+                        for trackPoint in map.trackPoints.dropFirst() {
+                            
+                            path.addLine(
+                                to: screenPoint(
+                                    x: trackPoint.x,
+                                    y: trackPoint.y,
+                                    bounds: bounds,
+                                    scale: scale
+                                )
+                            )
+                        }
+                    }
+                    .stroke(
+                        .yellow,
+                        style: StrokeStyle(
+                            lineWidth: 8,
+                            lineCap: .round,
+                            lineJoin: .round
+                        )
+                    )
+                }
+                
                 
                 // Map AprilTags
                 ForEach(map.aprilTags) { tag in

@@ -11,13 +11,15 @@ struct UICreateMap: View {
     @ObservedObject var mapStore: MapStore
     
     @StateObject private var detectionSession =
-        AprilTagDetectionSession()
+    AprilTagDetectionSession()
     
     @State private var scanFinished = false
     @State private var mapName = ""
     @State private var previewMap: GameMap?
     @State private var saveMessage = ""
     
+    @State private var trackPoints: [MapPoint] = []
+    @State private var isEditingTrack = false
     
     var body: some View {
         ZStack {
@@ -47,9 +49,21 @@ struct UICreateMap: View {
                     
                 } else if let previewMap {
                     
-                    UITrackEditor(
-                        map: previewMap
-                    )
+                    if isEditingTrack {
+                        
+                        UITrackEditor(
+                            map: previewMap,
+                            trackPoints: $trackPoints,
+                            onSave: {
+                                saveMap(previewMap)
+                                isEditingTrack = false
+                            }
+                        )
+                        
+                    } else {
+                        
+                        previewCard(previewMap)
+                    }
                     
                 } else {
                     
@@ -173,6 +187,7 @@ struct UICreateMap: View {
             
             Button("Create Map") {
                 previewMap = createMap()
+                isEditingTrack = true
             }
             .disabled(
                 mapName.trimmingCharacters(
@@ -198,6 +213,31 @@ struct UICreateMap: View {
             RoundedRectangle(cornerRadius: 12)
         )
     }
+    
+    // MARK: - Save
+    
+    private func saveMap(
+        _ map: GameMap
+    ) {
+        
+        var finishedMap = map
+        
+        finishedMap.trackPoints = trackPoints
+        
+        
+        do {
+            try mapStore.save(finishedMap)
+            
+            saveMessage = "Map saved."
+            
+            // Die fertige Map inklusive Track anzeigen
+            previewMap = finishedMap
+            
+        } catch {
+            saveMessage = "Map could not be saved."
+        }
+    }
+    
     
     
     // MARK: - Source
@@ -236,13 +276,13 @@ struct UICreateMap: View {
         
         
         let referenceInverse =
-            referenceTag.worldTransform.inverse
+        referenceTag.worldTransform.inverse
         
         
         let mapTags = scannedTags.map { tag in
             
             let relativeTransform =
-                referenceInverse * tag.worldTransform
+            referenceInverse * tag.worldTransform
             
             
             return MapAprilTag(
@@ -260,4 +300,41 @@ struct UICreateMap: View {
             aprilTags: mapTags
         )
     }
+
+    private func previewCard(
+        _ map: GameMap
+    ) -> some View {
+        
+        VStack(alignment: .leading, spacing: 12) {
+            
+            Text(map.name)
+                .font(.headline)
+            
+            Text("Reference Tag: #\(map.referenceTagID)")
+                .font(.subheadline)
+            
+            UI2DMapPreview(map: map)
+                .frame(height: 300)
+            
+            if saveMessage.isEmpty == false {
+                Text(saveMessage)
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            }
+            
+            Button("Edit Track") {
+                isEditingTrack = true
+            }
+            
+            Button("Back to Scan") {
+                previewMap = nil
+                saveMessage = ""
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(20)
+        .background(.black.opacity(0.75))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+    
 }
