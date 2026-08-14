@@ -11,6 +11,8 @@ struct UIAprilTagCamera: UIViewRepresentable {
     
     @ObservedObject var detectionSession: AprilTagDetectionSession
     
+    var map: GameMap? = nil
+    var referenceWorldTransform: simd_float4x4? = nil
     
     func makeUIView(context: Context) -> ARView {
         
@@ -40,6 +42,21 @@ struct UIAprilTagCamera: UIViewRepresentable {
         _ uiView: ARView,
         context: Context
     ) {
+        
+        guard let map else {
+            return
+        }
+        
+        guard let referenceWorldTransform else {
+            return
+        }
+        
+        
+        UIARTrack.draw(
+            map: map,
+            referenceWorldTransform: referenceWorldTransform,
+            in: uiView
+        )
     }
     static func dismantleUIView(
         _ uiView: ARView,

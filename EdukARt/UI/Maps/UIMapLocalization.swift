@@ -25,7 +25,9 @@ struct UIMapLocalization: View {
         ZStack {
             
             UIAprilTagCamera(
-                detectionSession: detectionSession
+                detectionSession: detectionSession,
+                map: map,
+                referenceWorldTransform: referenceWorldTransform
             )
             .ignoresSafeArea()
             
