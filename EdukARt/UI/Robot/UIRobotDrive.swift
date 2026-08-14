@@ -43,15 +43,11 @@ struct UIRobotDrive: View {
                     
                     driveModePicker
                     
-                    UIRobotJoystick { input in
+                    UIRobotJoystick(controller: controller) { input in
                         controller.updateJoystickInput(
                             x: Float(input.x),
                             y: Float(input.y)
                         )
-                    }
-                    
-                    if controller.driveMode == .mechanum {
-                        rotationButtons
                     }
                 }
             }
@@ -87,46 +83,4 @@ struct UIRobotDrive: View {
         .pickerStyle(.segmented)
     }
     
-    
-    private var rotationButtons: some View {
-        HStack(spacing: 12) {
-            
-            rotationButton(
-                systemName: "arrow.counterclockwise",
-                direction: .left
-            )
-            
-            rotationButton(
-                systemName: "arrow.clockwise",
-                direction: .right
-            )
-        }
-    }
-    
-    
-    private func rotationButton(
-        systemName: String,
-        direction: RobotController.RotationDirection
-    ) -> some View {
-        
-        Button {
-        } label: {
-            Image(systemName: systemName)
-                .font(.title3.weight(.bold))
-                .frame(width: 56, height: 44)
-        }
-        .buttonStyle(.plain)
-        .background(.white.opacity(0.14))
-        .foregroundStyle(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    controller.startMechanumRotation(direction)
-                }
-                .onEnded { _ in
-                    controller.stopMechanumRotation()
-                }
-        )
-    }
 }

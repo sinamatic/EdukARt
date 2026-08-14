@@ -134,7 +134,8 @@ struct RootView: View {
                     map: selectedMap,
                     onBack: {
                         phase = .selectMap
-                    }
+                    },
+                    controller: robotController
                 )
             }
             

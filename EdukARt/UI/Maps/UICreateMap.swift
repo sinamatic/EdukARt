@@ -29,13 +29,13 @@ struct UICreateMap: View {
             
             VStack {
                 
-                Spacer()
-                
                 if let previewMap {
                     previewCard(previewMap)
                 } else {
                     scanCard
                 }
+                
+                Spacer()
             }
             .padding()
         }
@@ -127,7 +127,7 @@ struct UICreateMap: View {
         }
         .foregroundStyle(.white)
         .padding(20)
-        .background(.black.opacity(0.7))
+        .background(.black.opacity(0.5))
         .clipShape(
             RoundedRectangle(cornerRadius: 12)
         )
@@ -187,7 +187,7 @@ struct UICreateMap: View {
         }
         .foregroundStyle(.white)
         .padding(20)
-        .background(.black.opacity(0.75))
+        .background(.black.opacity(0.5))
         .clipShape(
             RoundedRectangle(cornerRadius: 12)
         )

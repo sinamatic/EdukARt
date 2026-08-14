@@ -23,7 +23,7 @@ struct UI2DMapPreview: View {
             
             ZStack {
                 
-                Color.black.opacity(0.85)
+                Color.black.opacity(0.3)
                 
                 
                 // Map AprilTags
@@ -38,8 +38,7 @@ struct UI2DMapPreview: View {
                     
                     VStack(spacing: 4) {
                         
-                        Circle()
-                            .fill(.green)
+                        aprilTagMarker
                             .frame(
                                 width: 18,
                                 height: 18
@@ -65,8 +64,8 @@ struct UI2DMapPreview: View {
                     
                     VStack(spacing: 4) {
                         
-                        Circle()
-                            .fill(.yellow)
+                        Rectangle()
+                            .fill(.blue)
                             .frame(
                                 width: 22,
                                 height: 22
@@ -83,6 +82,17 @@ struct UI2DMapPreview: View {
                 RoundedRectangle(cornerRadius: 12)
             )
         }
+    }
+    
+    
+    private var aprilTagMarker: some View {
+        Rectangle()
+            .fill(.white)
+            .overlay(
+                Rectangle()
+                    .fill(.black)
+                    .padding(5)
+            )
     }
     
     

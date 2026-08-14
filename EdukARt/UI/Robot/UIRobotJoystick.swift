@@ -7,6 +7,7 @@ import SwiftUI
 
 struct UIRobotJoystick: View {
     
+    var controller: RobotController?
     let onInputChanged: (CGPoint) -> Void
     
     @State private var knobOffset: CGSize = .zero
@@ -18,6 +19,21 @@ struct UIRobotJoystick: View {
     var body: some View {
         ZStack {
             
+            if controller?.driveMode == .mechanum {
+                rotationButtons
+            }
+            
+            joystick
+        }
+        .frame(
+            width: controller == nil ? baseSize : 320,
+            height: baseSize
+        )
+    }
+    
+    
+    private var joystick: some View {
+        ZStack {
             Circle()
                 .fill(.white.opacity(0.1))
                 .overlay(
@@ -42,7 +58,7 @@ struct UIRobotJoystick: View {
             height: baseSize
         )
         .contentShape(Circle())
-        .highPriorityGesture(
+        .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
                     let offset = limitedOffset(
@@ -64,6 +80,51 @@ struct UIRobotJoystick: View {
                     }
                     
                     onInputChanged(.zero)
+                }
+        )
+    }
+    
+    
+    private var rotationButtons: some View {
+        HStack {
+            rotationButton(
+                systemName: "arrow.counterclockwise",
+                direction: .left
+            )
+            
+            Spacer()
+            
+            rotationButton(
+                systemName: "arrow.clockwise",
+                direction: .right
+            )
+        }
+        .frame(width: 320, height: baseSize, alignment: .bottom)
+    }
+    
+    
+    private func rotationButton(
+        systemName: String,
+        direction: RobotController.RotationDirection
+    ) -> some View {
+        
+        Button {
+        } label: {
+            Image(systemName: systemName)
+                .font(.title3.weight(.bold))
+                .frame(width: 56, height: 44)
+        }
+        .buttonStyle(.plain)
+        .background(.white.opacity(0.14))
+        .foregroundStyle(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    controller?.startMechanumRotation(direction)
+                }
+                .onEnded { _ in
+                    controller?.stopMechanumRotation()
                 }
         )
     }

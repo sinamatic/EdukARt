@@ -6,11 +6,15 @@
 import SwiftUI
 import simd
 
+
+
 struct UIMapLocalization: View {
     
     let map: GameMap
     let onBack: () -> Void
     
+    @ObservedObject var controller: RobotController
+
     @StateObject private var detectionSession =
         AprilTagDetectionSession()
     
@@ -28,13 +32,13 @@ struct UIMapLocalization: View {
             
             VStack {
                 
-                Spacer()
-                
                 if referenceWorldTransform == nil {
                     scanReferenceCard
                 } else {
                     localizedCard
                 }
+                
+                Spacer()
             }
             .padding()
             
@@ -43,11 +47,10 @@ struct UIMapLocalization: View {
                 VStack {
                     Spacer()
                     
-                    UIRobotJoystick { input in
-                        print(
-                            "Joystick:",
-                            input.x,
-                            input.y
+                    UIRobotJoystick(controller: controller) { input in
+                        controller.updateJoystickInput(
+                            x: Float(input.x),
+                            y: Float(input.y)
                         )
                     }
                     .padding(.bottom, 30)
@@ -92,7 +95,7 @@ struct UIMapLocalization: View {
         }
         .foregroundStyle(.white)
         .padding(20)
-        .background(.black.opacity(0.75))
+        .background(.black.opacity(0.5))
         .clipShape(
             RoundedRectangle(cornerRadius: 12)
         )
@@ -141,7 +144,7 @@ struct UIMapLocalization: View {
         }
         .foregroundStyle(.white)
         .padding(20)
-        .background(.black.opacity(0.75))
+        .background(.black.opacity(0.5))
         .clipShape(
             RoundedRectangle(cornerRadius: 12)
         )
