@@ -6,15 +6,13 @@
 import SwiftUI
 import simd
 
-
-
 struct UIMapLocalization: View {
     
     let map: GameMap
     let onBack: () -> Void
     
     @ObservedObject var controller: RobotController
-
+    
     @StateObject private var detectionSession =
         AprilTagDetectionSession()
     
@@ -22,11 +20,14 @@ struct UIMapLocalization: View {
     
     @State private var referenceSamples: [simd_float4x4] = []
     private let requiredSamples = 30
-
+    
     private let targetDistance = 0.8
     private let distanceTolerance = 0.12
-
+    
     private let centerTolerance = 0.08
+    
+    private let collisionController =
+        TrackCollisionController()
     
     
     var body: some View {
@@ -39,10 +40,12 @@ struct UIMapLocalization: View {
             )
             .ignoresSafeArea()
             
+            
             if referenceWorldTransform == nil {
-                       referenceScanGuide
-                   }
-                        
+                referenceScanGuide
+            }
+            
+            
             VStack {
                 
                 if referenceWorldTransform == nil {
@@ -73,10 +76,15 @@ struct UIMapLocalization: View {
         .onReceive(
             detectionSession.$detectedTags
         ) { tags in
+            
             detectReferenceTag(in: tags)
+            
+            checkRobotCollision(in: tags)
         }
     }
     
+    
+    // MARK: - Scan Reference Card
     
     private var scanReferenceCard: some View {
         VStack(spacing: 12) {
@@ -84,15 +92,12 @@ struct UIMapLocalization: View {
             Text(map.name)
                 .font(.headline)
             
-            
             Text("Scan Reference Tag")
                 .font(.title3.bold())
-            
             
             Text("#\(map.referenceTagID)")
                 .font(.largeTitle.bold())
                 .foregroundStyle(.green)
-            
             
             Text(
                 "Point the camera at AprilTag #\(map.referenceTagID) to align the map."
@@ -100,7 +105,6 @@ struct UIMapLocalization: View {
             .font(.caption)
             .multilineTextAlignment(.center)
             .foregroundStyle(.white.opacity(0.7))
-            
             
             Button("Back") {
                 onBack()
@@ -115,17 +119,17 @@ struct UIMapLocalization: View {
     }
     
     
+    // MARK: - Localized Card
+    
     private var localizedCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             
             Text(map.name)
                 .font(.headline)
             
-            
             Text("Map localized")
                 .font(.subheadline.bold())
                 .foregroundStyle(.green)
-            
             
             UI2DMapPreview(
                 map: map,
@@ -163,6 +167,8 @@ struct UIMapLocalization: View {
         )
     }
     
+    
+    // MARK: - Reference Tag Detection
     
     private func detectReferenceTag(
         in tags: [DetectedAprilTag]
@@ -224,6 +230,8 @@ struct UIMapLocalization: View {
     }
     
     
+    // MARK: - Robot Position
+    
     private var robotPosition: SIMD3<Float>? {
         
         guard let referenceWorldTransform else {
@@ -250,6 +258,105 @@ struct UIMapLocalization: View {
             from: robotTag.worldTransform
         )
     }
+    
+    
+    // MARK: - Robot Collision
+    
+    private func checkRobotCollision(
+        in tags: [DetectedAprilTag]
+    ) {
+        
+        // Map muss zuerst lokalisiert sein
+        guard let referenceWorldTransform else {
+            return
+        }
+        
+        
+        // Robot AprilTag #0 suchen
+        guard let robotTag = tags.first(
+            where: {
+                $0.id == 0
+            }
+        ) else {
+            return
+        }
+        
+        
+        // Weltposition des Roboters in Map-Koordinaten umrechnen
+        let localization = MapLocalization(
+            referenceWorldTransform:
+                referenceWorldTransform
+        )
+        
+        
+        let position = localization.mapPosition(
+            from: robotTag.worldTransform
+        )
+        
+        
+        // Gegen Coins und Itemboxen prüfen
+        collisionController.checkCollisions(
+            robotPosition: position,
+            elements: map.trackElements
+        ) { element in
+            
+            handleCollision(
+                with: element
+            )
+        }
+    }
+    
+    
+    // MARK: - Collision Reaction
+    
+    private func handleCollision(
+        with element: MapTrackElement
+    ) {
+        
+        switch element.type {
+            
+        case .coin:
+            
+            print("Coin collected")
+            
+            
+        case .itemBox:
+            
+            print("Itembox hit")
+            
+            spinRobot()
+        }
+    }
+    
+    
+    // MARK: - Itembox Effect
+
+    private func spinRobot() {
+        
+        guard controller.driveMode == .mechanum else {
+            print("Spin requires Mechanum mode")
+            return
+        }
+        
+        guard controller.isConnected && controller.isEnabled else {
+            print("Robot is not ready")
+            return
+        }
+        
+        controller.stopJoystick()
+        controller.startMechanumRotation(.right)
+        
+        Task {
+            try? await Task.sleep(
+                for: .seconds(2)
+            )
+            
+            controller.stopMechanumRotation()
+        }
+    }
+    
+    
+    // MARK: - Average Reference Transform
     
     private func averageTransform(
         _ transforms: [simd_float4x4]
@@ -278,6 +385,7 @@ struct UIMapLocalization: View {
         
         var result = first
         
+        
         result.columns.3 = SIMD4<Float>(
             position.x,
             position.y,
@@ -289,6 +397,9 @@ struct UIMapLocalization: View {
         return result
     }
     
+    
+    // MARK: - Reference Scan Guide
+    
     private var referenceScanGuide: some View {
         
         VStack {
@@ -298,8 +409,10 @@ struct UIMapLocalization: View {
             
             VStack(spacing: 20) {
                 
-                Text("Align Reference Tag #\(map.referenceTagID)")
-                    .font(.headline)
+                Text(
+                    "Align Reference Tag #\(map.referenceTagID)"
+                )
+                .font(.headline)
                 
                 
                 RoundedRectangle(
@@ -346,12 +459,18 @@ struct UIMapLocalization: View {
         .padding()
     }
     
+    
+    // MARK: - Current Reference Tag
+    
     private var currentReferenceTag: DetectedAprilTag? {
         
         detectionSession.detectedTags.first {
             $0.id == map.referenceTagID
         }
     }
+    
+    
+    // MARK: - Reference Guide Text
     
     private var referenceGuideText: String {
         
@@ -381,11 +500,15 @@ struct UIMapLocalization: View {
         return "Hold still..."
     }
     
+    
+    // MARK: - Reference Guide Color
+    
     private var referenceGuideColor: Color {
         
         guard let tag = currentReferenceTag else {
             return .white
         }
+        
         
         let distance = tag.distance
         
@@ -408,5 +531,3 @@ struct UIMapLocalization: View {
         return .white
     }
 }
-
-

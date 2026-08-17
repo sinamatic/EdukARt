@@ -9,6 +9,7 @@ struct MapLocalization {
     let referenceWorldTransform: simd_float4x4
     
     
+    
     func mapPosition(
         from worldTransform: simd_float4x4
     ) -> SIMD3<Float> {

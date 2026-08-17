@@ -35,10 +35,10 @@ struct UIARTrackElements {
             }
             
             
-            entity.position = SIMD3<Float>(
-                element.x,
-                element.y,
-                -0.05
+            configure(
+                entity,
+                for: element.type,
+                at: element
             )
             
             
@@ -67,6 +67,38 @@ struct UIARTrackElements {
             
             return try? Entity.load(
                 named: "Itembox"
+            )
+        }
+    }
+    
+    private static func configure(
+        _ entity: Entity,
+        for type: MapTrackElementType,
+        at element: MapTrackElement
+    ) {
+        
+        entity.position = SIMD3<Float>(
+            element.x,
+            element.y,
+            -0.05
+        )
+        
+        
+        switch type {
+            
+        case .coin:
+            
+            entity.orientation = simd_quatf(
+                angle: .pi / 2,
+                axis: SIMD3<Float>(1, 0, 0)
+            )
+            
+            
+        case .itemBox:
+            
+            entity.orientation = simd_quatf(
+                angle: .pi / 2,
+                axis: SIMD3<Float>(1, 0, 0)
             )
         }
     }
