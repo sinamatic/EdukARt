@@ -24,6 +24,20 @@ final class MapStore: ObservableObject {
     }
     
     
+    func update(_ map: GameMap) throws {
+        guard let index = maps.firstIndex(
+            where: {
+                $0.id == map.id
+            }
+        ) else {
+            return
+        }
+        
+        maps[index] = map
+        try persist()
+    }
+    
+    
     func delete(_ map: GameMap) throws {
         maps.removeAll {
             $0.id == map.id

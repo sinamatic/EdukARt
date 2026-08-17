@@ -34,7 +34,13 @@ struct UIARTrack {
             let start = map.trackPoints[index]
             let end = map.trackPoints[index + 1]
             
-            addDashes(
+//            addDashes(
+//                from: start,
+//                to: end,
+//                to: trackAnchor
+//            )
+            
+            addLineSegment(
                 from: start,
                 to: end,
                 to: trackAnchor
@@ -58,111 +64,183 @@ struct UIARTrack {
             arView.scene.removeAnchor(anchor)
         }
     }
+//    
+//    
+//    private static func addDashes(
+//        from start: MapPoint,
+//        to end: MapPoint,
+//        to anchor: AnchorEntity
+//    ) {
+//        
+//        let startX = start.x
+//        let startY = start.y
+//        
+//        let endX = end.x
+//        let endY = end.y
+//        
+//        
+//        let deltaX = endX - startX
+//        let deltaY = endY - startY
+//        
+//        
+//        let segmentLength = sqrt(
+//            deltaX * deltaX +
+//            deltaY * deltaY
+//        )
+//        
+//        
+//        guard segmentLength > 0 else {
+//            return
+//        }
+//        
+//        
+//        let dashLength: Float = 0.15
+//        let gapLength: Float = 0.10
+//        
+//        let dashWidth: Float = 0.03
+//        let dashHeight: Float = 0.005
+//        
+//        let stepLength =
+//            dashLength + gapLength
+//        
+//        
+//        let directionX =
+//            deltaX / segmentLength
+//        
+//        let directionY =
+//            deltaY / segmentLength
+//        
+//        
+//        var distance: Float = 0
+//        
+//        
+//        while distance < segmentLength {
+//            
+//            let remainingDistance =
+//                segmentLength - distance
+//            
+//            let currentDashLength =
+//                min(
+//                    dashLength,
+//                    remainingDistance
+//                )
+//            
+//            
+//            let centerDistance =
+//                distance + currentDashLength / 2
+//            
+//            
+//            let centerX =
+//                startX +
+//                directionX * centerDistance
+//            
+//            let centerY =
+//                startY +
+//                directionY * centerDistance
+//            
+//            
+//            let dash = makeDash(
+//                length: currentDashLength,
+//                width: dashWidth,
+//                height: dashHeight
+//            )
+//            
+//            
+//            dash.position = SIMD3<Float>(
+//                centerX,
+//                centerY,
+//                -0.01
+//            )
+//            
+//            
+//            let angle =
+//                atan2(deltaY, deltaX)
+//            
+//            
+//            dash.orientation = simd_quatf(
+//                angle: angle,
+//                axis: SIMD3<Float>(0, 0, 1)
+//            )
+//            
+//            
+//            anchor.addChild(dash)
+//            
+//            
+//            distance += stepLength
+//        }
+//    }
     
-    
-    private static func addDashes(
+    private static func addLineSegment(
         from start: MapPoint,
         to end: MapPoint,
         to anchor: AnchorEntity
     ) {
         
-        let startX = start.x
-        let startY = start.y
+        let deltaX = end.x - start.x
+        let deltaY = end.y - start.y
         
-        let endX = end.x
-        let endY = end.y
-        
-        
-        let deltaX = endX - startX
-        let deltaY = endY - startY
-        
-        
-        let segmentLength = sqrt(
+        let length = sqrt(
             deltaX * deltaX +
             deltaY * deltaY
         )
         
-        
-        guard segmentLength > 0 else {
+        guard length > 0 else {
             return
         }
         
         
-        let dashLength: Float = 0.15
-        let gapLength: Float = 0.10
+        let centerX =
+            (start.x + end.x) / 2
         
-        let dashWidth: Float = 0.03
-        let dashHeight: Float = 0.005
-        
-        let stepLength =
-            dashLength + gapLength
+        let centerY =
+            (start.y + end.y) / 2
         
         
-        let directionX =
-            deltaX / segmentLength
-        
-        let directionY =
-            deltaY / segmentLength
+        let lineWidth: Float = 0.03
+        let lineHeight: Float = 0.005
         
         
-        var distance: Float = 0
+        let mesh = MeshResource.generateBox(
+            width: length,
+            height: lineWidth,
+            depth: lineHeight
+        )
         
         
-        while distance < segmentLength {
-            
-            let remainingDistance =
-                segmentLength - distance
-            
-            let currentDashLength =
-                min(
-                    dashLength,
-                    remainingDistance
-                )
-            
-            
-            let centerDistance =
-                distance + currentDashLength / 2
-            
-            
-            let centerX =
-                startX +
-                directionX * centerDistance
-            
-            let centerY =
-                startY +
-                directionY * centerDistance
-            
-            
-            let dash = makeDash(
-                length: currentDashLength,
-                width: dashWidth,
-                height: dashHeight
-            )
-            
-            
-            dash.position = SIMD3<Float>(
-                centerX,
-                centerY,
-                -0.01
-            )
-            
-            
-            let angle =
-                atan2(deltaY, deltaX)
-            
-            
-            dash.orientation = simd_quatf(
-                angle: angle,
-                axis: SIMD3<Float>(0, 0, 1)
-            )
-            
-            
-            anchor.addChild(dash)
-            
-            
-            distance += stepLength
-        }
+        let material = SimpleMaterial(
+            color: .white,
+            isMetallic: false
+        )
+        
+        
+        let line = ModelEntity(
+            mesh: mesh,
+            materials: [material]
+        )
+        
+        
+        line.position = SIMD3<Float>(
+            centerX,
+            centerY,
+            -0.005
+        )
+        
+        
+        let angle = atan2(
+            deltaY,
+            deltaX
+        )
+        
+        
+        line.orientation = simd_quatf(
+            angle: angle,
+            axis: SIMD3<Float>(0, 0, 1)
+        )
+        
+        
+        anchor.addChild(line)
     }
+    
     
     
     private static func makeDash(

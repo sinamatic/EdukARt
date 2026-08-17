@@ -11,6 +11,7 @@ struct UIStartGameChooseMap: View {
     
     let onCreateMap: () -> Void
     let onSelectMap: (GameMap) -> Void
+    let onEditTrack: (GameMap) -> Void
     
     var body: some View {
         ZStack {
@@ -76,6 +77,11 @@ struct UIStartGameChooseMap: View {
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
                                 .swipeActions {
+                                    Button("Edit Track") {
+                                        onEditTrack(map)
+                                    }
+                                    .tint(.blue)
+                                    
                                     Button(
                                         "Delete",
                                         role: .destructive

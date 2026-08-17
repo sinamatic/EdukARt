@@ -20,6 +20,14 @@ struct UIMapLocalization: View {
     
     @State private var referenceWorldTransform: simd_float4x4?
     
+    @State private var referenceSamples: [simd_float4x4] = []
+    private let requiredSamples = 30
+
+    private let targetDistance = 0.8
+    private let distanceTolerance = 0.12
+
+    private let centerTolerance = 0.08
+    
     
     var body: some View {
         ZStack {
@@ -31,7 +39,10 @@ struct UIMapLocalization: View {
             )
             .ignoresSafeArea()
             
-            
+            if referenceWorldTransform == nil {
+                       referenceScanGuide
+                   }
+                        
             VStack {
                 
                 if referenceWorldTransform == nil {
@@ -157,22 +168,59 @@ struct UIMapLocalization: View {
         in tags: [DetectedAprilTag]
     ) {
         
+        // Map wurde bereits lokalisiert
         guard referenceWorldTransform == nil else {
             return
         }
         
         
+        // Reference Tag suchen
         guard let referenceTag = tags.first(
             where: {
                 $0.id == map.referenceTagID
             }
         ) else {
+            referenceSamples.removeAll()
             return
         }
         
         
-        referenceWorldTransform =
+        let distance = referenceTag.distance
+        
+        
+        // Richtiger Abstand?
+        let correctDistance =
+            abs(distance - targetDistance)
+            <= distanceTolerance
+        
+        
+        // Genug in der Bildmitte?
+        let correctPosition =
+            referenceTag.centerOffset
+            <= centerTolerance
+        
+        
+        guard correctDistance && correctPosition else {
+            referenceSamples.removeAll()
+            return
+        }
+        
+        
+        // Gute Messung sammeln
+        referenceSamples.append(
             referenceTag.worldTransform
+        )
+        
+        
+        // Noch nicht genug Messungen
+        guard referenceSamples.count >= requiredSamples else {
+            return
+        }
+        
+        
+        // Stabile Pose berechnen
+        referenceWorldTransform =
+            averageTransform(referenceSamples)
     }
     
     
@@ -202,4 +250,163 @@ struct UIMapLocalization: View {
             from: robotTag.worldTransform
         )
     }
+    
+    private func averageTransform(
+        _ transforms: [simd_float4x4]
+    ) -> simd_float4x4 {
+        
+        guard let first = transforms.first else {
+            return matrix_identity_float4x4
+        }
+        
+        
+        var position = SIMD3<Float>.zero
+        
+        
+        for transform in transforms {
+            
+            position += SIMD3<Float>(
+                transform.columns.3.x,
+                transform.columns.3.y,
+                transform.columns.3.z
+            )
+        }
+        
+        
+        position /= Float(transforms.count)
+        
+        
+        var result = first
+        
+        result.columns.3 = SIMD4<Float>(
+            position.x,
+            position.y,
+            position.z,
+            1
+        )
+        
+        
+        return result
+    }
+    
+    private var referenceScanGuide: some View {
+        
+        VStack {
+            
+            Spacer()
+            
+            
+            VStack(spacing: 20) {
+                
+                Text("Align Reference Tag #\(map.referenceTagID)")
+                    .font(.headline)
+                
+                
+                RoundedRectangle(
+                    cornerRadius: 12
+                )
+                .stroke(
+                    referenceGuideColor,
+                    lineWidth: 4
+                )
+                .frame(
+                    width: 110,
+                    height: 110
+                )
+                
+                
+                Text(referenceGuideText)
+                    .font(.subheadline)
+                    .multilineTextAlignment(.center)
+                
+                
+                if referenceSamples.isEmpty == false {
+                    
+                    ProgressView(
+                        value: Double(referenceSamples.count),
+                        total: Double(requiredSamples)
+                    )
+                    .tint(.green)
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(24)
+            .background(
+                .black.opacity(0.7)
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 16
+                )
+            )
+            
+            
+            Spacer()
+        }
+        .padding()
+    }
+    
+    private var currentReferenceTag: DetectedAprilTag? {
+        
+        detectionSession.detectedTags.first {
+            $0.id == map.referenceTagID
+        }
+    }
+    
+    private var referenceGuideText: String {
+        
+        guard let tag = currentReferenceTag else {
+            return "Point the camera at the reference tag."
+        }
+        
+        
+        let distance = tag.distance
+        
+        
+        if distance > targetDistance + distanceTolerance {
+            return "Move closer."
+        }
+        
+        
+        if distance < targetDistance - distanceTolerance {
+            return "Move further away."
+        }
+        
+        
+        if tag.centerOffset > centerTolerance {
+            return "Move the tag into the center."
+        }
+        
+        
+        return "Hold still..."
+    }
+    
+    private var referenceGuideColor: Color {
+        
+        guard let tag = currentReferenceTag else {
+            return .white
+        }
+        
+        let distance = tag.distance
+        
+        
+        let correctDistance =
+            abs(distance - targetDistance)
+            <= distanceTolerance
+        
+        
+        let correctPosition =
+            tag.centerOffset
+            <= centerTolerance
+        
+        
+        if correctDistance && correctPosition {
+            return .green
+        }
+        
+        
+        return .white
+    }
 }
+
+

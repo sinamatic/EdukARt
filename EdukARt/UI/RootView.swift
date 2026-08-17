@@ -14,6 +14,7 @@ struct RootView: View {
     
     @State private var phase: AppPhase = .logo
     @State private var selectedMap: GameMap?
+    @State private var editingTrackPoints: [MapPoint] = []
     
     
     var body: some View {
@@ -118,6 +119,11 @@ struct RootView: View {
                 onSelectMap: { map in
                     selectedMap = map
                     phase = .localizeMap
+                },
+                onEditTrack: { map in
+                    selectedMap = map
+                    editingTrackPoints = map.trackPoints
+                    phase = .editTrack
                 }
             )
             
@@ -136,6 +142,18 @@ struct RootView: View {
                         phase = .selectMap
                     },
                     controller: robotController
+                )
+            }
+            
+            
+        case .editTrack:
+            if let selectedMap {
+                UITrackEditor(
+                    map: selectedMap,
+                    trackPoints: $editingTrackPoints,
+                    onSave: {
+                        saveEditedTrack()
+                    }
                 )
             }
             
@@ -177,6 +195,11 @@ struct RootView: View {
                 phase = .selectMap
             }
             
+        case .editTrack:
+            return {
+                phase = .selectMap
+            }
+            
         case .game:
             return {
                 phase = .selectMap
@@ -206,7 +229,23 @@ struct RootView: View {
         case selectMap
         case createMap
         case localizeMap
+        case editTrack
         case game
        
+    }
+    
+    
+    private func saveEditedTrack() {
+        guard var selectedMap else {
+            phase = .selectMap
+            return
+        }
+        
+        selectedMap.trackPoints = editingTrackPoints
+        
+        try? mapStore.update(selectedMap)
+        
+        self.selectedMap = selectedMap
+        phase = .selectMap
     }
 }

@@ -22,6 +22,8 @@ struct DetectedAprilTag: Identifiable {
     let source: AprilTagSource
     let worldPosition: SIMD3<Float>
     let worldTransform: simd_float4x4
+    
+    let centerOffset: Double
 }
 
 final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDelegate {
@@ -109,6 +111,29 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
                     return nil
                 }
                 
+                let centerOffset: Double
+                let centerTranslation = pose.translation
+                
+                if centerTranslation.count >= 3 {
+                    let x = Double(centerTranslation[0])
+                    let y = Double(centerTranslation[1])
+                    let z = Double(centerTranslation[2])
+                    
+                    if abs(z) > 0.001 {
+                        let horizontalOffset = x / z
+                        let verticalOffset = y / z
+                        
+                        centerOffset = sqrt(
+                            horizontalOffset * horizontalOffset +
+                            verticalOffset * verticalOffset
+                        )
+                    } else {
+                        centerOffset = 1.0
+                    }
+                } else {
+                    centerOffset = 1.0
+                }
+                
                 
                 let translation = pose.translation
                 
@@ -145,7 +170,8 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
                     distance: distance,
                     source: .iPhone,
                     worldPosition: worldPosition,
-                    worldTransform: worldTransform
+                    worldTransform: worldTransform,
+                    centerOffset: centerOffset
                 )
             }
             
