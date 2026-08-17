@@ -15,13 +15,15 @@ struct GameMap: Identifiable, Codable {
     var aprilTags: [MapAprilTag]
     
     var trackPoints: [MapPoint]
+    var trackElements: [MapTrackElement]
     
     
     init(
         name: String,
         referenceTagID: Int,
         aprilTags: [MapAprilTag],
-        trackPoints: [MapPoint] = []
+        trackPoints: [MapPoint] = [],
+        trackElements: [MapTrackElement] = []
     ) {
         id = UUID()
         self.name = name
@@ -29,7 +31,10 @@ struct GameMap: Identifiable, Codable {
         self.referenceTagID = referenceTagID
         self.aprilTags = aprilTags
         self.trackPoints = trackPoints
+        self.trackElements = trackElements
     }
+    
+    
 }
 
 

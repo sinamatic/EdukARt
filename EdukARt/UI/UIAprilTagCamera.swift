@@ -14,6 +14,17 @@ struct UIAprilTagCamera: UIViewRepresentable {
     var map: GameMap? = nil
     var referenceWorldTransform: simd_float4x4? = nil
     
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    
+    final class Coordinator {
+        var didDrawMapContent = false
+    }
+    
+    
     func makeUIView(context: Context) -> ARView {
         
         let arView = ARView(
@@ -43,6 +54,10 @@ struct UIAprilTagCamera: UIViewRepresentable {
         context: Context
     ) {
         
+        guard context.coordinator.didDrawMapContent == false else {
+            return
+        }
+        
         guard let map else {
             return
         }
@@ -57,10 +72,22 @@ struct UIAprilTagCamera: UIViewRepresentable {
             referenceWorldTransform: referenceWorldTransform,
             in: uiView
         )
+        
+        
+        UIARTrackElements.draw(
+            elements: map.trackElements,
+            referenceWorldTransform: referenceWorldTransform,
+            in: uiView
+        )
+        
+        
+        context.coordinator.didDrawMapContent = true
     }
+    
+    
     static func dismantleUIView(
         _ uiView: ARView,
-        coordinator: ()
+        coordinator: Coordinator
     ) {
         uiView.session.pause()
     }

@@ -20,6 +20,7 @@ struct UICreateMap: View {
     
     @State private var trackPoints: [MapPoint] = []
     @State private var isEditingTrack = false
+    @State private var trackElements: [MapTrackElement] = []
     
     var body: some View {
         ZStack {
@@ -54,6 +55,7 @@ struct UICreateMap: View {
                         UITrackEditor(
                             map: previewMap,
                             trackPoints: $trackPoints,
+                            trackElements: $trackElements,
                             onSave: {
                                 saveMap(previewMap)
                                 isEditingTrack = false
@@ -223,6 +225,7 @@ struct UICreateMap: View {
         var finishedMap = map
         
         finishedMap.trackPoints = trackPoints
+        finishedMap.trackElements = trackElements
         
         
         do {

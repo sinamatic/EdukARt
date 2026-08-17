@@ -15,6 +15,7 @@ struct RootView: View {
     @State private var phase: AppPhase = .logo
     @State private var selectedMap: GameMap?
     @State private var editingTrackPoints: [MapPoint] = []
+    @State private var editingTrackElements: [MapTrackElement] = []
     
     
     var body: some View {
@@ -123,6 +124,7 @@ struct RootView: View {
                 onEditTrack: { map in
                     selectedMap = map
                     editingTrackPoints = map.trackPoints
+                    editingTrackElements = map.trackElements
                     phase = .editTrack
                 }
             )
@@ -151,6 +153,7 @@ struct RootView: View {
                 UITrackEditor(
                     map: selectedMap,
                     trackPoints: $editingTrackPoints,
+                    trackElements: $editingTrackElements,
                     onSave: {
                         saveEditedTrack()
                     }
@@ -242,6 +245,7 @@ struct RootView: View {
         }
         
         selectedMap.trackPoints = editingTrackPoints
+        selectedMap.trackElements = editingTrackElements
         
         try? mapStore.update(selectedMap)
         
