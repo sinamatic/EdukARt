@@ -10,6 +10,8 @@ struct UI2DMapPreview: View {
     let map: GameMap
     var robotPosition: SIMD3<Float>? = nil
     
+    var removedElementIDs: Set<UUID> = []
+    
     
     var body: some View {
         GeometryReader { geometry in
@@ -34,7 +36,11 @@ struct UI2DMapPreview: View {
                 
                 // MARK: - Track Elements
                 
-                ForEach(map.trackElements) { element in
+                ForEach(
+                    map.trackElements.filter {
+                        removedElementIDs.contains($0.id) == false
+                    }
+                ) { element in
                     
                     let point = transform.screenPoint(
                         x: element.x,

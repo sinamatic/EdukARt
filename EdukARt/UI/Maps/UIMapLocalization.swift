@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UIKit
 import simd
 
 struct UIMapLocalization: View {
@@ -26,6 +27,9 @@ struct UIMapLocalization: View {
     
     private let centerTolerance = 0.08
     
+    @State private var removedElementIDs: Set<UUID> = []
+    @State private var isItemboxEffectActive = false
+
     private let collisionController =
         TrackCollisionController()
     
@@ -36,10 +40,10 @@ struct UIMapLocalization: View {
             UIAprilTagCamera(
                 detectionSession: detectionSession,
                 map: map,
-                referenceWorldTransform: referenceWorldTransform
+                referenceWorldTransform: referenceWorldTransform,
+                removedElementIDs: removedElementIDs
             )
             .ignoresSafeArea()
-            
             
             if referenceWorldTransform == nil {
                 referenceScanGuide
@@ -78,7 +82,6 @@ struct UIMapLocalization: View {
         ) { tags in
             
             detectReferenceTag(in: tags)
-            
             checkRobotCollision(in: tags)
         }
     }
@@ -133,7 +136,8 @@ struct UIMapLocalization: View {
             
             UI2DMapPreview(
                 map: map,
-                robotPosition: robotPosition
+                robotPosition: robotPosition,
+                removedElementIDs: removedElementIDs
             )
             .frame(height: 300)
             
@@ -261,18 +265,15 @@ struct UIMapLocalization: View {
     
     
     // MARK: - Robot Collision
-    
+
     private func checkRobotCollision(
         in tags: [DetectedAprilTag]
     ) {
         
-        // Map muss zuerst lokalisiert sein
         guard let referenceWorldTransform else {
             return
         }
         
-        
-        // Robot AprilTag #0 suchen
         guard let robotTag = tags.first(
             where: {
                 $0.id == 0
@@ -281,23 +282,22 @@ struct UIMapLocalization: View {
             return
         }
         
-        
-        // Weltposition des Roboters in Map-Koordinaten umrechnen
         let localization = MapLocalization(
             referenceWorldTransform:
                 referenceWorldTransform
         )
         
-        
         let position = localization.mapPosition(
             from: robotTag.worldTransform
         )
         
+        let activeElements = map.trackElements.filter {
+            removedElementIDs.contains($0.id) == false
+        }
         
-        // Gegen Coins und Itemboxen prüfen
         collisionController.checkCollisions(
             robotPosition: position,
-            elements: map.trackElements
+            elements: activeElements
         ) { element in
             
             handleCollision(
@@ -305,13 +305,20 @@ struct UIMapLocalization: View {
             )
         }
     }
-    
-    
+
+
     // MARK: - Collision Reaction
-    
+
     private func handleCollision(
         with element: MapTrackElement
     ) {
+        
+        // Element sofort vom Spielfeld entfernen
+        removedElementIDs.insert(
+            element.id
+        )
+        
+        triggerCollisionFeedback()
         
         switch element.type {
             
@@ -319,17 +326,67 @@ struct UIMapLocalization: View {
             
             print("Coin collected")
             
+            flashCoinCollection()
             
         case .itemBox:
             
-            print("Itembox hit")
+            print("Itembox collected")
             
-            spinRobot()
+            itemBoxCollision()
         }
     }
     
     
-    // MARK: - Itembox Effect
+    private func triggerCollisionFeedback() {
+        let generator = UIImpactFeedbackGenerator(
+            style: .medium
+        )
+        
+        generator.prepare()
+        generator.impactOccurred()
+    }
+    
+    
+    private func flashCoinCollection() {
+        guard controller.isConnected else {
+            print("Robot is not ready for coin light feedback")
+            return
+        }
+        
+        let previousMode = controller.lightController.activeMode
+        let previousColor = controller.lightController.allLightsColor
+        
+        controller.lightController.setAllLightsColor(
+            red: 0,
+            green: 255,
+            blue: 0
+        )
+        
+        controller.sendLightMode(
+            .rotation
+        )
+        
+        Task {
+            try? await Task.sleep(
+                for: .milliseconds(450)
+            )
+            
+            await MainActor.run {
+                controller.lightController.setAllLightsColor(
+                    red: previousColor.red,
+                    green: previousColor.green,
+                    blue: previousColor.blue
+                )
+                
+                controller.sendLightMode(
+                    previousMode
+                )
+            }
+        }
+    }
+    
+    
+    // MARK: - Itembox Effect (old)
 
     private func spinRobot() {
         
@@ -352,6 +409,93 @@ struct UIMapLocalization: View {
             )
             
             controller.stopMechanumRotation()
+        }
+    }
+    
+    // MARK: - Itembox Collision
+
+    private func itemBoxCollision() {
+        
+        guard isItemboxEffectActive == false else {
+            return
+        }
+        
+        guard controller.driveMode == .mechanum else {
+            print("Itembox effect requires Mechanum mode")
+            return
+        }
+        
+        guard controller.isConnected,
+              controller.isEnabled else {
+            print("Robot is not ready")
+            return
+        }
+        
+        isItemboxEffectActive = true
+        
+        controller.stopJoystick()
+        
+        
+        Task {
+            
+            // 1. Rechts blinken + rechts drehen
+            
+            controller.sendLightMode(
+                .flashRight
+            )
+            
+            controller.startMechanumRotation(
+                .right
+            )
+            
+            try? await Task.sleep(
+                for: .seconds(1)
+            )
+            
+            controller.stopMechanumRotation()
+            
+            
+            // 2. Links blinken + links drehen
+            
+            controller.sendLightMode(
+                .flashLeft
+            )
+            
+            controller.startMechanumRotation(
+                .left
+            )
+            
+            try? await Task.sleep(
+                for: .seconds(1)
+            )
+            
+            controller.stopMechanumRotation()
+            
+            
+            // 3. Rechts blinken + rechts drehen
+            
+            controller.sendLightMode(
+                .flashRight
+            )
+            
+            controller.startMechanumRotation(
+                .right
+            )
+            
+            try? await Task.sleep(
+                for: .seconds(1)
+            )
+            
+            controller.stopMechanumRotation()
+            
+            
+            // Licht wieder normal
+            
+            controller.sendLightMode(
+                .enabled
+            )
+            
+            isItemboxEffectActive = false
         }
     }
     

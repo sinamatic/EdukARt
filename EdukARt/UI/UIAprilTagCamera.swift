@@ -14,6 +14,9 @@ struct UIAprilTagCamera: UIViewRepresentable {
     var map: GameMap? = nil
     var referenceWorldTransform: simd_float4x4? = nil
     
+    var removedElementIDs: Set<UUID> = []
+
+    
     
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -53,6 +56,10 @@ struct UIAprilTagCamera: UIViewRepresentable {
         _ uiView: ARView,
         context: Context
     ) {
+        UIARTrackElements.remove(
+            elementIDs: removedElementIDs,
+            from: uiView
+        )
         
         guard context.coordinator.didDrawMapContent == false else {
             return

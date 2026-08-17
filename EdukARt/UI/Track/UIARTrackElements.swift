@@ -3,6 +3,7 @@
 //  EdukARt
 //
 
+import Foundation
 import RealityKit
 import simd
 
@@ -35,10 +36,20 @@ struct UIARTrackElements {
             }
             
             
-            configure(
+            entity.name =
+                "trackElement_\(element.id.uuidString)"
+            
+            
+            entity.position = SIMD3<Float>(
+                element.x,
+                element.y,
+                -0.05
+            )
+            
+            
+            configureOrientation(
                 entity,
-                for: element.type,
-                at: element
+                for: element.type
             )
             
             
@@ -47,6 +58,31 @@ struct UIARTrackElements {
         
         
         arView.scene.addAnchor(anchor)
+    }
+    
+    
+    static func remove(
+        elementIDs: Set<UUID>,
+        from arView: ARView
+    ) {
+        
+        for id in elementIDs {
+            
+            let entityName =
+                "trackElement_\(id.uuidString)"
+            
+            
+            for anchor in arView.scene.anchors {
+                
+                if let entity =
+                    anchor.findEntity(
+                        named: entityName
+                    ) {
+                    
+                    entity.removeFromParent()
+                }
+            }
+        }
     }
     
     
@@ -71,18 +107,11 @@ struct UIARTrackElements {
         }
     }
     
-    private static func configure(
+    
+    private static func configureOrientation(
         _ entity: Entity,
-        for type: MapTrackElementType,
-        at element: MapTrackElement
+        for type: MapTrackElementType
     ) {
-        
-        entity.position = SIMD3<Float>(
-            element.x,
-            element.y,
-            -0.05
-        )
-        
         
         switch type {
             
@@ -90,7 +119,11 @@ struct UIARTrackElements {
             
             entity.orientation = simd_quatf(
                 angle: .pi / 2,
-                axis: SIMD3<Float>(1, 0, 0)
+                axis: SIMD3<Float>(
+                    1,
+                    0,
+                    0
+                )
             )
             
             
@@ -98,7 +131,11 @@ struct UIARTrackElements {
             
             entity.orientation = simd_quatf(
                 angle: .pi / 2,
-                axis: SIMD3<Float>(1, 0, 0)
+                axis: SIMD3<Float>(
+                    1,
+                    0,
+                    0
+                )
             )
         }
     }

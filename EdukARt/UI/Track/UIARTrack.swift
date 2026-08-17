@@ -45,14 +45,6 @@ struct UIARTrack {
         }
         
         
-        for element in map.trackElements {
-            addTrackElement(
-                element,
-                to: trackAnchor
-            )
-        }
-        
-        
         arView.scene.addAnchor(trackAnchor)
     }
     
@@ -245,88 +237,6 @@ struct UIARTrack {
         
         anchor.addChild(line)
     }
-    
-    
-    private static func addTrackElement(
-        _ element: MapTrackElement,
-        to anchor: AnchorEntity
-    ) {
-        
-        let entity =
-            makeTrackElementEntity(
-                for: element.type
-            )
-        
-        
-        entity.position = SIMD3<Float>(
-            element.x,
-            element.y,
-            -0.04
-        )
-        
-        
-        anchor.addChild(entity)
-    }
-    
-    
-    private static func makeTrackElementEntity(
-        for type: MapTrackElementType
-    ) -> Entity {
-        
-        switch type {
-        case .coin:
-            if let coin = try? ModelEntity.loadModel(
-                named: "Coin"
-            ) {
-                coin.scale = SIMD3<Float>(
-                    repeating: 0.08
-                )
-                
-                return coin
-            }
-            
-            let mesh = MeshResource.generateSphere(
-                radius: 0.04
-            )
-            
-            let material = SimpleMaterial(
-                color: .yellow,
-                isMetallic: true
-            )
-            
-            return ModelEntity(
-                mesh: mesh,
-                materials: [material]
-            )
-            
-        case .itemBox:
-            if let itemBox = try? ModelEntity.loadModel(
-                named: "Itembox"
-            ) {
-                itemBox.scale = SIMD3<Float>(
-                    repeating: 0.08
-                )
-                
-                return itemBox
-            }
-            
-            let mesh = MeshResource.generateBox(
-                size: 0.08
-            )
-            
-            let material = SimpleMaterial(
-                color: .systemPink,
-                isMetallic: false
-            )
-            
-            return ModelEntity(
-                mesh: mesh,
-                materials: [material]
-            )
-        }
-    }
-    
-    
     
     private static func makeDash(
         length: Float,
