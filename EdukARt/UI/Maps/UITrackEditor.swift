@@ -20,28 +20,33 @@ struct UITrackEditor: View {
             
             GeometryReader { geometry in
                 
-                let bounds = mapBounds
+                let transform = MapCoordinateTransform(
+                    bounds: map.mapBounds,
+                    size: geometry.size
+                )
                 
                 ZStack {
                     
                     Color.black
                     
                     
-                    // AprilTags
+                    // MARK: - AprilTags
+                    
                     ForEach(map.aprilTags) { tag in
                         
-                        let point = screenPoint(
+                        let point = transform.screenPoint(
                             x: tag.x,
-                            y: tag.y,
-                            size: geometry.size,
-                            bounds: bounds
+                            y: tag.y
                         )
                         
                         VStack(spacing: 2) {
                             
                             Circle()
                                 .fill(.green)
-                                .frame(width: 20, height: 20)
+                                .frame(
+                                    width: 20,
+                                    height: 20
+                                )
                             
                             Text("#\(tag.id)")
                                 .font(.caption)
@@ -51,7 +56,8 @@ struct UITrackEditor: View {
                     }
                     
                     
-                    // Rennstrecke
+                    // MARK: - Track
+                    
                     if trackPoints.count > 1 {
                         
                         Path { path in
@@ -59,11 +65,9 @@ struct UITrackEditor: View {
                             let first = trackPoints[0]
                             
                             path.move(
-                                to: screenPoint(
+                                to: transform.screenPoint(
                                     x: first.x,
-                                    y: first.y,
-                                    size: geometry.size,
-                                    bounds: bounds
+                                    y: first.y
                                 )
                             )
                             
@@ -71,11 +75,9 @@ struct UITrackEditor: View {
                             for point in trackPoints.dropFirst() {
                                 
                                 path.addLine(
-                                    to: screenPoint(
+                                    to: transform.screenPoint(
                                         x: point.x,
-                                        y: point.y,
-                                        size: geometry.size,
-                                        bounds: bounds
+                                        y: point.y
                                     )
                                 )
                             }
@@ -98,18 +100,18 @@ struct UITrackEditor: View {
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
                             
-                            let mapPoint = mapPoint(
-                                from: value.location,
-                                size: geometry.size,
-                                bounds: bounds
+                            let point = transform.mapPoint(
+                                from: value.location
                             )
                             
-                            addPoint(mapPoint)
+                            addPoint(point)
                         }
                 )
             }
             .aspectRatio(1, contentMode: .fit)
             
+            
+            // MARK: - Buttons
             
             HStack {
                 
@@ -133,13 +135,11 @@ struct UITrackEditor: View {
             }
             
             
-            
             Text("\(trackPoints.count) track points")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .padding()
-
     }
     
     
@@ -149,7 +149,7 @@ struct UITrackEditor: View {
         _ point: MapPoint
     ) {
         
-        // verhindert extrem viele Punkte direkt nebeneinander
+        // Verhindert extrem viele Punkte direkt nebeneinander
         
         if let last = trackPoints.last {
             
@@ -161,7 +161,8 @@ struct UITrackEditor: View {
                 dy * dy
             )
             
-            // mindestens 2 cm Abstand
+            // Mindestens 2 cm Abstand
+            
             guard distance > 0.02 else {
                 return
             }
@@ -169,107 +170,4 @@ struct UITrackEditor: View {
         
         trackPoints.append(point)
     }
-    
-    
-    // MARK: - Screen -> Map
-    
-    private func mapPoint(
-        from screenPoint: CGPoint,
-        size: CGSize,
-        bounds: MapBounds
-    ) -> MapPoint {
-        
-        let normalizedX =
-            Float(screenPoint.x / size.width)
-        
-        let normalizedY =
-            Float(screenPoint.y / size.height)
-        
-        
-        let x =
-            bounds.minX +
-            normalizedX * (bounds.maxX - bounds.minX)
-        
-        let y =
-            bounds.minY +
-            normalizedY * (bounds.maxY - bounds.minY)
-        
-        
-        return MapPoint(
-            x: x,
-            y: y
-        )
-    }
-    
-    
-    // MARK: - Map -> Screen
-    
-    private func screenPoint(
-        x: Float,
-        y: Float,
-        size: CGSize,
-        bounds: MapBounds
-    ) -> CGPoint {
-        
-        let normalizedX =
-            (x - bounds.minX) /
-            (bounds.maxX - bounds.minX)
-        
-        let normalizedY =
-            (y - bounds.minY) /
-            (bounds.maxY - bounds.minY)
-        
-        
-        return CGPoint(
-            x: CGFloat(normalizedX) * size.width,
-            y: CGFloat(normalizedY) * size.height
-        )
-    }
-    
-    
-    // MARK: - Bounds
-    
-    private var mapBounds: MapBounds {
-        
-        let xs = map.aprilTags.map(\.x)
-        let ys = map.aprilTags.map(\.y)
-        
-        
-        guard
-            let minX = xs.min(),
-            let maxX = xs.max(),
-            let minY = ys.min(),
-            let maxY = ys.max()
-        else {
-            return MapBounds(
-                minX: -1,
-                maxX: 1,
-                minY: -1,
-                maxY: 1
-            )
-        }
-        
-        
-        let padding: Float = 0.3
-        
-        
-        return MapBounds(
-            minX: minX - padding,
-            maxX: maxX + padding,
-            minY: minY - padding,
-            maxY: maxY + padding
-        )
-    }
-}
-
-
-// MARK: - Helper
-
-private struct MapBounds {
-    
-    let minX: Float
-    let maxX: Float
-    
-    let minY: Float
-    let maxY: Float
 }

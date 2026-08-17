@@ -1,5 +1,5 @@
 //
-//  UIMapPreview.swift
+//  UI2DMapPreview.swift
 //  EdukARt
 //
 
@@ -14,16 +14,17 @@ struct UI2DMapPreview: View {
     var body: some View {
         GeometryReader { geometry in
             
-            let points = allPoints
-            let bounds = mapBounds(points)
-            let scale = mapScale(
-                bounds: bounds,
+            let transform = MapCoordinateTransform(
+                bounds: map.mapBounds,
                 size: geometry.size
             )
             
             ZStack {
                 
                 Color.black.opacity(0.3)
+                
+                
+                // MARK: - Track
                 
                 if map.trackPoints.count > 1 {
                     
@@ -32,11 +33,9 @@ struct UI2DMapPreview: View {
                         let first = map.trackPoints[0]
                         
                         path.move(
-                            to: screenPoint(
+                            to: transform.screenPoint(
                                 x: first.x,
-                                y: first.y,
-                                bounds: bounds,
-                                scale: scale
+                                y: first.y
                             )
                         )
                         
@@ -44,11 +43,9 @@ struct UI2DMapPreview: View {
                         for trackPoint in map.trackPoints.dropFirst() {
                             
                             path.addLine(
-                                to: screenPoint(
+                                to: transform.screenPoint(
                                     x: trackPoint.x,
-                                    y: trackPoint.y,
-                                    bounds: bounds,
-                                    scale: scale
+                                    y: trackPoint.y
                                 )
                             )
                         }
@@ -64,14 +61,13 @@ struct UI2DMapPreview: View {
                 }
                 
                 
-                // Map AprilTags
+                // MARK: - AprilTags
+                
                 ForEach(map.aprilTags) { tag in
                     
-                    let point = screenPoint(
+                    let point = transform.screenPoint(
                         x: tag.x,
-                        y: tag.y,
-                        bounds: bounds,
-                        scale: scale
+                        y: tag.y
                     )
                     
                     VStack(spacing: 4) {
@@ -90,14 +86,13 @@ struct UI2DMapPreview: View {
                 }
                 
                 
-                // Robot
+                // MARK: - Robot
+                
                 if let robotPosition {
                     
-                    let point = screenPoint(
+                    let point = transform.screenPoint(
                         x: robotPosition.x,
-                        y: robotPosition.y,
-                        bounds: bounds,
-                        scale: scale
+                        y: robotPosition.y
                     )
                     
                     VStack(spacing: 4) {
@@ -123,6 +118,8 @@ struct UI2DMapPreview: View {
     }
     
     
+    // MARK: - AprilTag Marker
+    
     private var aprilTagMarker: some View {
         Rectangle()
             .fill(.white)
@@ -131,125 +128,5 @@ struct UI2DMapPreview: View {
                     .fill(.black)
                     .padding(5)
             )
-    }
-    
-    
-    // MARK: - Points
-    
-    private var allPoints: [CGPoint] {
-        
-        var points = map.aprilTags.map { tag in
-            CGPoint(
-                x: CGFloat(tag.x),
-                y: CGFloat(tag.y)
-            )
-        }
-        
-        
-        if let robotPosition {
-            points.append(
-                CGPoint(
-                    x: CGFloat(robotPosition.x),
-                    y: CGFloat(robotPosition.y)
-                )
-            )
-        }
-        
-        
-        return points
-    }
-    
-    
-    // MARK: - Bounds
-    
-    private func mapBounds(
-        _ points: [CGPoint]
-    ) -> CGRect {
-        
-        guard let first = points.first else {
-            return CGRect(
-                x: 0,
-                y: 0,
-                width: 1,
-                height: 1
-            )
-        }
-        
-        
-        var minX = first.x
-        var maxX = first.x
-        
-        var minY = first.y
-        var maxY = first.y
-        
-        
-        for point in points {
-            minX = min(minX, point.x)
-            maxX = max(maxX, point.x)
-            
-            minY = min(minY, point.y)
-            maxY = max(maxY, point.y)
-        }
-        
-        
-        return CGRect(
-            x: minX,
-            y: minY,
-            width: max(maxX - minX, 0.01),
-            height: max(maxY - minY, 0.01)
-        )
-    }
-    
-    
-    // MARK: - Scale
-    
-    private func mapScale(
-        bounds: CGRect,
-        size: CGSize
-    ) -> CGFloat {
-        
-        let padding: CGFloat = 40
-        
-        let availableWidth =
-            max(size.width - padding * 2, 1)
-        
-        let availableHeight =
-            max(size.height - padding * 2, 1)
-        
-        
-        let scaleX =
-            availableWidth / bounds.width
-        
-        let scaleY =
-            availableHeight / bounds.height
-        
-        
-        return min(scaleX, scaleY)
-    }
-    
-    
-    // MARK: - Screen Position
-    
-    private func screenPoint(
-        x: Float,
-        y: Float,
-        bounds: CGRect,
-        scale: CGFloat
-    ) -> CGPoint {
-        
-        let padding: CGFloat = 40
-        
-        
-        return CGPoint(
-            x:
-                (CGFloat(x) - bounds.minX)
-                * scale
-                + padding,
-            
-            y:
-                (CGFloat(y) - bounds.minY)
-                * scale
-                + padding
-        )
     }
 }
