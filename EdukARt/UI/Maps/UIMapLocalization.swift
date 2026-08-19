@@ -20,10 +20,14 @@ struct UIMapLocalization: View {
         AprilTagDetectionSession()
     
     @State private var referenceWorldTransform: simd_float4x4?
+    @State private var realRobotTransform: simd_float4x4?
+    @State private var realRobotPosition: SIMD3<Float>?
     
     @State private var removedElementIDs: Set<UUID> = []
     @State private var isItemboxEffectActive = false
     @State private var isOilEffectActive = false
+    @State private var isSimulationVisible = false
+    @State private var isLiveSyncEnabled = true
 
     private let collisionController =
         TrackCollisionController()
@@ -41,7 +45,7 @@ struct UIMapLocalization: View {
                 removedElementIDs:
                     removedElementIDs,
                 showSimulatedRobot:
-                    controller.isEnabled == false
+                    isSimulationVisible
             )
             .ignoresSafeArea()
             
@@ -56,6 +60,18 @@ struct UIMapLocalization: View {
                 Spacer()
             }
             .padding()
+            
+            
+            if referenceWorldTransform != nil {
+                VStack {
+                    HStack {
+                        Spacer()
+                        simulationControls
+                    }
+                    Spacer()
+                }
+                .padding()
+            }
             
             
             if referenceWorldTransform != nil {
@@ -77,10 +93,7 @@ struct UIMapLocalization: View {
         ) { tags in
             
             detectReferenceTag(in: tags)
-            
-            if controller.isEnabled {
-                checkRealRobotCollision(in: tags)
-            }
+            detectRobot(in: tags)
         }
         .onReceive(
             simulatedRobot.$position
@@ -90,6 +103,12 @@ struct UIMapLocalization: View {
             }
             
             checkCollision(at: position)
+        }
+        .onChange(of: controller.isEnabled) { oldValue, newValue in
+            if oldValue == true,
+               newValue == false {
+                synchronizeSimulation()
+            }
         }
     }
     
@@ -165,7 +184,6 @@ struct UIMapLocalization: View {
                 .font(.caption)
             }
             
-            
             Button("Back") {
                 onBack()
             }
@@ -208,6 +226,54 @@ struct UIMapLocalization: View {
     }
     
     
+    // MARK: - Robot Detection
+    
+    private func detectRobot(
+        in tags: [DetectedAprilTag]
+    ) {
+        
+        guard
+            let referenceWorldTransform,
+            let robotTag = tags.first(
+                where: {
+                    $0.id == 0
+                }
+            )
+        else {
+            return
+        }
+        
+        let localization =
+            AprilTagLocalization(
+                referenceWorldTransform:
+                    referenceWorldTransform
+            )
+        
+        let robotTransform =
+            localization.relativeTransform(
+                from: robotTag.worldTransform
+            )
+        
+        realRobotTransform = robotTransform
+        realRobotPosition = localization.relativePosition(
+            from: robotTag.worldTransform
+        )
+        
+        if controller.isEnabled,
+           let realRobotPosition {
+            checkCollision(at: realRobotPosition)
+        }
+        
+        if isLiveSyncEnabled &&
+           controller.isEnabled &&
+           isSimulationVisible {
+            synchronizeSimulation(
+                with: robotTransform
+            )
+        }
+    }
+    
+    
     // MARK: - Robot Position
     
     private var activeRobotPosition: SIMD3<Float>? {
@@ -223,64 +289,101 @@ struct UIMapLocalization: View {
     }
     
     
-    private var realRobotPosition: SIMD3<Float>? {
-        
-        guard let referenceWorldTransform else {
-            return nil
-        }
-        
-        
-        guard let robotTag = detectionSession.detectedTags.first(
-            where: {
-                $0.id == 0
+    // MARK: - Simulation Sync
+    
+    private var simulationControls: some View {
+        HStack(spacing: 8) {
+            Button {
+                toggleSimulation()
+            } label: {
+                Image(
+                    systemName:
+                        isSimulationVisible
+                        ? "car.fill"
+                        : "car"
+                )
+                .frame(width: 34, height: 34)
             }
-        ) else {
-            return nil
+            
+            Button {
+                synchronizeSimulation()
+            } label: {
+                Image(
+                    systemName: "arrow.triangle.2.circlepath"
+                )
+                .frame(width: 34, height: 34)
+            }
+            .disabled(
+                isSimulationVisible == false ||
+                realRobotTransform == nil
+            )
+            
+            Toggle(
+                isOn: $isLiveSyncEnabled
+            ) {
+                Image(
+                    systemName: "link"
+                )
+            }
+            .labelsHidden()
+            .frame(width: 44)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(.black.opacity(0.58))
+        .foregroundStyle(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+    
+    
+    private func toggleSimulation() {
+        if isSimulationVisible {
+            isSimulationVisible = false
+        } else {
+            isSimulationVisible = true
+            
+            if realRobotTransform != nil {
+                synchronizeSimulation()
+            }
+        }
+    }
+    
+    
+    private func synchronizeSimulation() {
+        guard let realRobotTransform else {
+            return
         }
         
+        synchronizeSimulation(
+            with: realRobotTransform
+        )
+    }
+    
+    
+    private func synchronizeSimulation(
+        with transform: simd_float4x4
+    ) {
         
-        let localization = MapLocalization(
-            referenceWorldTransform:
-                referenceWorldTransform
+        let position = SIMD3<Float>(
+            transform.columns.3.x,
+            transform.columns.3.y,
+            transform.columns.3.z
         )
         
+        let rotation = atan2(
+            transform.columns.0.y,
+            transform.columns.0.x
+        )
         
-        return localization.mapPosition(
-            from: robotTag.worldTransform
+        simulatedRobot.setPose(
+            position: position,
+            rotation: rotation
         )
     }
     
     
     // MARK: - Robot Collision
-
-    private func checkRealRobotCollision(
-        in tags: [DetectedAprilTag]
-    ) {
-        
-        guard let referenceWorldTransform else {
-            return
-        }
-        
-        guard let robotTag = tags.first(
-            where: {
-                $0.id == 0
-            }
-        ) else {
-            return
-        }
-        
-        let localization = MapLocalization(
-            referenceWorldTransform:
-                referenceWorldTransform
-        )
-        
-        let position = localization.mapPosition(
-            from: robotTag.worldTransform
-        )
-        
-        checkCollision(at: position)
-    }
-    
     
     private func checkCollision(
         at position: SIMD3<Float>
@@ -447,7 +550,6 @@ struct UIMapLocalization: View {
         isItemboxEffectActive = true
         
         controller.stopJoystick()
-        
         
         Task {
             

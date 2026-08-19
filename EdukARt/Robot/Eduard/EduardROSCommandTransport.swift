@@ -12,6 +12,7 @@ protocol EduardROSCommandTransport: AnyObject {
     var targetHost: String { get }
     var targetPort: UInt16 { get }
 
+    func reconnect()
     func send(topic: String, messageType: String, message: [String: EduardROSValue])
     func call(service: String, serviceType: String, request: [String: EduardROSValue])
 }

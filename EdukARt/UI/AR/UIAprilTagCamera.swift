@@ -67,9 +67,29 @@ struct UIAprilTagCamera: UIViewRepresentable {
         )
 
         if showSimulatedRobot {
+            if uiView.scene.findEntity(
+                named: "SimulatedEduard"
+            ) == nil,
+               let referenceWorldTransform {
+                
+                let robot =
+                    EduardRobotSimulation()
+                
+                UIARSimulatedRobot.draw(
+                    robot: robot,
+                    referenceWorldTransform:
+                        referenceWorldTransform,
+                    in: uiView
+                )
+            }
+            
             UIARSimulatedRobot.update(
                 simulatedRobot: simulatedRobot,
                 in: uiView
+            )
+        } else {
+            UIARSimulatedRobot.remove(
+                from: uiView
             )
         }
         
@@ -98,25 +118,6 @@ struct UIAprilTagCamera: UIViewRepresentable {
             referenceWorldTransform: referenceWorldTransform,
             in: uiView
         )
-        
-        
-        
-        
-        if showSimulatedRobot {
-            
-            let robot =
-                EduardRobotSimulation()
-            
-            
-            UIARSimulatedRobot.draw(
-                robot: robot,
-                referenceWorldTransform:
-                    referenceWorldTransform,
-                in: uiView
-            )
-        }
-        
-        
         context.coordinator.didDrawMapContent = true
     }
     

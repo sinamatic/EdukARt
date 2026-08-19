@@ -13,7 +13,7 @@ final class EduardWiFiCommandTransport: EduardROSCommandTransport {
     let targetHost: String
     let targetPort: UInt16
 
-    private let connection: NWConnection
+    private var connection: NWConnection
     private let encoder = JSONEncoder()
 
     init(targetHost: String = "192.168.0.100", targetPort: UInt16 = 50505) {
@@ -28,6 +28,12 @@ final class EduardWiFiCommandTransport: EduardROSCommandTransport {
 
     deinit {
         connection.cancel()
+    }
+
+    func reconnect() {
+        connection.cancel()
+        connection = makeConnection()
+        connection.start(queue: .global(qos: .userInitiated))
     }
 
     func send(topic: String, messageType: String, message: [String: EduardROSValue]) {
@@ -58,5 +64,12 @@ final class EduardWiFiCommandTransport: EduardROSCommandTransport {
         var packet = encodedCommand
         packet.append(0x0A)
         connection.send(content: packet, completion: .contentProcessed { _ in })
+    }
+
+    private func makeConnection() -> NWConnection {
+        let endpointHost = NWEndpoint.Host(targetHost)
+        let endpointPort = NWEndpoint.Port(rawValue: targetPort) ?? 50505
+
+        return NWConnection(host: endpointHost, port: endpointPort, using: .udp)
     }
 }

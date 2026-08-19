@@ -186,4 +186,19 @@ struct UIARSimulatedRobot {
             directionRotation *
             standUpRotation
     }
+    
+    
+    static func remove(
+        from arView: ARView
+    ) {
+        
+        guard let entity =
+            arView.scene.findEntity(
+                named: "SimulatedEduard"
+            ) else {
+            return
+        }
+        
+        entity.removeFromParent()
+    }
 }

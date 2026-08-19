@@ -52,6 +52,23 @@ final class SimulatedRobotController:
     }
     
     
+    func setPose(
+        position: SIMD3<Float>,
+        rotation: Float
+    ) {
+        self.position = position
+        self.rotation = rotation
+        
+        movementX = 0
+        movementY = 0
+        rotationInput = 0
+        
+        targetMovementX = 0
+        targetMovementY = 0
+        targetRotationInput = 0
+    }
+    
+    
     func stop() {
         targetMovementX = 0
         targetMovementY = 0
@@ -75,13 +92,16 @@ final class SimulatedRobotController:
     
     private func startTimer() {
         
-        timer = Timer.scheduledTimer(
-            withTimeInterval: updateInterval,
+        let timer = Timer(
+            timeInterval: updateInterval,
             repeats: true
         ) { [weak self] _ in
             
             self?.updateMovement()
         }
+
+        self.timer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
     
     

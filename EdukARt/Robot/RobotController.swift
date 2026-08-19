@@ -169,6 +169,7 @@ final class RobotController: ObservableObject {
     func sendEnable() {
         isConnected = true
         simulationCommandTransport.stop()
+        transport.reconnect()
         sendRemoteControlledMode()
         isEnabled = true
         useEduardTransport()
@@ -279,13 +280,16 @@ final class RobotController: ObservableObject {
 
     private func startCommandLoop() {
         commandTimer?.invalidate()
-        commandTimer = Timer.scheduledTimer(withTimeInterval: commandRepeatInterval, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: commandRepeatInterval, repeats: true) { [weak self] _ in
             guard let self, self.isConnected, self.isEnabled else {
                 return
             }
 
             self.sendCommand(for: self.activeJoystickDirection)
         }
+
+        commandTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     private func useEduardTransport() {
