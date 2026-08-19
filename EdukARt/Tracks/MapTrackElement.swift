@@ -9,6 +9,7 @@ import Foundation
 enum MapTrackElementType: String, Codable {
     case coin
     case itemBox
+    case oil
 }
 
 struct MapTrackElement: Identifiable, Codable {

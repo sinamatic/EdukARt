@@ -23,6 +23,7 @@ struct UITrackEditor: View {
         case track = "Track"
         case coin = "Coin"
         case itemBox = "Itembox"
+        case oil = "Oil"
         
         var id: String {
             rawValue
@@ -116,9 +117,9 @@ struct UITrackEditor: View {
                         
                         Circle()
                             .fill(
-                                element.type == .coin
-                                ? Color.yellow
-                                : Color.pink
+                                color(
+                                    for: element.type
+                                )
                             )
                             .frame(
                                 width: 18,
@@ -248,6 +249,15 @@ struct UITrackEditor: View {
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                
+                
+            case .oil:
+                
+                Text(
+                    "\(oilCount) oil spots"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .padding()
@@ -303,6 +313,9 @@ struct UITrackEditor: View {
             
         case .itemBox:
             type = .itemBox
+            
+        case .oil:
+            type = .oil
             
         case .track:
             return
@@ -362,6 +375,21 @@ struct UITrackEditor: View {
                     at: index
                 )
             }
+            
+            
+        case .oil:
+            
+            if let index =
+                trackElements.lastIndex(
+                    where: {
+                        $0.type == .oil
+                    }
+                ) {
+                
+                trackElements.remove(
+                    at: index
+                )
+            }
         }
     }
     
@@ -384,6 +412,11 @@ struct UITrackEditor: View {
             trackElements.removeAll {
                 $0.type == .itemBox
             }
+            
+        case .oil:
+            trackElements.removeAll {
+                $0.type == .oil
+            }
         }
     }
     
@@ -405,5 +438,31 @@ struct UITrackEditor: View {
             $0.type == .itemBox
         }
         .count
+    }
+    
+    
+    private var oilCount: Int {
+        
+        trackElements.filter {
+            $0.type == .oil
+        }
+        .count
+    }
+    
+    
+    private func color(
+        for type: MapTrackElementType
+    ) -> Color {
+        
+        switch type {
+        case .coin:
+            return .yellow
+            
+        case .itemBox:
+            return .pink
+            
+        case .oil:
+            return .gray
+        }
     }
 }

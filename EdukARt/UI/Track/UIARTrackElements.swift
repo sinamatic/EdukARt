@@ -43,11 +43,18 @@ struct UIARTrackElements {
             entity.position = SIMD3<Float>(
                 element.x,
                 element.y,
-                -0.05
+                zPosition(
+                    for: element.type
+                )
             )
             
             
             configureOrientation(
+                entity,
+                for: element.type
+            )
+            
+            configureScale(
                 entity,
                 for: element.type
             )
@@ -104,6 +111,13 @@ struct UIARTrackElements {
             return try? Entity.load(
                 named: "Itembox"
             )
+            
+            
+        case .oil:
+            
+            return try? Entity.load(
+                named: "Oil"
+            )
         }
     }
     
@@ -120,9 +134,9 @@ struct UIARTrackElements {
             entity.orientation = simd_quatf(
                 angle: .pi / 2,
                 axis: SIMD3<Float>(
-                    1,
                     0,
-                    0
+                    0,
+                    1
                 )
             )
             
@@ -132,11 +146,47 @@ struct UIARTrackElements {
             entity.orientation = simd_quatf(
                 angle: .pi / 2,
                 axis: SIMD3<Float>(
-                    1,
                     0,
+                    1,
                     0
                 )
             )
+            
+            
+        case .oil:
+            
+            entity.orientation = simd_quatf()
+        }
+    }
+    
+    
+    private static func configureScale(
+        _ entity: Entity,
+        for type: MapTrackElementType
+    ) {
+        
+        switch type {
+        case .coin, .itemBox:
+            break
+            
+        case .oil:
+            entity.scale = SIMD3<Float>(
+                repeating: 0.05
+            )
+        }
+    }
+    
+    
+    private static func zPosition(
+        for type: MapTrackElementType
+    ) -> Float {
+        
+        switch type {
+        case .coin, .itemBox:
+            return -0.05
+            
+        case .oil:
+            return 0
         }
     }
 }

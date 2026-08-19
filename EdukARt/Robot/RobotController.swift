@@ -153,11 +153,7 @@ final class RobotController: ObservableObject {
     }
 
     func sendEnable() {
-        guard isConnected else {
-            statusMessage = "Confirm the WiFi connection before sending Enable."
-            return
-        }
-
+        isConnected = true
         sendRemoteControlledMode()
         sendStopCommand()
         isEnabled = true

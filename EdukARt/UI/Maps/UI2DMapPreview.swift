@@ -219,6 +219,27 @@ struct UI2DMapPreview: View {
                 )
                 .foregroundStyle(.white)
             )
+            
+        
+        case .oil:
+            
+            RoundedRectangle(
+                cornerRadius: 4
+            )
+            .fill(.black)
+            .frame(
+                width: 20,
+                height: 20
+            )
+            .overlay(
+                Image(
+                    systemName: "questionmark"
+                )
+                .font(
+                    .caption.bold()
+                )
+                .foregroundStyle(.white)
+            )
         }
     }
 }

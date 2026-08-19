@@ -29,6 +29,7 @@ struct UIMapLocalization: View {
     
     @State private var removedElementIDs: Set<UUID> = []
     @State private var isItemboxEffectActive = false
+    @State private var isOilEffectActive = false
 
     private let collisionController =
         TrackCollisionController()
@@ -333,6 +334,13 @@ struct UIMapLocalization: View {
             print("Itembox collected")
             
             itemBoxCollision()
+        
+        
+        case .oil:
+               
+            print("Oil collected")
+                
+            oilCollision()
         }
     }
     
@@ -386,29 +394,49 @@ struct UIMapLocalization: View {
     }
     
     
-    // MARK: - Itembox Effect (old)
+    // MARK: - Oil Collission
 
-    private func spinRobot() {
+    private func oilCollision() {
         
-        guard controller.driveMode == .mechanum else {
-            print("Spin requires Mechanum mode")
+        guard isOilEffectActive == false else {
             return
         }
         
-        guard controller.isConnected && controller.isEnabled else {
+        guard controller.driveMode == .mechanum else {
+            print("Oil effect requires Mechanum mode")
+            return
+        }
+        
+        guard controller.isConnected,
+              controller.isEnabled else {
             print("Robot is not ready")
             return
         }
         
+        isOilEffectActive = true
+        
         controller.stopJoystick()
-        controller.startMechanumRotation(.right)
         
         Task {
+            controller.sendLightMode(
+                .rainbow
+            )
+            
+            controller.startMechanumRotation(
+                .right
+            )
+            
             try? await Task.sleep(
-                for: .seconds(2)
+                for: .seconds(1)
             )
             
             controller.stopMechanumRotation()
+            
+            controller.sendLightMode(
+                .enabled
+            )
+            
+            isOilEffectActive = false
         }
     }
     
