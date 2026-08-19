@@ -41,8 +41,12 @@ struct UIMapLocalization: View {
             UIAprilTagCamera(
                 detectionSession: detectionSession,
                 map: map,
-                referenceWorldTransform: referenceWorldTransform,
-                removedElementIDs: removedElementIDs
+                referenceWorldTransform:
+                    referenceWorldTransform,
+                removedElementIDs:
+                    removedElementIDs,
+                showSimulatedRobot:
+                    controller.usedRobot == .simulation
             )
             .ignoresSafeArea()
             

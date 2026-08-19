@@ -16,7 +16,7 @@ struct UIAprilTagCamera: UIViewRepresentable {
     
     var removedElementIDs: Set<UUID> = []
 
-    
+    var showSimulatedRobot = false
     
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -25,6 +25,8 @@ struct UIAprilTagCamera: UIViewRepresentable {
     
     final class Coordinator {
         var didDrawMapContent = false
+        var didDrawSimulatedRobot = false
+
     }
     
     
@@ -86,6 +88,21 @@ struct UIAprilTagCamera: UIViewRepresentable {
             referenceWorldTransform: referenceWorldTransform,
             in: uiView
         )
+        
+        
+        if showSimulatedRobot {
+            
+            let robot =
+                EduardRobotSimulation()
+            
+            
+            UIARSimulatedRobot.draw(
+                robot: robot,
+                referenceWorldTransform:
+                    referenceWorldTransform,
+                in: uiView
+            )
+        }
         
         
         context.coordinator.didDrawMapContent = true

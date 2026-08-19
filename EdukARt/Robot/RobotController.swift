@@ -10,6 +10,18 @@ import Combine
 import Foundation
 
 final class RobotController: ObservableObject {
+    enum UsedRobot: String, CaseIterable, Identifiable {
+        
+        case eduard = "Eduard"
+        case simulation = "Simulation"
+        
+        var id: String {
+            rawValue
+        }
+    }
+    
+    @Published var usedRobot: UsedRobot = .eduard
+    
     enum ConnectionState: Equatable {
         case disconnected
         case connected

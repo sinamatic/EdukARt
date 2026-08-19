@@ -13,6 +13,7 @@ struct UIRobotSettings: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            usedRobotPicker
             
             Button {
                 withAnimation {
@@ -23,11 +24,11 @@ struct UIRobotSettings: View {
                     Text("Settings")
                         .font(.subheadline.weight(.bold))
                     
+                    
+                   
+                    
                     Spacer()
                     
-                    Text(controller.connectionState.title)
-                        .font(.caption)
-                        .foregroundStyle(connectionColor)
                     
                     Image(systemName: "chevron.down")
                         .rotationEffect(
@@ -60,14 +61,6 @@ struct UIRobotSettings: View {
                             )
                         }
                         
-                        Button {
-                            controller.connect()
-                        } label: {
-                            settingsActionLabel(
-                                title: "Connect",
-                                systemName: "antenna.radiowaves.left.and.right"
-                            )
-                        }
                         
                         Button {
                             controller.sendEnable()
@@ -125,5 +118,31 @@ struct UIRobotSettings: View {
         }
         
         UIApplication.shared.open(settingsURL)
+    }
+    
+    private var usedRobotPicker: some View {
+        
+        VStack(alignment: .leading, spacing: 8) {
+            
+            Text("Used Robot")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.72))
+            
+            
+            Picker(
+                "Used Robot",
+                selection: $controller.usedRobot
+            ) {
+                
+                ForEach(
+                    RobotController.UsedRobot.allCases
+                ) { robot in
+                    
+                    Text(robot.rawValue)
+                        .tag(robot)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
     }
 }
