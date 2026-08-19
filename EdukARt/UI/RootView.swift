@@ -9,8 +9,8 @@ import SwiftUI
 
 struct RootView: View {
     
-    @StateObject private var robotController = RobotController()
-    @StateObject private var simulatedRobotController = SimulatedRobotController()
+    @StateObject private var robotController: RobotController
+    @StateObject private var simulatedRobotController: SimulatedRobotController
     
     @StateObject private var mapStore = MapStore()
     
@@ -18,6 +18,23 @@ struct RootView: View {
     @State private var selectedMap: GameMap?
     @State private var editingTrackPoints: [MapPoint] = []
     @State private var editingTrackElements: [MapTrackElement] = []
+    
+    
+    init() {
+        let simulatedRobotController = SimulatedRobotController()
+        
+        _simulatedRobotController = StateObject(
+            wrappedValue: simulatedRobotController
+        )
+        
+        _robotController = StateObject(
+            wrappedValue: RobotController(
+                simulationCommandTransport: SimulationCommandTransport(
+                    simulatedRobot: simulatedRobotController
+                )
+            )
+        )
+    }
     
     
     var body: some View {
@@ -65,12 +82,6 @@ struct RootView: View {
         }
         .task {
             await leaveLogoAfterDelay()
-        }
-        .onAppear {
-            configureRobotTransport()
-        }
-        .onChange(of: robotController.usedRobot) {
-            configureRobotTransport()
         }
     }
     
@@ -127,7 +138,6 @@ struct RootView: View {
                 },
                 onSelectMap: { map in
                     selectedMap = map
-                    configureRobotTransport()
                     phase = .localizeMap
                 },
                 onEditTrack: { map in
@@ -266,20 +276,4 @@ struct RootView: View {
         phase = .selectMap
     }
 
-
-    private func configureRobotTransport() {
-        switch robotController.usedRobot {
-        case .eduard:
-            robotController.setCommandTransport(
-                robotController.eduardCommandTransport
-            )
-
-        case .simulation:
-            robotController.setCommandTransport(
-                SimulationCommandTransport(
-                    simulatedRobot: simulatedRobotController
-                )
-            )
-        }
-    }
 }

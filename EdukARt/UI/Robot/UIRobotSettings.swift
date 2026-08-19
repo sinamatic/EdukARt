@@ -13,8 +13,6 @@ struct UIRobotSettings: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            usedRobotPicker
-            
             Button {
                 withAnimation {
                     isExpanded.toggle()
@@ -118,31 +116,5 @@ struct UIRobotSettings: View {
         }
         
         UIApplication.shared.open(settingsURL)
-    }
-    
-    private var usedRobotPicker: some View {
-        
-        VStack(alignment: .leading, spacing: 8) {
-            
-            Text("Used Robot")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.72))
-            
-            
-            Picker(
-                "Used Robot",
-                selection: $controller.usedRobot
-            ) {
-                
-                ForEach(
-                    RobotController.UsedRobot.allCases
-                ) { robot in
-                    
-                    Text(robot.rawValue)
-                        .tag(robot)
-                }
-            }
-            .pickerStyle(.segmented)
-        }
     }
 }

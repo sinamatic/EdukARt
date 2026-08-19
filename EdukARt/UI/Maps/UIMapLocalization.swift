@@ -41,7 +41,7 @@ struct UIMapLocalization: View {
                 removedElementIDs:
                     removedElementIDs,
                 showSimulatedRobot:
-                    controller.usedRobot == .simulation
+                    controller.isEnabled == false
             )
             .ignoresSafeArea()
             
@@ -78,14 +78,14 @@ struct UIMapLocalization: View {
             
             detectReferenceTag(in: tags)
             
-            if controller.usedRobot == .eduard {
+            if controller.isEnabled {
                 checkRealRobotCollision(in: tags)
             }
         }
         .onReceive(
             simulatedRobot.$position
         ) { position in
-            guard controller.usedRobot == .simulation else {
+            guard controller.isEnabled == false else {
                 return
             }
             
@@ -202,7 +202,7 @@ struct UIMapLocalization: View {
         
         referenceWorldTransform = referenceTag.worldTransform
         
-        if controller.usedRobot == .simulation {
+        if controller.isEnabled == false {
             simulatedRobot.reset()
         }
     }
@@ -211,17 +211,15 @@ struct UIMapLocalization: View {
     // MARK: - Robot Position
     
     private var activeRobotPosition: SIMD3<Float>? {
-        switch controller.usedRobot {
-        case .eduard:
+        if controller.isEnabled {
             return realRobotPosition
-            
-        case .simulation:
-            guard referenceWorldTransform != nil else {
-                return nil
-            }
-            
-            return simulatedRobot.position
         }
+        
+        guard referenceWorldTransform != nil else {
+            return nil
+        }
+        
+        return simulatedRobot.position
     }
     
     
@@ -406,12 +404,6 @@ struct UIMapLocalization: View {
             return
         }
         
-        guard controller.isConnected,
-              controller.isEnabled else {
-            print("Robot is not ready")
-            return
-        }
-        
         isOilEffectActive = true
         
         controller.stopJoystick()
@@ -449,12 +441,6 @@ struct UIMapLocalization: View {
         
         guard controller.driveMode == .mechanum else {
             print("Itembox effect requires Mechanum mode")
-            return
-        }
-        
-        guard controller.isConnected,
-              controller.isEnabled else {
-            print("Robot is not ready")
             return
         }
         

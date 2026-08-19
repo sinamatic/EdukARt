@@ -11,20 +11,6 @@ import Foundation
 
 final class RobotController: ObservableObject {
     
-    
-    enum UsedRobot: String, CaseIterable, Identifiable {
-        
-        case eduard = "Eduard"
-        case simulation = "Simulation"
-        
-        var id: String {
-            rawValue
-        }
-        
-    }
-    
-    @Published var usedRobot: UsedRobot = .eduard
-    
     enum ConnectionState: Equatable {
         case disconnected
         case connected
@@ -42,15 +28,6 @@ final class RobotController: ObservableObject {
         }
     }
     
-    var commandTransport:
-        RobotCommandTransport?
-    
-    func setCommandTransport(
-        _ transport: RobotCommandTransport
-    ) {
-        commandTransport = transport
-    }
-
     enum DriveMode: String, CaseIterable, Identifiable {
         case mechanum = "Mechanum"
         case offroad = "Offroad"
@@ -90,13 +67,18 @@ final class RobotController: ObservableObject {
     }
 
     @Published private(set) var isConnected = false
+    
     @Published private(set) var isEnabled = false
+    @Published var isSimulationVisible = false
+    
     @Published private(set) var activeJoystickDirection: JoystickDirection = .idle
     @Published var driveMode: DriveMode = .mechanum
     @Published private(set) var statusMessage = "Connect the iPhone to the EduardBlue3 WiFi network first."
 
     let lightController: LightController
-    let eduardCommandTransport: RobotCommandTransport
+    private let eduardCommandTransport: RobotCommandTransport
+    private let simulationCommandTransport: RobotCommandTransport
+    private var activeCommandTransport: RobotCommandTransport
 
     var connectionState: ConnectionState {
         if isEnabled {
@@ -131,10 +113,14 @@ final class RobotController: ObservableObject {
     private var joystickInput = (x: 0.0, y: 0.0)
     private var activeRotationDirection: RotationDirection?
 
-    init(transport: EduardROSCommandTransport = EduardWiFiCommandTransport()) {
+    init(
+        transport: EduardROSCommandTransport = EduardWiFiCommandTransport(),
+        simulationCommandTransport: RobotCommandTransport
+    ) {
         self.transport = transport
         eduardCommandTransport = EduardRobotCommandTransport(transport: transport)
-        commandTransport = eduardCommandTransport
+        self.simulationCommandTransport = simulationCommandTransport
+        activeCommandTransport = simulationCommandTransport
         lightController = LightController(transport: transport)
     }
 
@@ -159,6 +145,7 @@ final class RobotController: ObservableObject {
         activeRotationDirection = nil
         isConnected = false
         isEnabled = false
+        useSimulationTransport()
         statusMessage = "Disconnected. Connect the iPhone to EduardBlue3 and try again."
     }
 
@@ -173,20 +160,19 @@ final class RobotController: ObservableObject {
         activeJoystickDirection = .idle
         activeRotationDirection = nil
         sendStopCommand()
-        if usedRobot == .eduard {
-            sendDisabledMode()
-        }
+        sendDisabledMode()
         isEnabled = false
+        useSimulationTransport()
         statusMessage = "Disable sent. The connection remains active."
     }
 
     func sendEnable() {
         isConnected = true
-        if usedRobot == .eduard {
-            sendRemoteControlledMode()
-        }
-        sendStopCommand()
+        simulationCommandTransport.stop()
+        sendRemoteControlledMode()
         isEnabled = true
+        useEduardTransport()
+        sendStopCommand()
         statusMessage = "Enable active. \(driveMode.rawValue) mode ready."
         startCommandLoop()
     }
@@ -201,16 +187,9 @@ final class RobotController: ObservableObject {
         activeRotationDirection = nil
         sendStopCommand()
 
-        if isEnabled, usedRobot == .eduard {
-            sendRemoteControlledMode()
-            statusMessage = "\(mode.rawValue) mode active."
-        }
     }
 
     func sendLightMode(_ mode: LightController.StandardMode) {
-        guard usedRobot == .eduard else {
-            return
-        }
 
         guard isConnected else {
             statusMessage = "Confirm the WiFi connection before changing lights."
@@ -240,18 +219,6 @@ final class RobotController: ObservableObject {
             return
         }
 
-        guard isConnected else {
-            activeRotationDirection = nil
-            statusMessage = "Confirm the WiFi connection before using rotation."
-            return
-        }
-
-        guard isEnabled else {
-            activeRotationDirection = nil
-            statusMessage = "Send Enable before using rotation."
-            return
-        }
-
         activeRotationDirection = direction
         sendCommand(for: activeJoystickDirection)
         statusMessage = rotationStatusMessage
@@ -263,18 +230,6 @@ final class RobotController: ObservableObject {
     }
 
     private func updateJoystickDirection(_ direction: JoystickDirection) {
-        guard isConnected else {
-            activeJoystickDirection = .idle
-            statusMessage = "Confirm the WiFi connection before using the joystick."
-            return
-        }
-
-        guard isEnabled else {
-            activeJoystickDirection = .idle
-            statusMessage = "Send Enable before using the joystick."
-            return
-        }
-
         guard activeJoystickDirection != direction else {
             sendCommand(for: direction)
             return
@@ -331,6 +286,16 @@ final class RobotController: ObservableObject {
 
             self.sendCommand(for: self.activeJoystickDirection)
         }
+    }
+
+    private func useEduardTransport() {
+        simulationCommandTransport.stop()
+        activeCommandTransport = eduardCommandTransport
+    }
+
+    private func useSimulationTransport() {
+        eduardCommandTransport.stop()
+        activeCommandTransport = simulationCommandTransport
     }
 
     private func joystickDirection(x: Double, y: Double) -> JoystickDirection {
@@ -426,7 +391,7 @@ final class RobotController: ObservableObject {
     }
 
     private func sendDriveCommand(linearX: Double, linearY: Double = 0.0, angularZ: Double = 0.0) {
-        commandTransport?.drive(
+        activeCommandTransport.drive(
             x: linearX,
             y: linearY,
             rotation: angularZ
@@ -434,7 +399,7 @@ final class RobotController: ObservableObject {
     }
 
     private func sendStopCommand() {
-        commandTransport?.stop()
+        activeCommandTransport.stop()
     }
 
     private var forwardVelocity: Double {
