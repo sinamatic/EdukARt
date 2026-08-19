@@ -143,4 +143,47 @@ struct UIARSimulatedRobot {
             anchor
         )
     }
+    
+    static func update(
+        simulatedRobot: SimulatedRobotController,
+        in arView: ARView
+    ) {
+        
+        guard let entity =
+            arView.scene.findEntity(
+                named: "SimulatedEduard"
+            ) else {
+            return
+        }
+        
+        
+        entity.position = SIMD3<Float>(
+            simulatedRobot.position.x,
+            simulatedRobot.position.y,
+            simulatedRobot.position.z - 0.14
+        )
+        
+        
+        let standUpRotation = simd_quatf(
+            angle: -.pi / 2,
+            axis: SIMD3<Float>(1, 0, 0)
+        )
+        
+        
+        let driveRotation = simd_quatf(
+            angle: simulatedRobot.rotation,
+            axis: SIMD3<Float>(0, 0, 1)
+        )
+        
+        let directionRotation = simd_quatf(
+            angle: .pi,
+            axis: SIMD3<Float>(0, 0, 1)
+        )
+        
+        
+        entity.orientation =
+            driveRotation *
+            directionRotation *
+            standUpRotation
+    }
 }

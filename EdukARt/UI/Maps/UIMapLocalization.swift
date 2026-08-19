@@ -13,6 +13,8 @@ struct UIMapLocalization: View {
     let onBack: () -> Void
     
     @ObservedObject var controller: RobotController
+
+    @ObservedObject var simulatedRobot: SimulatedRobotController
     
     @StateObject private var detectionSession =
         AprilTagDetectionSession()
@@ -40,6 +42,7 @@ struct UIMapLocalization: View {
             
             UIAprilTagCamera(
                 detectionSession: detectionSession,
+                simulatedRobot: simulatedRobot,
                 map: map,
                 referenceWorldTransform:
                     referenceWorldTransform,
@@ -87,7 +90,19 @@ struct UIMapLocalization: View {
         ) { tags in
             
             detectReferenceTag(in: tags)
-            checkRobotCollision(in: tags)
+            
+            if controller.usedRobot == .eduard {
+                checkRealRobotCollision(in: tags)
+            }
+        }
+        .onReceive(
+            simulatedRobot.$position
+        ) { position in
+            guard controller.usedRobot == .simulation else {
+                return
+            }
+            
+            checkCollision(at: position)
         }
     }
     
@@ -141,13 +156,13 @@ struct UIMapLocalization: View {
             
             UI2DMapPreview(
                 map: map,
-                robotPosition: robotPosition,
+                robotPosition: activeRobotPosition,
                 removedElementIDs: removedElementIDs
             )
             .frame(height: 300)
             
             
-            if let robotPosition {
+            if let activeRobotPosition {
                 
                 Text("Robot #0")
                     .font(.headline)
@@ -155,9 +170,9 @@ struct UIMapLocalization: View {
                 Text(
                     String(
                         format: "x: %.2f   y: %.2f   z: %.2f",
-                        robotPosition.x,
-                        robotPosition.y,
-                        robotPosition.z
+                        activeRobotPosition.x,
+                        activeRobotPosition.y,
+                        activeRobotPosition.z
                     )
                 )
                 .font(.caption)
@@ -236,12 +251,31 @@ struct UIMapLocalization: View {
         // Stabile Pose berechnen
         referenceWorldTransform =
             averageTransform(referenceSamples)
+        
+        if controller.usedRobot == .simulation {
+            simulatedRobot.reset()
+        }
     }
     
     
     // MARK: - Robot Position
     
-    private var robotPosition: SIMD3<Float>? {
+    private var activeRobotPosition: SIMD3<Float>? {
+        switch controller.usedRobot {
+        case .eduard:
+            return realRobotPosition
+            
+        case .simulation:
+            guard referenceWorldTransform != nil else {
+                return nil
+            }
+            
+            return simulatedRobot.position
+        }
+    }
+    
+    
+    private var realRobotPosition: SIMD3<Float>? {
         
         guard let referenceWorldTransform else {
             return nil
@@ -271,7 +305,7 @@ struct UIMapLocalization: View {
     
     // MARK: - Robot Collision
 
-    private func checkRobotCollision(
+    private func checkRealRobotCollision(
         in tags: [DetectedAprilTag]
     ) {
         
@@ -295,6 +329,17 @@ struct UIMapLocalization: View {
         let position = localization.mapPosition(
             from: robotTag.worldTransform
         )
+        
+        checkCollision(at: position)
+    }
+    
+    
+    private func checkCollision(
+        at position: SIMD3<Float>
+    ) {
+        guard referenceWorldTransform != nil else {
+            return
+        }
         
         let activeElements = map.trackElements.filter {
             removedElementIDs.contains($0.id) == false

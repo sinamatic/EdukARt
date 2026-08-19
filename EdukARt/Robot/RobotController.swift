@@ -10,6 +10,8 @@ import Combine
 import Foundation
 
 final class RobotController: ObservableObject {
+    
+    
     enum UsedRobot: String, CaseIterable, Identifiable {
         
         case eduard = "Eduard"
@@ -18,6 +20,7 @@ final class RobotController: ObservableObject {
         var id: String {
             rawValue
         }
+        
     }
     
     @Published var usedRobot: UsedRobot = .eduard
@@ -37,6 +40,15 @@ final class RobotController: ObservableObject {
                 return "Enabled"
             }
         }
+    }
+    
+    var commandTransport:
+        RobotCommandTransport?
+    
+    func setCommandTransport(
+        _ transport: RobotCommandTransport
+    ) {
+        commandTransport = transport
     }
 
     enum DriveMode: String, CaseIterable, Identifiable {
@@ -84,6 +96,7 @@ final class RobotController: ObservableObject {
     @Published private(set) var statusMessage = "Connect the iPhone to the EduardBlue3 WiFi network first."
 
     let lightController: LightController
+    let eduardCommandTransport: RobotCommandTransport
 
     var connectionState: ConnectionState {
         if isEnabled {
@@ -100,7 +113,6 @@ final class RobotController: ObservableObject {
     let transport: EduardROSCommandTransport
 
     private let setModeService = "set_mode"
-    private let driveVelocityTopic = "cmd_vel"
     private let commandRepeatInterval = 0.05
     private let joystickDeadZone = 0.05
     private let diagonalDirectionThreshold = 0.35
@@ -121,6 +133,8 @@ final class RobotController: ObservableObject {
 
     init(transport: EduardROSCommandTransport = EduardWiFiCommandTransport()) {
         self.transport = transport
+        eduardCommandTransport = EduardRobotCommandTransport(transport: transport)
+        commandTransport = eduardCommandTransport
         lightController = LightController(transport: transport)
     }
 
@@ -159,14 +173,18 @@ final class RobotController: ObservableObject {
         activeJoystickDirection = .idle
         activeRotationDirection = nil
         sendStopCommand()
-        sendDisabledMode()
+        if usedRobot == .eduard {
+            sendDisabledMode()
+        }
         isEnabled = false
         statusMessage = "Disable sent. The connection remains active."
     }
 
     func sendEnable() {
         isConnected = true
-        sendRemoteControlledMode()
+        if usedRobot == .eduard {
+            sendRemoteControlledMode()
+        }
         sendStopCommand()
         isEnabled = true
         statusMessage = "Enable active. \(driveMode.rawValue) mode ready."
@@ -183,13 +201,17 @@ final class RobotController: ObservableObject {
         activeRotationDirection = nil
         sendStopCommand()
 
-        if isEnabled {
+        if isEnabled, usedRobot == .eduard {
             sendRemoteControlledMode()
             statusMessage = "\(mode.rawValue) mode active."
         }
     }
 
     func sendLightMode(_ mode: LightController.StandardMode) {
+        guard usedRobot == .eduard else {
+            return
+        }
+
         guard isConnected else {
             statusMessage = "Confirm the WiFi connection before changing lights."
             return
@@ -404,41 +426,15 @@ final class RobotController: ObservableObject {
     }
 
     private func sendDriveCommand(linearX: Double, linearY: Double = 0.0, angularZ: Double = 0.0) {
-        transport.send(
-            topic: driveVelocityTopic,
-            messageType: "geometry_msgs/msg/Twist",
-            message: [
-                "linear": .object([
-                    "x": .double(linearX),
-                    "y": .double(linearY),
-                    "z": .double(stoppedVelocity)
-                ]),
-                "angular": .object([
-                    "x": .double(stoppedVelocity),
-                    "y": .double(stoppedVelocity),
-                    "z": .double(angularZ)
-                ])
-            ]
+        commandTransport?.drive(
+            x: linearX,
+            y: linearY,
+            rotation: angularZ
         )
     }
 
     private func sendStopCommand() {
-        transport.send(
-            topic: driveVelocityTopic,
-            messageType: "geometry_msgs/msg/Twist",
-            message: [
-                "linear": .object([
-                    "x": .double(stoppedVelocity),
-                    "y": .double(stoppedVelocity),
-                    "z": .double(stoppedVelocity)
-                ]),
-                "angular": .object([
-                    "x": .double(stoppedVelocity),
-                    "y": .double(stoppedVelocity),
-                    "z": .double(stoppedVelocity)
-                ])
-            ]
-        )
+        commandTransport?.stop()
     }
 
     private var forwardVelocity: Double {

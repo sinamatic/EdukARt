@@ -12,6 +12,9 @@ struct UICreateMap: View {
     
     @StateObject private var detectionSession =
     AprilTagDetectionSession()
+
+    @StateObject private var simulatedRobot =
+        SimulatedRobotController()
     
     @State private var scanFinished = false
     @State private var mapName = ""
@@ -28,7 +31,8 @@ struct UICreateMap: View {
             if scanFinished == false {
                 
                 UIAprilTagCamera(
-                    detectionSession: detectionSession
+                    detectionSession: detectionSession,
+                    simulatedRobot: simulatedRobot
                 )
                 .ignoresSafeArea()
                 

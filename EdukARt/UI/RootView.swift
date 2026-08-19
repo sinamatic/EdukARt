@@ -10,6 +10,8 @@ import SwiftUI
 struct RootView: View {
     
     @StateObject private var robotController = RobotController()
+    @StateObject private var simulatedRobotController = SimulatedRobotController()
+    
     @StateObject private var mapStore = MapStore()
     
     @State private var phase: AppPhase = .logo
@@ -63,6 +65,12 @@ struct RootView: View {
         }
         .task {
             await leaveLogoAfterDelay()
+        }
+        .onAppear {
+            configureRobotTransport()
+        }
+        .onChange(of: robotController.usedRobot) {
+            configureRobotTransport()
         }
     }
     
@@ -119,6 +127,7 @@ struct RootView: View {
                 },
                 onSelectMap: { map in
                     selectedMap = map
+                    configureRobotTransport()
                     phase = .localizeMap
                 },
                 onEditTrack: { map in
@@ -143,8 +152,12 @@ struct RootView: View {
                     onBack: {
                         phase = .selectMap
                     },
-                    controller: robotController
+                    controller: robotController,
+                    simulatedRobot: simulatedRobotController
+                    
+                    
                 )
+            
             }
             
             
@@ -251,5 +264,22 @@ struct RootView: View {
         
         self.selectedMap = selectedMap
         phase = .selectMap
+    }
+
+
+    private func configureRobotTransport() {
+        switch robotController.usedRobot {
+        case .eduard:
+            robotController.setCommandTransport(
+                robotController.eduardCommandTransport
+            )
+
+        case .simulation:
+            robotController.setCommandTransport(
+                SimulationCommandTransport(
+                    simulatedRobot: simulatedRobotController
+                )
+            )
+        }
     }
 }

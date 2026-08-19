@@ -2,6 +2,16 @@
 //  RobotCommandTransport.swift
 //  EdukARt
 //
-//  Created by Sina Steinmüller on 19.08.26.
-//
 
+import Foundation
+
+protocol RobotCommandTransport: AnyObject {
+    
+    func drive(
+        x: Double,
+        y: Double,
+        rotation: Double
+    )
+    
+    func stop()
+}

@@ -11,6 +11,9 @@ struct UIAprilTagCamera: UIViewRepresentable {
     
     @ObservedObject var detectionSession: AprilTagDetectionSession
     
+    @ObservedObject var simulatedRobot:
+        SimulatedRobotController
+    
     var map: GameMap? = nil
     var referenceWorldTransform: simd_float4x4? = nil
     
@@ -62,6 +65,13 @@ struct UIAprilTagCamera: UIViewRepresentable {
             elementIDs: removedElementIDs,
             from: uiView
         )
+
+        if showSimulatedRobot {
+            UIARSimulatedRobot.update(
+                simulatedRobot: simulatedRobot,
+                in: uiView
+            )
+        }
         
         guard context.coordinator.didDrawMapContent == false else {
             return
@@ -88,6 +98,8 @@ struct UIAprilTagCamera: UIViewRepresentable {
             referenceWorldTransform: referenceWorldTransform,
             in: uiView
         )
+        
+        
         
         
         if showSimulatedRobot {
