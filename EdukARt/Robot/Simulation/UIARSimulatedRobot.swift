@@ -7,6 +7,18 @@ import RealityKit
 import simd
 
 struct UIARSimulatedRobot {
+
+    private static let positionOffset =
+        SIMD3<Float>(
+            0, // left / right
+            0.03, // front / back
+            0.24 // z-axis, ground
+        )
+
+    private static let visualScale =
+        SIMD3<Float>(
+            repeating: 1.12
+        )
     
     static func draw(
         robot: EduardRobotSimulation,
@@ -113,7 +125,9 @@ struct UIARSimulatedRobot {
             robot.position.x,
             robot.position.y,
             robot.position.z
-        )
+        ) + positionOffset
+
+        robotEntity.scale = visualScale
         
         
         // MARK: - Orientation
@@ -160,8 +174,8 @@ struct UIARSimulatedRobot {
         entity.position = SIMD3<Float>(
             simulatedRobot.position.x,
             simulatedRobot.position.y,
-            simulatedRobot.position.z - 0.14
-        )
+            simulatedRobot.position.z
+        ) + positionOffset
         
         
         let standUpRotation = simd_quatf(
