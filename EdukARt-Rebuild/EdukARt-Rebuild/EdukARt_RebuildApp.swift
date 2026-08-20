@@ -1,0 +1,17 @@
+//
+//  EdukARt_RebuildApp.swift
+//  EdukARt-Rebuild
+//
+//  Created by Sina Steinmüller on 20.08.26.
+//
+
+import SwiftUI
+
+@main
+struct EdukARt_RebuildApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
