@@ -42,33 +42,4 @@ struct UIRobotControl: View {
             }
         }
     }
-    
-    private func toggleSettings() {
-        settingsExpanded.toggle()
-        
-        if settingsExpanded {
-            driveExpanded = false
-            lightsExpanded = false
-        }
-    }
-    
-    
-    private func toggleDrive() {
-        driveExpanded.toggle()
-        
-        if driveExpanded {
-            settingsExpanded = false
-            lightsExpanded = false
-        }
-    }
-    
-    
-    private func toggleLights() {
-        lightsExpanded.toggle()
-        
-        if lightsExpanded {
-            settingsExpanded = false
-            driveExpanded = false
-        }
-    }
 }

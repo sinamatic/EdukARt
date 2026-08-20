@@ -93,21 +93,6 @@ struct UIRobotSettings: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
     }
     
-    
-    private var connectionColor: Color {
-        switch controller.connectionState {
-        case .disconnected:
-            return .red
-            
-        case .connected:
-            return .yellow
-            
-        case .enabled:
-            return .green
-        }
-    }
-    
-    
     private func openWiFiSettings() {
         guard let settingsURL = URL(
             string: UIApplication.openSettingsURLString

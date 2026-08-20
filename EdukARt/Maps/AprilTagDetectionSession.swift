@@ -183,48 +183,6 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
         }
     }
     
-    
-    private func worldPosition(
-        from pose: TagPose,
-        cameraTransform: simd_float4x4
-    ) -> SIMD3<Float> {
-        
-        let translation = pose.translation
-        
-        let x = Float(translation[0])
-        let y = Float(translation[1])
-        let z = Float(translation[2])
-        
-        
-        // SwiftAprilTag:
-        // x = right
-        // y = down
-        // z = forward
-        //
-        // ARKit:
-        // x = right
-        // y = up
-        // -z = forward
-        
-        let tagPositionInCamera = SIMD4<Float>(
-            x,
-            -y,
-            -z,
-            1
-        )
-        
-        
-        let tagPositionInWorld =
-        cameraTransform * tagPositionInCamera
-        
-        
-        return SIMD3<Float>(
-            tagPositionInWorld.x,
-            tagPositionInWorld.y,
-            tagPositionInWorld.z
-        )
-    }
-    
     private func worldTransform(
         from pose: TagPose,
         cameraTransform: simd_float4x4
@@ -281,12 +239,6 @@ final class AprilTagDetectionSession: NSObject, ObservableObject, ARSessionDeleg
             $0.id < $1.id
         }
     }
-    
-    func resetScan() {
-        detectedTags = []
-        scannedTags = []
-    }
-
     func stop() {
         isDetecting = false
     }

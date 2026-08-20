@@ -128,27 +128,6 @@ final class RobotController: ObservableObject {
         commandTimer?.invalidate()
     }
 
-    func connect() {
-        guard isConnected == false else {
-            return
-        }
-
-        isConnected = true
-        statusMessage = "Sending to \(transport.targetHost):\(transport.targetPort)."
-    }
-
-    func disconnect() {
-        commandTimer?.invalidate()
-        commandTimer = nil
-        lightController.stop()
-        activeJoystickDirection = .idle
-        activeRotationDirection = nil
-        isConnected = false
-        isEnabled = false
-        useSimulationTransport()
-        statusMessage = "Disconnected. Connect the iPhone to EduardBlue3 and try again."
-    }
-
     func sendDisable() {
         guard isConnected else {
             statusMessage = "No active connection to Eduard."
