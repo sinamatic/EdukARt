@@ -3,7 +3,8 @@
 //  EdukARt-Rebuild
 //
 //  Created by Sina Steinmüller on 21.08.26.
-//
+//  https://developer.apple.com/documentation/realitykit/loading-entities-from-a-file
+//  https://developer.apple.com/documentation/realitykit/entity/load(named:in:)
 
 import SwiftUI
 import RealityKit
@@ -30,17 +31,15 @@ struct CameraARView: UIViewRepresentable {
 
         let anchor = AnchorEntity(
             plane: .horizontal,
-            classification: .floor,
-            minimumBounds: [0.3, 0.3]
+            classification: .any,
+            minimumBounds: [0.2, 0.2]
         )
-
+        
+        let simulation = EduardSimulation()
+        
         do {
-            let eduard =
-                try Entity.load(
-                    named: "Eduard"
-                )
-
-            anchor.addChild(eduard)
+            let eduard = try simulation.loadEntity()
+                           anchor.addChild(eduard)
 
         } catch {
             print(
@@ -52,6 +51,8 @@ struct CameraARView: UIViewRepresentable {
         arView.scene.addAnchor(anchor)
 
         return arView
+        
+        
     }
 
     func updateUIView(
@@ -59,4 +60,8 @@ struct CameraARView: UIViewRepresentable {
         context: Context
     ) {
     }
+    
+    
 }
+
+
