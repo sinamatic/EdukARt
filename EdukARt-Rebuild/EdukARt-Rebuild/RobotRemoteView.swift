@@ -409,22 +409,11 @@ private extension RobotRemoteView {
             .buttonStyle(.plain)
             
             if cameraExpanded {
-                ZStack {
-                    Color.white.opacity(0.08)
-                    
-                    VStack(spacing: 8) {
-                        Image(systemName: "camera")
-                            .font(.title)
-                        
-                        Text("Camera Preview")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.white.opacity(0.7))
-                }
-                .frame(height: 200)
-                .clipShape(
-                    RoundedRectangle(cornerRadius: 8)
-                )
+                CameraPreviewView()
+                    .frame(height: 220)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 8)
+                    )
             }
         }
         .padding(14)
