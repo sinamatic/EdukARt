@@ -1,5 +1,5 @@
 //
-//  JoystickView.swift
+//  DragGestureView.swift
 //  EdukARt-Rebuild
 //
 //  Created by Sina Steinmüller on 21.08.26.
@@ -9,7 +9,7 @@
 import SwiftUI
 import SwiftUIJoystick
 
-public struct JoystickView: View {
+public struct Joystick: View {
     
     private let baseSize: CGFloat = 220
     private let knobSize: CGFloat = 82
@@ -60,8 +60,6 @@ public struct JoystickView: View {
                         Image(systemName: "arrowtriangle.right.fill")
                             .offset(x: 60)
                     }
-                    
-                    
                     .foregroundStyle(.white.opacity(0.75))
                 },
                 foreground: {
@@ -75,7 +73,6 @@ public struct JoystickView: View {
                 },
                 locksInPlace: false)
         }
-        
     }
 }
 
@@ -86,14 +83,11 @@ public struct JoystickView: View {
     ZStack {
         Color.black
             .ignoresSafeArea()
-
-        JoystickView(
+        
+        Joystick(
             monitor: JoystickMonitor(),
             width: 180,
             shape: .circle
         )
-        
-        
     }
-    
 }

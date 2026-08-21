@@ -1,33 +1,46 @@
+//
+//  DragGestureView.swift
+//  EdukARt-Rebuild
+//
+//  Created by Sina Steinmüller on 21.08.26.
+//
+
 import SwiftUI
+import SwiftUIJoystick
 import UIKit
 
 struct RobotRemoteView: View {
-
+    
+    @StateObject private var joystickMonitor = JoystickMonitor()
+    
     @State private var settingsExpanded = false
+    @State private var driveExpanded = true
     @State private var lightsExpanded = false
     @State private var cameraExpanded = false
-
+    
     @State private var driveMode: DriveMode = .mecanum
     @State private var lightMode: LightMode = .enabled
-
+    
     @State private var allLightsColor = Color.orange
     @State private var signalColor = Color.orange
-
+    
     var body: some View {
         ZStack {
             Color.black
                 .ignoresSafeArea()
-
+            
+            // expandable sections
             ScrollView {
                 VStack(spacing: 12) {
-
+                    
                     settingsSection
-
-                    driveSection
-
+                    
                     lightsSection
-
+                    
                     cameraSection
+                    
+                    driveSection // toDo remove scrollbar
+                    
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 30)
@@ -41,21 +54,22 @@ struct RobotRemoteView: View {
 // MARK: - Settings
 
 private extension RobotRemoteView {
-
+    
     var settingsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-
+            
             Button {
                 withAnimation {
                     settingsExpanded.toggle()
                 }
             } label: {
                 HStack {
+                    Image(systemName: "gearshape")
                     Text("Settings")
                         .font(.subheadline.weight(.bold))
-
+                    
                     Spacer()
-
+                    
                     Image(systemName: "chevron.down")
                         .rotationEffect(
                             .degrees(settingsExpanded ? 0 : -90)
@@ -64,16 +78,17 @@ private extension RobotRemoteView {
                 .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
-
+            
             if settingsExpanded {
                 VStack(alignment: .leading, spacing: 12) {
-
+                    
                     Text("Connect your device to Eduard's WiFi network.")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.72))
-
+                    // ToDo Ping Robot and check active WiFi Connection
+                    
                     HStack(spacing: 8) {
-
+                        
                         Button {
                             openWiFiSettings()
                         } label: {
@@ -86,8 +101,9 @@ private extension RobotRemoteView {
                                 .clipShape(
                                     RoundedRectangle(cornerRadius: 8)
                                 )
+                            // toDo change color to green when connected
                         }
-
+                        
                         Button {
                             print("Enable Robot")
                         } label: {
@@ -100,14 +116,15 @@ private extension RobotRemoteView {
                                 .clipShape(
                                     RoundedRectangle(cornerRadius: 8)
                                 )
+                            // toDo change color to green when enabled, maybe use light switch ros topic?
                         }
                     }
                     .buttonStyle(.plain)
-
+                    
                     Text("Drive Mode")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.white.opacity(0.68))
-
+                    
                     Picker("Drive Mode", selection: $driveMode) {
                         ForEach(DriveMode.allCases) { mode in
                             Text(mode.title)
@@ -127,16 +144,16 @@ private extension RobotRemoteView {
             RoundedRectangle(cornerRadius: 8)
         )
     }
-
+    
     func openWiFiSettings() {
         print("Open WiFi Settings")
-
+        
         guard let url = URL(
-            string: UIApplication.openSettingsURLString
+            string: UIApplication.openSettingsURLString // toDo check if Wifi settings can be opened, this opens App Settings?!
         ) else {
             return
         }
-
+        
         UIApplication.shared.open(url)
     }
 }
@@ -144,23 +161,62 @@ private extension RobotRemoteView {
 // MARK: - Drive
 
 private extension RobotRemoteView {
-
+    
     var driveSection: some View {
         VStack(alignment: .leading, spacing: 16) {
+            
+            // ToDo remove scrollbar, interfers with Joystick
+            
+            Button {
+                withAnimation {
+                    driveExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "steeringwheel")
+                    
+                    Text("Drive")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
 
-            Text("Drive")
-                .font(.subheadline.weight(.bold))
+                    
+                    
+                    Text(driveMode.title)
+                        .font(.caption)
+                        .foregroundStyle(.brandGreen)
+                    
+                    Image(systemName: "chevron.down")
+                        .rotationEffect(
+                            .degrees(driveExpanded ? 0 : -90)
+                        )
+                }
+                
                 .foregroundStyle(.white)
-
-            JoystickView { input in
-                print(
-                    "Joystick:",
-                    input.x,
-                    input.y
-                )
             }
-            .frame(maxWidth: .infinity)
+            
+                .buttonStyle(.plain)
+            
+            if driveExpanded {
+                JoystickView(
+                    monitor: joystickMonitor,
+                    width: 180,
+                    shape: .circle
+                )
+                .frame(maxWidth: .infinity) // centered
+
+                Text(
+                    "X: \(joystickMonitor.xyPoint.x, specifier: "%.2f")   Y: \(joystickMonitor.xyPoint.y, specifier: "%.2f")"
+                )
+                .font(.caption)
+                
+                
+                .frame(maxWidth: .infinity)
+            }
+            
+            
+            Spacer(minLength: 30)
         }
+        .foregroundStyle(.white)
         .padding(14)
         .background(.white.opacity(0.08))
         .clipShape(
@@ -172,10 +228,10 @@ private extension RobotRemoteView {
 // MARK: - Lights
 
 private extension RobotRemoteView {
-
+    
     var lightsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-
+            
             Button {
                 withAnimation {
                     lightsExpanded.toggle()
@@ -183,16 +239,16 @@ private extension RobotRemoteView {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "lightbulb.2")
-
+                    
                     Text("Lights")
                         .font(.subheadline.weight(.bold))
-
+                    
                     Spacer()
-
+                    
                     Text(lightMode.title)
                         .font(.caption)
                         .foregroundStyle(.yellow)
-
+                    
                     Image(systemName: "chevron.down")
                         .rotationEffect(
                             .degrees(lightsExpanded ? 0 : -90)
@@ -201,7 +257,7 @@ private extension RobotRemoteView {
                 .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
-
+            
             if lightsExpanded {
                 carLightsSection
                 allLightsSection
@@ -214,28 +270,28 @@ private extension RobotRemoteView {
             RoundedRectangle(cornerRadius: 8)
         )
     }
-
+    
     var carLightsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-
+            
             Text("Car Mode")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.white.opacity(0.68))
-
+            
             lightButtons([
                 .enabled,
                 .loading
             ])
         }
     }
-
+    
     var allLightsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-
+            
             Text("All Lights")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.white.opacity(0.68))
-
+            
             ColorPicker(
                 "Color",
                 selection: $allLightsColor,
@@ -245,7 +301,7 @@ private extension RobotRemoteView {
             .onChange(of: allLightsColor) { _, color in
                 print("All Lights Color:", color)
             }
-
+            
             lightButtons([
                 .slowBlinking,
                 .fastBlinking,
@@ -254,14 +310,14 @@ private extension RobotRemoteView {
             ])
         }
     }
-
+    
     var signalLightsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-
+            
             Text("Blinker")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.white.opacity(0.68))
-
+            
             ColorPicker(
                 "Blinker Color",
                 selection: $signalColor,
@@ -271,18 +327,18 @@ private extension RobotRemoteView {
             .onChange(of: signalColor) { _, color in
                 print("Blinker Color:", color)
             }
-
+            
             lightButtons([
                 .flashLeft,
                 .flashRight
             ])
         }
     }
-
+    
     func lightButtons(
         _ modes: [LightMode]
     ) -> some View {
-
+        
         LazyVGrid(
             columns: [
                 GridItem(.flexible()),
@@ -291,16 +347,16 @@ private extension RobotRemoteView {
             spacing: 8
         ) {
             ForEach(modes) { mode in
-
+                
                 Button {
                     lightMode = mode
                     print("Light Mode:", mode.title)
-
+                    
                 } label: {
                     VStack(spacing: 6) {
-
+                        
                         Image(systemName: mode.systemImage)
-
+                        
                         Text(mode.title)
                             .font(.caption.weight(.semibold))
                             .multilineTextAlignment(.center)
@@ -321,10 +377,10 @@ private extension RobotRemoteView {
 // MARK: - Camera
 
 private extension RobotRemoteView {
-
+    
     var cameraSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-
+            
             Button {
                 withAnimation {
                     cameraExpanded.toggle()
@@ -332,12 +388,12 @@ private extension RobotRemoteView {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "camera")
-
+                    
                     Text("Camera")
                         .font(.subheadline.weight(.bold))
-
+                    
                     Spacer()
-
+                    
                     Image(systemName: "chevron.down")
                         .rotationEffect(
                             .degrees(cameraExpanded ? 0 : -90)
@@ -346,15 +402,15 @@ private extension RobotRemoteView {
                 .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
-
+            
             if cameraExpanded {
                 ZStack {
                     Color.white.opacity(0.08)
-
+                    
                     VStack(spacing: 8) {
                         Image(systemName: "camera")
                             .font(.title)
-
+                        
                         Text("Camera Preview")
                             .font(.caption)
                     }
@@ -377,19 +433,19 @@ private extension RobotRemoteView {
 // MARK: - Drive Mode
 
 private enum DriveMode: String, CaseIterable, Identifiable {
-
+    
     case mecanum
     case offroad
-
+    
     var id: Self {
         self
     }
-
+    
     var title: String {
         switch self {
         case .mecanum:
             return "Mecanum"
-
+            
         case .offroad:
             return "Offroad"
         }
@@ -399,7 +455,7 @@ private enum DriveMode: String, CaseIterable, Identifiable {
 // MARK: - Light Mode
 
 private enum LightMode: String, CaseIterable, Identifiable {
-
+    
     case enabled
     case loading
     case slowBlinking
@@ -408,60 +464,60 @@ private enum LightMode: String, CaseIterable, Identifiable {
     case rainbowRunning
     case flashLeft
     case flashRight
-
+    
     var id: Self {
         self
     }
-
+    
     var title: String {
         switch self {
         case .enabled:
             return "Enabled Light"
-
+            
         case .loading:
             return "Pulsation"
-
+            
         case .slowBlinking:
             return "Slow Blinking"
-
+            
         case .fastBlinking:
             return "Fast Blinking"
-
+            
         case .running:
             return "Running Light"
-
+            
         case .rainbowRunning:
             return "Rainbow Running"
-
+            
         case .flashLeft:
             return "Left Signal"
-
+            
         case .flashRight:
             return "Right Signal"
         }
     }
-
+    
     var systemImage: String {
         switch self {
         case .enabled:
             return "checkmark.circle"
-
+            
         case .loading:
             return "hourglass"
-
+            
         case .slowBlinking:
             return "exclamationmark.triangle"
-
+            
         case .fastBlinking:
             return "globe"
-
+            
         case .running,
-             .rainbowRunning:
+                .rainbowRunning:
             return "circle.hexagongrid.circle"
-
+            
         case .flashLeft:
             return "arrowtriangle.left.fill"
-
+            
         case .flashRight:
             return "arrowtriangle.right.fill"
         }
@@ -471,24 +527,24 @@ private enum LightMode: String, CaseIterable, Identifiable {
 // MARK: - Light Button Style
 
 private struct LightButtonStyle: ButtonStyle {
-
+    
     let isSelected: Bool
-
+    
     func makeBody(
         configuration: Configuration
     ) -> some View {
-
+        
         configuration.label
             .padding(.horizontal, 8)
             .background(
                 isSelected
-                    ? .yellow.opacity(0.9)
-                    : .white.opacity(0.14)
+                ? .yellow.opacity(0.9)
+                : .white.opacity(0.14)
             )
             .foregroundStyle(
                 isSelected
-                    ? .black
-                    : .white
+                ? .black
+                : .white
             )
             .clipShape(
                 RoundedRectangle(cornerRadius: 8)

@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		90B4CBC6303846AE005FB20C /* SwiftUIJoystick in Frameworks */ = {isa = PBXBuildFile; productRef = 90B4CBC5303846AE005FB20C /* SwiftUIJoystick */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		90092AA13037942B00D9DE91 /* EdukARt-Rebuild.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "EdukARt-Rebuild.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				90B4CBC6303846AE005FB20C /* SwiftUIJoystick in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = "EdukARt-Rebuild";
 			packageProductDependencies = (
+				90B4CBC5303846AE005FB20C /* SwiftUIJoystick */,
 			);
 			productName = "EdukARt-Rebuild";
 			productReference = 90092AA13037942B00D9DE91 /* EdukARt-Rebuild.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = 90092A983037942B00D9DE91;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				90B4CBC4303846AE005FB20C /* XCRemoteSwiftPackageReference "SwiftUIJoystick" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 90092AA23037942B00D9DE91 /* Products */;
 			projectDirPath = "";
@@ -332,6 +341,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		90B4CBC4303846AE005FB20C /* XCRemoteSwiftPackageReference "SwiftUIJoystick" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/michael94ellis/SwiftUIJoystick";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		90B4CBC5303846AE005FB20C /* SwiftUIJoystick */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 90B4CBC4303846AE005FB20C /* XCRemoteSwiftPackageReference "SwiftUIJoystick" */;
+			productName = SwiftUIJoystick;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 90092A993037942B00D9DE91 /* Project object */;
 }
