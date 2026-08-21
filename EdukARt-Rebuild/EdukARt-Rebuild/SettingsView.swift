@@ -13,3 +13,7 @@ struct SettingsView: View {
         Text("Settings")
     }
 }
+
+
+// Right or left handed
+// Offroad or Mechanum -> should switch VR view + in game controller
