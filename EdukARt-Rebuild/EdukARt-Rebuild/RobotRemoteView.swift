@@ -12,6 +12,7 @@ import UIKit
 struct RobotRemoteView: View {
     
     @StateObject private var joystickMonitor = JoystickMonitor()
+    @StateObject private var rotationJoystickMonitor = JoystickMonitor()
     
     @State private var settingsExpanded = false
     @State private var driveExpanded = true
@@ -180,7 +181,7 @@ private extension RobotRemoteView {
                         .foregroundStyle(.white)
 
                     
-                    
+                    Spacer()
                     Text(driveMode.title)
                         .font(.caption)
                         .foregroundStyle(.brandGreen)
@@ -190,6 +191,7 @@ private extension RobotRemoteView {
                             .degrees(driveExpanded ? 0 : -90)
                         )
                 }
+                Spacer()
                 
                 .foregroundStyle(.white)
             }
@@ -198,23 +200,26 @@ private extension RobotRemoteView {
             
             if driveExpanded {
                 JoystickView(
-                    monitor: joystickMonitor,
+                    joystickMonitor: JoystickMonitor(),
+                    rotationJoystickMonitor: JoystickMonitor(),
                     width: 180,
                     shape: .circle
                 )
-                .frame(maxWidth: .infinity) // centered
+                .frame(maxWidth: .infinity)
+
+                Text(
+                    "Rotation: \(rotationJoystickMonitor.xyPoint.x, specifier: "%.2f")"
+                )
 
                 Text(
                     "X: \(joystickMonitor.xyPoint.x, specifier: "%.2f")   Y: \(joystickMonitor.xyPoint.y, specifier: "%.2f")"
                 )
                 .font(.caption)
-                
-                
                 .frame(maxWidth: .infinity)
             }
             
             
-            Spacer(minLength: 30)
+           
         }
         .foregroundStyle(.white)
         .padding(14)
