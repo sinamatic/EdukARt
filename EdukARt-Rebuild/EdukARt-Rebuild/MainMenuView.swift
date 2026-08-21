@@ -41,8 +41,22 @@ struct MainMenuView: View {
                     SettingsView()
                 } label: {Text("Settings")}
                     .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
+                
+                
+                // Test Stuff
+                NavigationLink {
+                    CameraARView()
+                        .ignoresSafeArea()
+                } label: {
+                    Text("TEST")
+                }
+                .buttonStyle(MenuButtonStyle(color: .gray))
+                
+                
             }
             .padding(30)
+            
+            
             
         }
         

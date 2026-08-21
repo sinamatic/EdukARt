@@ -200,8 +200,8 @@ private extension RobotRemoteView {
             
             if driveExpanded {
                 JoystickView(
-                    joystickMonitor: JoystickMonitor(),
-                    rotationJoystickMonitor: JoystickMonitor(),
+                    joystickMonitor: joystickMonitor,
+                    rotationJoystickMonitor: rotationJoystickMonitor,
                     width: 180,
                     shape: .circle
                 )
