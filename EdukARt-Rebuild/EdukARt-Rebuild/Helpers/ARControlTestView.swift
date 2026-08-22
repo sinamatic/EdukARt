@@ -13,15 +13,15 @@ struct ARControlTestView: View {
     @ObservedObject var eduardModelStore: EduardModelStore
 
     @StateObject private var joystickMonitor = JoystickMonitor()
-    @StateObject private var rotationJoystickMonitor = JoystickMonitor()
+//    @StateObject private var rotationJoystickMonitor = JoystickMonitor()
 
     var body: some View {
         ZStack {
 
             CameraARView(
                 eduardModelStore: eduardModelStore,
-                joystickMonitor: joystickMonitor,
-                rotationJoystickMonitor: rotationJoystickMonitor
+                joystickMonitor: joystickMonitor
+//                rotationJoystickMonitor: rotationJoystickMonitor
             )
             Text(
                 "Drive X: \(joystickMonitor.xyPoint.x, specifier: "%.1f")  Y: \(joystickMonitor.xyPoint.y, specifier: "%.1f")"
@@ -34,16 +34,15 @@ struct ARControlTestView: View {
 
                 JoystickView(
                     joystickMonitor: joystickMonitor,
-                    rotationJoystickMonitor: rotationJoystickMonitor,
                     width: 180,
                     shape: .circle
                 )
                 
-                Text(
-                    "Rotation X: \(rotationJoystickMonitor.xyPoint.x, specifier: "%.1f")"
-                )
-                .font(.caption)
-                .padding(.bottom, 10)
+//                Text(
+//                    "Rotation X: \(rotationJoystickMonitor.xyPoint.x, specifier: "%.1f")"
+//                )
+//                .font(.caption)
+//                .padding(.bottom, 10)
             }
         }
     }

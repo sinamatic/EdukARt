@@ -201,15 +201,14 @@ private extension RobotRemoteView {
             if driveExpanded {
                 JoystickView(
                     joystickMonitor: joystickMonitor,
-                    rotationJoystickMonitor: rotationJoystickMonitor,
                     width: 180,
                     shape: .circle
                 )
                 .frame(maxWidth: .infinity)
 
-                Text(
-                    "Rotation: \(rotationJoystickMonitor.xyPoint.x, specifier: "%.2f")"
-                )
+//                Text(
+//                    "Rotation: \(rotationJoystickMonitor.xyPoint.x, specifier: "%.2f")"
+//                )
 
                 Text(
                     "X: \(joystickMonitor.xyPoint.x, specifier: "%.2f")   Y: \(joystickMonitor.xyPoint.y, specifier: "%.2f")"

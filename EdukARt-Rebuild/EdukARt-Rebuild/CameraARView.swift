@@ -18,7 +18,7 @@ struct CameraARView: UIViewRepresentable {
     @ObservedObject var eduardModelStore: EduardModelStore
     
     @ObservedObject var joystickMonitor: JoystickMonitor
-    @ObservedObject var rotationJoystickMonitor: JoystickMonitor
+//    @ObservedObject var rotationJoystickMonitor: JoystickMonitor
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -120,43 +120,42 @@ struct CameraARView: UIViewRepresentable {
             return
         }
 
-        let center: CGFloat = 90
-
         let x =
             Float(
-                (joystickMonitor.xyPoint.x - center)
-                / center
+                joystickMonitor.xyPoint.x
+                / 180
             )
 
         let y =
             Float(
-                (joystickMonitor.xyPoint.y - center)
-                / center
-            )
-
-        let rotationX =
-            Float(
-                (rotationJoystickMonitor.xyPoint.x - center)
-                / center
+                joystickMonitor.xyPoint.y
+                / 180
             )
 
         let movementSpeed: Float = 0.02
-        let rotationSpeed: Float = 0.03
 
         eduard.position.x += x * movementSpeed
         eduard.position.z += y * movementSpeed
 
-        if abs(rotationX) > 0.05 {
-
-            let rotation =
-                simd_quatf(
-                    angle: rotationX * rotationSpeed,
-                    axis: SIMD3<Float>(0, 1, 0)
-                )
-
-            eduard.transform.rotation =
-                rotation * eduard.transform.rotation
-        }
+//        let rotationX =
+//            Float(
+//                rotationJoystickMonitor.xyPoint.x
+//                / 120
+//            )
+//
+//        let rotationSpeed: Float = 0.03
+//
+//        if abs(rotationX) > 0.05 {
+//
+//            let rotation =
+//                simd_quatf(
+//                    angle: rotationX * rotationSpeed,
+//                    axis: SIMD3<Float>(0, 1, 0)
+//                )
+//
+//            eduard.transform.rotation =
+//                rotation * eduard.transform.rotation
+//        }
     }
     
     
