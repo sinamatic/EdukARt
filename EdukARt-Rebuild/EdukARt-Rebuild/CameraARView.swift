@@ -9,10 +9,15 @@
 import SwiftUI
 import RealityKit
 import ARKit
+import Combine
 
 struct CameraARView: UIViewRepresentable {
     
     @ObservedObject var eduardModelStore: EduardModelStore
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeUIView(context: Context) -> ARView {
         
@@ -60,6 +65,10 @@ struct CameraARView: UIViewRepresentable {
             "Start ARSession"
         )
 
+        PerformanceLogger.shared.start(
+            "Find Floor Anchor"
+        )
+
         let anchor = AnchorEntity(
             plane: .horizontal,
             classification: .floor,
@@ -67,6 +76,24 @@ struct CameraARView: UIViewRepresentable {
         )
         
         arView.scene.addAnchor(anchor)
+
+        context.coordinator.anchorSubscription =
+            arView.scene.subscribe(
+                to: SceneEvents.AnchoredStateChanged.self
+            ) { event in
+
+                guard event.anchor === anchor else {
+                    return
+                }
+
+                if event.isAnchored {
+                    PerformanceLogger.shared.end(
+                        "Find Floor Anchor"
+                    )
+
+                    print("✅ Floor anchor found")
+                }
+            }
         
         
         // Load preloaded eduard
@@ -95,7 +122,8 @@ struct CameraARView: UIViewRepresentable {
     ) {
     }
     
+    final class Coordinator {
+        var anchorSubscription: (any Cancellable)?
+    }
     
 }
-
-
