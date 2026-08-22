@@ -46,6 +46,13 @@ struct CameraARView: UIViewRepresentable {
         arView.session.delegate =
             context.coordinator
         
+        // Dection not on Main Thread anymore
+        arView.session.delegateQueue =
+            DispatchQueue(
+                label: "AprilTagDetectionQueue",
+                qos: .userInitiated
+            )
+        
         func makeCoordinator() -> Coordinator {
             Coordinator()
         }
@@ -173,15 +180,38 @@ struct CameraARView: UIViewRepresentable {
         var eduard: Entity?
         
         // April Tag sample from https://github.com/keyqcloud/SwiftAprilTag
-
         let detector = try! Detector(
             families: [.tag36h11]
         )
+        
+        var isDetecting = false
+        var frameCounter = 0
+
 
         func session(
             _ session: ARSession,
             didUpdate frame: ARFrame
         ) {
+
+            // checks every 6th frame, 60 / 6 ≈ 10 AprilTag-checks per second
+            frameCounter += 1
+
+                guard frameCounter % 6 == 0 else {
+                    return
+                }
+            
+            // prevents parallel detections
+            guard isDetecting == false else {
+                        return
+                    }
+            
+            isDetecting = true
+
+                  defer {
+                      isDetecting = false
+                  }
+            
+            
             let pixelBuffer = frame.capturedImage
 
             do {
@@ -202,5 +232,5 @@ struct CameraARView: UIViewRepresentable {
             }
         }
     }
-    }
+}
     
