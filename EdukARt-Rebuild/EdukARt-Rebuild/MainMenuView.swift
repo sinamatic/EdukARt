@@ -19,7 +19,7 @@ struct MainMenuView: View {
             Image("Keyvisual")
                 .resizable()
                 .scaledToFill()
-                .ignoresSafeArea()
+                
             
             
             VStack(spacing: 12) {
@@ -55,8 +55,9 @@ struct MainMenuView: View {
                 } label: {
                     Text("AR Test")
                 }
-                .ignoresSafeArea()
+                
                 .disabled(eduardModelStore.model == nil)
+                
                 
                 
 //                NavigationLink {
@@ -77,9 +78,11 @@ struct MainMenuView: View {
 //                .onChange(of: eduardModelStore.model == nil) { _, isNil in
 //                    print("MENU model is nil:", isNil)
                 }
+            .padding(30)
 
                 }
-                .padding(30)
+        
+                
 
                 }
         

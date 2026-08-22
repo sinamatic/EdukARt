@@ -46,7 +46,9 @@ struct ContentView: View {
                 MainMenuView(
                                     eduardModelStore: eduardModelStore
                                 )
+                .ignoresSafeArea()
                     .preferredColorScheme(.dark)
+                    
             }
         }
     }

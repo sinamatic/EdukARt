@@ -23,6 +23,10 @@ struct ARControlTestView: View {
                 joystickMonitor: joystickMonitor,
                 rotationJoystickMonitor: rotationJoystickMonitor
             )
+            Text(
+                "Drive X: \(joystickMonitor.xyPoint.x, specifier: "%.1f")  Y: \(joystickMonitor.xyPoint.y, specifier: "%.1f")"
+            )
+            .font(.caption)
             .ignoresSafeArea()
 
             VStack {
@@ -34,6 +38,11 @@ struct ARControlTestView: View {
                     width: 180,
                     shape: .circle
                 )
+                
+                Text(
+                    "Rotation X: \(rotationJoystickMonitor.xyPoint.x, specifier: "%.1f")"
+                )
+                .font(.caption)
                 .padding(.bottom, 10)
             }
         }

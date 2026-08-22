@@ -42,11 +42,11 @@ final class EduardSimulation {
         if let frontLeftWheel = eduard.findEntity(
             named: "wheel_front_left"
         ) {
-            frontLeftWheel.transform.rotation =
-                simd_quatf(
-                    angle: .pi / 2,
-                    axis: SIMD3<Float>(0, 0, 1)
-                )
+//            frontLeftWheel.transform.rotation =
+//                simd_quatf(
+//                    angle: .pi / 2,
+//                    axis: SIMD3<Float>(0, 0, 1)
+//                )
         }
 
         return eduard

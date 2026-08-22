@@ -134,38 +134,17 @@ struct CameraARView: UIViewRepresentable {
                 / center
             )
 
-            
-        
-        /*
-         
-         Joystick rechts
-         → +X
-
-         Joystick links
-         → -X
-
-         Joystick hoch
-         → -Z
-
-         Joystick runter
-         → +Z
-         
-         */
-        
-        
-        // MARK - Rotation Joystick
         let rotationX =
             Float(
                 (rotationJoystickMonitor.xyPoint.x - center)
                 / center
             )
-        
+
         let movementSpeed: Float = 0.02
         let rotationSpeed: Float = 0.03
-        
+
         eduard.position.x += x * movementSpeed
         eduard.position.z += y * movementSpeed
-        
 
         if abs(rotationX) > 0.05 {
 
@@ -179,7 +158,6 @@ struct CameraARView: UIViewRepresentable {
                 rotation * eduard.transform.rotation
         }
     }
-    
     
     
     final class Coordinator {
