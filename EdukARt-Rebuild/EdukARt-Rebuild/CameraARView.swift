@@ -10,6 +10,7 @@ import SwiftUI
 import RealityKit
 import ARKit
 import Combine
+import SwiftAprilTag
 
 import SwiftUIJoystick
 
@@ -34,12 +35,22 @@ struct CameraARView: UIViewRepresentable {
             "Create ARView"
         )
        
-
+        // Create AR View
         let arView = ARView(
             frame: .zero,
             cameraMode: .ar,
                        automaticallyConfigureSession: false
         )
+        
+        // Coordinator constantly AR Frames
+        arView.session.delegate =
+            context.coordinator
+        
+        func makeCoordinator() -> Coordinator {
+            Coordinator()
+        }
+        
+        
         
         PerformanceLogger.shared.end(
             "Create ARView"
@@ -157,9 +168,39 @@ struct CameraARView: UIViewRepresentable {
     }
     
     
-    final class Coordinator {
-        var anchorSubscription: EventSubscription?
+    final class Coordinator: NSObject, ARSessionDelegate {
+        
         var eduard: Entity?
+        
+        // April Tag sample from https://github.com/keyqcloud/SwiftAprilTag
+
+        let detector = try! Detector(
+            families: [.tag36h11]
+        )
+
+        func session(
+            _ session: ARSession,
+            didUpdate frame: ARFrame
+        ) {
+            let pixelBuffer = frame.capturedImage
+
+            do {
+                let detections = try detector.detect(
+                    pixelBuffer: pixelBuffer
+                )
+
+                for detection in detections {
+                    print(
+                        "Tag id=\(detection.id), corners=\(detection.corners)"
+                    )
+                }
+            } catch {
+                print(
+                    "AprilTag detection error:",
+                    error
+                )
+            }
+        }
     }
     }
     

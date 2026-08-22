@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		90819FA8303A106D00090B99 /* SwiftAprilTag in Frameworks */ = {isa = PBXBuildFile; productRef = 90819FA7303A106D00090B99 /* SwiftAprilTag */; };
 		90B4CBC6303846AE005FB20C /* SwiftUIJoystick in Frameworks */ = {isa = PBXBuildFile; productRef = 90B4CBC5303846AE005FB20C /* SwiftUIJoystick */; };
 /* End PBXBuildFile section */
 
@@ -27,6 +28,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				90819FA8303A106D00090B99 /* SwiftAprilTag in Frameworks */,
 				90B4CBC6303846AE005FB20C /* SwiftUIJoystick in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -71,6 +73,7 @@
 			name = "EdukARt-Rebuild";
 			packageProductDependencies = (
 				90B4CBC5303846AE005FB20C /* SwiftUIJoystick */,
+				90819FA7303A106D00090B99 /* SwiftAprilTag */,
 			);
 			productName = "EdukARt-Rebuild";
 			productReference = 90092AA13037942B00D9DE91 /* EdukARt-Rebuild.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				90B4CBC4303846AE005FB20C /* XCRemoteSwiftPackageReference "SwiftUIJoystick" */,
+				90819FA6303A106D00090B99 /* XCRemoteSwiftPackageReference "SwiftAprilTag" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 90092AA23037942B00D9DE91 /* Products */;
@@ -345,6 +349,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		90819FA6303A106D00090B99 /* XCRemoteSwiftPackageReference "SwiftAprilTag" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/keyqcloud/SwiftAprilTag";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		90B4CBC4303846AE005FB20C /* XCRemoteSwiftPackageReference "SwiftUIJoystick" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/michael94ellis/SwiftUIJoystick";
@@ -356,6 +368,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		90819FA7303A106D00090B99 /* SwiftAprilTag */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 90819FA6303A106D00090B99 /* XCRemoteSwiftPackageReference "SwiftAprilTag" */;
+			productName = SwiftAprilTag;
+		};
 		90B4CBC5303846AE005FB20C /* SwiftUIJoystick */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 90B4CBC4303846AE005FB20C /* XCRemoteSwiftPackageReference "SwiftUIJoystick" */;

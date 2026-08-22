@@ -38,6 +38,8 @@ final class EduardSimulation {
 
 
         eduard.name = name
+        
+        // ToDo rotate wheels
 
         if let frontLeftWheel = eduard.findEntity(
             named: "wheel_front_left"

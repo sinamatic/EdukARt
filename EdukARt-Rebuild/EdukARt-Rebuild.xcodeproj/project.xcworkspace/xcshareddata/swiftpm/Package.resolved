@@ -1,6 +1,15 @@
 {
-  "originHash" : "0c2b07bd02731650383ed39e41433281bed19b2ed6cc7103e7daec7fb1d05e44",
+  "originHash" : "13717d6ab333748691b81446de11c6650dd59a8be45b6aeb34f8ffe9e1a7ad12",
   "pins" : [
+    {
+      "identity" : "swiftapriltag",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/keyqcloud/SwiftAprilTag",
+      "state" : {
+        "branch" : "main",
+        "revision" : "038cb9026711ddba05b71c16b32eb364bcfa6ef9"
+      }
+    },
     {
       "identity" : "swiftuijoystick",
       "kind" : "remoteSourceControl",
