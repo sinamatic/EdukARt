@@ -48,24 +48,34 @@ struct MainMenuView: View {
                     .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
                 
                 
-                
                 NavigationLink {
-                    CameraARView(
-                        
+                    ARControlTestView(
                         eduardModelStore: eduardModelStore
                     )
-                    .ignoresSafeArea()
                 } label: {
-                    Text(
-                        eduardModelStore.model == nil
-                            ? "Loading Eduard..."
-                            : "AR Test"
-                    )
+                    Text("AR Test")
                 }
+                .ignoresSafeArea()
                 .disabled(eduardModelStore.model == nil)
-
-                .onChange(of: eduardModelStore.model == nil) { _, isNil in
-                    print("MENU model is nil:", isNil)
+                
+                
+//                NavigationLink {
+//                    CameraARView(
+//                        
+//                        eduardModelStore: eduardModelStore
+//                    )
+//                    .ignoresSafeArea()
+//                } label: {
+//                    Text(
+//                        eduardModelStore.model == nil
+//                            ? "Loading Eduard..."
+//                            : "AR Test"
+//                    )
+//                }
+//                .disabled(eduardModelStore.model == nil)
+//
+//                .onChange(of: eduardModelStore.model == nil) { _, isNil in
+//                    print("MENU model is nil:", isNil)
                 }
 
                 }
@@ -74,9 +84,9 @@ struct MainMenuView: View {
                 }
         
         
-        .onAppear {
-            PerformanceLogger.shared.end("App to Main Menu")
-        }
+//        .onAppear {
+//            PerformanceLogger.shared.end("App to Main Menu")
+//        }
         
         
     }
@@ -102,7 +112,6 @@ struct MainMenuView: View {
                 )
         }
     }
-}
     
     
     

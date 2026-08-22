@@ -11,9 +11,14 @@ import RealityKit
 import ARKit
 import Combine
 
+import SwiftUIJoystick
+
 struct CameraARView: UIViewRepresentable {
     
     @ObservedObject var eduardModelStore: EduardModelStore
+    
+    @ObservedObject var joystickMonitor: JoystickMonitor
+    @ObservedObject var rotationJoystickMonitor: JoystickMonitor
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -77,34 +82,24 @@ struct CameraARView: UIViewRepresentable {
         
         arView.scene.addAnchor(anchor)
 
-        context.coordinator.anchorSubscription =
-            arView.scene.subscribe(
-                to: SceneEvents.AnchoredStateChanged.self
-            ) { event in
-
-                guard event.anchor === anchor else {
-                    return
-                }
-
-                if event.isAnchored {
-                    PerformanceLogger.shared.end(
-                        "Find Floor Anchor"
-                    )
-
-                    print("✅ Floor anchor found")
-                }
-            }
         
         
         // Load preloaded eduard
         if let model = eduardModelStore.model {
             let eduard = model.clone(recursive: true)
             anchor.addChild(eduard)
+            
+            context.coordinator.eduard = eduard
 
             print("Used preloaded Eduard model")
+            
+            
+            
         } else {
             print("Eduard model is not loaded yet")
         }
+        
+        
         
         
 
@@ -120,10 +115,76 @@ struct CameraARView: UIViewRepresentable {
         _ uiView: ARView,
         context: Context
     ) {
+
+        guard let eduard = context.coordinator.eduard else {
+            return
+        }
+
+        let center: CGFloat = 90
+
+        let x =
+            Float(
+                (joystickMonitor.xyPoint.x - center)
+                / center
+            )
+
+        let y =
+            Float(
+                (joystickMonitor.xyPoint.y - center)
+                / center
+            )
+
+            
+        
+        /*
+         
+         Joystick rechts
+         → +X
+
+         Joystick links
+         → -X
+
+         Joystick hoch
+         → -Z
+
+         Joystick runter
+         → +Z
+         
+         */
+        
+        
+        // MARK - Rotation Joystick
+        let rotationX =
+            Float(
+                (rotationJoystickMonitor.xyPoint.x - center)
+                / center
+            )
+        
+        let movementSpeed: Float = 0.02
+        let rotationSpeed: Float = 0.03
+        
+        eduard.position.x += x * movementSpeed
+        eduard.position.z += y * movementSpeed
+        
+
+        if abs(rotationX) > 0.05 {
+
+            let rotation =
+                simd_quatf(
+                    angle: rotationX * rotationSpeed,
+                    axis: SIMD3<Float>(0, 1, 0)
+                )
+
+            eduard.transform.rotation =
+                rotation * eduard.transform.rotation
+        }
     }
+    
+    
     
     final class Coordinator {
-        var anchorSubscription: (any Cancellable)?
+        var anchorSubscription: EventSubscription?
+        var eduard: Entity?
+    }
     }
     
-}
