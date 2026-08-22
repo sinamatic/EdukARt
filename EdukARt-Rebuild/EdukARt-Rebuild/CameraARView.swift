@@ -18,7 +18,7 @@ struct CameraARView: UIViewRepresentable {
     @ObservedObject var eduardModelStore: EduardModelStore
     
     @ObservedObject var joystickMonitor: JoystickMonitor
-    @ObservedObject var sidewaysJoystickMonitor: JoystickMonitor
+    @ObservedObject var turnJoystickMonitor: JoystickMonitor
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -126,36 +126,34 @@ struct CameraARView: UIViewRepresentable {
                 / 180
             )
 
-        let sideways =
+        let turn =
             Float(
-                sidewaysJoystickMonitor.xyPoint.x
+                -turnJoystickMonitor.xyPoint.x
                 / 120
             )
 
+        let sideways =
+            Float(
+                joystickMonitor.xyPoint.x
+                / 180
+            )
+
         let movementSpeed: Float = 0.02
+        let rotationSpeed: Float = 0.03
 
         eduard.position.x += sideways * movementSpeed
         eduard.position.z += forward * movementSpeed
 
-//        let rotationX =
-//            Float(
-//                sidewaysJoystickMonitor.xyPoint.x
-//                / 120
-//            )
-//
-//        let rotationSpeed: Float = 0.03
-//
-//        if abs(rotationX) > 0.05 {
-//
-//            let rotation =
-//                simd_quatf(
-//                    angle: rotationX * rotationSpeed,
-//                    axis: SIMD3<Float>(0, 1, 0)
-//                )
-//
-//            eduard.transform.rotation =
-//                rotation * eduard.transform.rotation
-//        }
+        if abs(turn) > 0.05 {
+            let rotation =
+                simd_quatf(
+                    angle: turn * rotationSpeed,
+                    axis: SIMD3<Float>(0, 1, 0)
+                )
+
+            eduard.transform.rotation =
+                rotation * eduard.transform.rotation
+        }
     }
     
     

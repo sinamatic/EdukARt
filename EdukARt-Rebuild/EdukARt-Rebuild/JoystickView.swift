@@ -16,7 +16,7 @@ public struct JoystickView: View {
     
     /// The monitor object to observe the user input on the Joystick in XY or Polar coordinates
     @ObservedObject public var joystickMonitor: JoystickMonitor
-    @ObservedObject public var sidewaysJoystickMonitor: JoystickMonitor
+    @ObservedObject public var turnJoystickMonitor: JoystickMonitor
     
     /// The width or diameter in which the Joystick will report values
     ///  For example: 100 will provide 0-100, with (50,50) being the origin
@@ -28,55 +28,20 @@ public struct JoystickView: View {
     
     public init(
         joystickMonitor: JoystickMonitor,
-        sidewaysJoystickMonitor: JoystickMonitor,
+        turnJoystickMonitor: JoystickMonitor,
         width: CGFloat,
         shape: JoystickShape = .rect
     ) {
         self.joystickMonitor = joystickMonitor
-        self.sidewaysJoystickMonitor = sidewaysJoystickMonitor
+        self.turnJoystickMonitor = turnJoystickMonitor
         self.dragDiameter = width
         self.shape = shape
     }
     
     public var body: some View {
-        
-//        JoystickBuilder(
-//            monitor: rotationJoystickMonitor,
-//            width: 120,
-//            shape: .rect,
-//            background: {
-//                ZStack {
-//                    RoundedRectangle(cornerRadius: 50)
-//                        .fill(.white.opacity(0.1))
-//                        .overlay(
-//                            RoundedRectangle(cornerRadius: 50)
-//                                .stroke(
-//                                    .white.opacity(0.36),
-//                                    lineWidth: 2
-//                                )
-//                        )
-//
-//                    Image(systemName: "arrow.counterclockwise")
-//                        .offset(x: -40)
-//
-//                    Image(systemName: "arrow.clockwise")
-//                        .offset(x: 40)
-//                }
-//                .foregroundStyle(.white)
-//                .frame(width: 150, height: 70)
-//            },
-//            foreground: {
-//                Circle()
-//                    .fill(.brandGreen.opacity(0.9))
-//                    .frame(width: 32, height: 32)
-//            },
-//            locksInPlace: false
-//        )
-//        .frame(width: 120, height: 70)
-
         HStack(alignment: .bottom, spacing: 40) {
             JoystickBuilder(
-                monitor: sidewaysJoystickMonitor,
+                monitor: turnJoystickMonitor,
                 width: 120,
                 shape: .rect,
                 background: {
@@ -91,10 +56,10 @@ public struct JoystickView: View {
                                     )
                             )
                         
-                        Image(systemName: "arrowtriangle.left.fill")
+                        Image(systemName: "arrow.counterclockwise")
                             .offset(x: -40)
                         
-                        Image(systemName: "arrowtriangle.right.fill")
+                        Image(systemName: "arrow.clockwise")
                             .offset(x: 40)
                     }
                     .foregroundStyle(.white)
@@ -163,7 +128,7 @@ public struct JoystickView: View {
         
         JoystickView(
             joystickMonitor: JoystickMonitor(),
-            sidewaysJoystickMonitor: JoystickMonitor(),
+            turnJoystickMonitor: JoystickMonitor(),
             width: 180,
             shape: .circle
         )

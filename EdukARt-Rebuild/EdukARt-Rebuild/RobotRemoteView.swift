@@ -12,7 +12,7 @@ import UIKit
 struct RobotRemoteView: View {
     
     @StateObject private var joystickMonitor = JoystickMonitor()
-    @StateObject private var sidewaysJoystickMonitor = JoystickMonitor()
+    @StateObject private var turnJoystickMonitor = JoystickMonitor()
     
     @State private var settingsExpanded = false
     @State private var driveExpanded = true
@@ -201,18 +201,14 @@ private extension RobotRemoteView {
             if driveExpanded {
                 JoystickView(
                     joystickMonitor: joystickMonitor,
-                    sidewaysJoystickMonitor: sidewaysJoystickMonitor,
+                    turnJoystickMonitor: turnJoystickMonitor,
                     width: 180,
                     shape: .circle
                 )
                 .frame(maxWidth: .infinity)
 
-//                Text(
-//                    "Rotation: \(sidewaysJoystickMonitor.xyPoint.x, specifier: "%.2f")"
-//                )
-
                 Text(
-                    "Forward: \(joystickMonitor.xyPoint.y, specifier: "%.2f")   Sideways: \(sidewaysJoystickMonitor.xyPoint.x, specifier: "%.2f")"
+                    "Forward: \(joystickMonitor.xyPoint.y, specifier: "%.2f")   Sideways: \(joystickMonitor.xyPoint.x, specifier: "%.2f")   Turn: \(turnJoystickMonitor.xyPoint.x, specifier: "%.2f")"
                 )
                 .font(.caption)
                 .frame(maxWidth: .infinity)
