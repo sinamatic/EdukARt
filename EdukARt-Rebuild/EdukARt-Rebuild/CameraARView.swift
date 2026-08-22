@@ -15,7 +15,9 @@ struct CameraARView: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
 
         let arView = ARView(
-            frame: .zero
+            frame: .zero,
+            cameraMode: .ar,
+                       automaticallyConfigureSession: false
         )
 
         let configuration =
@@ -31,24 +33,24 @@ struct CameraARView: UIViewRepresentable {
 
         let anchor = AnchorEntity(
             plane: .horizontal,
-            classification: .any,
-            minimumBounds: [0.2, 0.2]
+            classification: .floor,
+            minimumBounds: [0.3, 0.3]
         )
         
-        let simulation = EduardSimulation()
+        arView.scene.addAnchor(anchor)
         
-        do {
-            let eduard = try simulation.loadEntity()
-                           anchor.addChild(eduard)
+        let simulation = EduardSimulation()
 
-        } catch {
-            print(
-                "Could not load Eduard model:",
-                error
-            )
+        Task {
+            do {
+                let eduard = try await simulation.loadEntity()
+                anchor.addChild(eduard)
+            } catch {
+                print("Could not load Eduard:", error)
+            }
         }
 
-        arView.scene.addAnchor(anchor)
+        
 
         return arView
         
