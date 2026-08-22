@@ -29,27 +29,32 @@ final class EduardSimulation {
     var position: SIMD3<Float> = .zero
     var rotation: Float = 0
 
-    func loadEntity() throws -> Entity {
+    func loadEntity() async throws -> Entity {
 
         print("Start loading Eduard")
 
         let eduard = Entity()
         eduard.name = name
 
-        let chassis = try Entity.load(named: chassisModelName)
-        print("Loaded chassis")
+        let chassis = try await Entity(
+            named: chassisModelName
+        )
 
-        let frontLeftWheel = try Entity.load(named: frontLeftWheelModelName)
-        print("Loaded front left wheel")
+        let frontLeftWheel = try await Entity(
+            named: frontLeftWheelModelName
+        )
 
-        let frontRightWheel = try Entity.load(named: frontRightWheelModelName)
-        print("Loaded front right wheel")
+        let frontRightWheel = try await Entity(
+            named: frontRightWheelModelName
+        )
 
-        let backLeftWheel = try Entity.load(named: backLeftWheelModelName)
-        print("Loaded back left wheel")
+        let backLeftWheel = try await Entity(
+            named: backLeftWheelModelName
+        )
 
-        let backRightWheel = try Entity.load(named: backRightWheelModelName)
-        print("Loaded back right wheel")
+        let backRightWheel = try await Entity(
+            named: backRightWheelModelName
+        )
 
         eduard.addChild(chassis)
         eduard.addChild(frontLeftWheel)
