@@ -16,7 +16,7 @@ public struct JoystickView: View {
     
     /// The monitor object to observe the user input on the Joystick in XY or Polar coordinates
     @ObservedObject public var joystickMonitor: JoystickMonitor
-//    @ObservedObject public var rotationJoystickMonitor: JoystickMonitor
+    @ObservedObject public var sidewaysJoystickMonitor: JoystickMonitor
     
     /// The width or diameter in which the Joystick will report values
     ///  For example: 100 will provide 0-100, with (50,50) being the origin
@@ -28,12 +28,12 @@ public struct JoystickView: View {
     
     public init(
         joystickMonitor: JoystickMonitor,
-//        rotationJoystickMonitor: JoystickMonitor,
+        sidewaysJoystickMonitor: JoystickMonitor,
         width: CGFloat,
         shape: JoystickShape = .rect
     ) {
         self.joystickMonitor = joystickMonitor
-//        self.rotationJoystickMonitor = rotationJoystickMonitor
+        self.sidewaysJoystickMonitor = sidewaysJoystickMonitor
         self.dragDiameter = width
         self.shape = shape
     }
@@ -74,48 +74,84 @@ public struct JoystickView: View {
 //        )
 //        .frame(width: 120, height: 70)
 
-        JoystickBuilder(
-            monitor: joystickMonitor,
-            width: dragDiameter,
-            shape: shape,
-            background: {
-                ZStack {
-                    
+        HStack(alignment: .bottom, spacing: 40) {
+            JoystickBuilder(
+                monitor: sidewaysJoystickMonitor,
+                width: 120,
+                shape: .rect,
+                background: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 50)
+                            .fill(.white.opacity(0.1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 50)
+                                    .stroke(
+                                        .white.opacity(0.36),
+                                        lineWidth: 2
+                                    )
+                            )
+                        
+                        Image(systemName: "arrowtriangle.left.fill")
+                            .offset(x: -40)
+                        
+                        Image(systemName: "arrowtriangle.right.fill")
+                            .offset(x: 40)
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: 150, height: 70)
+                },
+                foreground: {
                     Circle()
-                        .fill(.white.opacity(0.1))
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    .white.opacity(0.36),
-                                    lineWidth: 2
-                                )
+                        .fill(.brandGreen.opacity(0.9))
+                        .frame(width: 32, height: 32)
+                },
+                locksInPlace: false
+            )
+            .frame(width: 120, height: 70)
+            
+            JoystickBuilder(
+                monitor: joystickMonitor,
+                width: dragDiameter,
+                shape: shape,
+                background: {
+                    ZStack {
+                        
+                        Circle()
+                            .fill(.white.opacity(0.1))
+                            .overlay(
+                                Circle()
+                                    .stroke(
+                                        .white.opacity(0.36),
+                                        lineWidth: 2
+                                    )
+                            )
+                        
+                        Image(systemName: "arrowtriangle.up.fill")
+                            .offset(y: -60)
+                        
+                        Image(systemName: "arrowtriangle.down.fill")
+                            .offset(y: 60)
+                        
+                        Image(systemName: "arrowtriangle.left.fill")
+                            .offset(x: -60)
+                        
+                        Image(systemName: "arrowtriangle.right.fill")
+                            .offset(x: 60)
+                    }
+                    .foregroundStyle(.white.opacity(0.75))
+                },
+                foreground: {
+                    Image("EdukARtIllustration")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(
+                            width: knobSize,
+                            height: knobSize
                         )
-                    
-                    Image(systemName: "arrowtriangle.up.fill")
-                        .offset(y: -60)
-                    
-                    Image(systemName: "arrowtriangle.down.fill")
-                        .offset(y: 60)
-                    
-                    Image(systemName: "arrowtriangle.left.fill")
-                        .offset(x: -60)
-                    
-                    Image(systemName: "arrowtriangle.right.fill")
-                        .offset(x: 60)
-                }
-                .foregroundStyle(.white.opacity(0.75))
-            },
-            foreground: {
-                Image("EdukARtIllustration")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(
-                        width: knobSize,
-                        height: knobSize
-                    )
-            },
-            locksInPlace: false
-        )
+                },
+                locksInPlace: false
+            )
+        }
         .padding(.bottom, 10)
     }
 }
@@ -127,6 +163,7 @@ public struct JoystickView: View {
         
         JoystickView(
             joystickMonitor: JoystickMonitor(),
+            sidewaysJoystickMonitor: JoystickMonitor(),
             width: 180,
             shape: .circle
         )
