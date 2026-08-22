@@ -23,20 +23,30 @@ final class EduardSimulation {
     var rotation: Float = 0
 
     func loadEntity() async throws -> Entity {
+        
+        PerformanceLogger.shared.start(
+                "Load Eduard USDZ"
+            )
 
-        let eduard = try await Entity(
-            named: modelName
-        )
+            let eduard = try await Entity(
+                named: modelName
+            )
+
+            PerformanceLogger.shared.end(
+                "Load Eduard USDZ"
+            )
+
 
         eduard.name = name
 
         if let frontLeftWheel = eduard.findEntity(
             named: "wheel_front_left"
         ) {
-            print(
-                "Front left wheel found:",
-                frontLeftWheel.name
-            )
+            frontLeftWheel.transform.rotation =
+                simd_quatf(
+                    angle: .pi / 2,
+                    axis: SIMD3<Float>(0, 0, 1)
+                )
         }
 
         return eduard

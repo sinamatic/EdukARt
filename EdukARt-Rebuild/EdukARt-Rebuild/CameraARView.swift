@@ -11,14 +11,36 @@ import RealityKit
 import ARKit
 
 struct CameraARView: UIViewRepresentable {
+    
+    @ObservedObject var eduardModelStore: EduardModelStore
 
     func makeUIView(context: Context) -> ARView {
+        
+        PerformanceLogger.shared.end(
+            "Button to CameraARView"
+        )
+
+        PerformanceLogger.shared.start(
+            "Create ARView"
+        )
+       
 
         let arView = ARView(
             frame: .zero,
             cameraMode: .ar,
                        automaticallyConfigureSession: false
         )
+        
+        PerformanceLogger.shared.end(
+            "Create ARView"
+        )
+        
+        arView.debugOptions.insert(
+            .showStatistics
+        )
+        
+        
+        
 
         let configuration =
             ARWorldTrackingConfiguration()
@@ -27,8 +49,15 @@ struct CameraARView: UIViewRepresentable {
             .horizontal
         ]
 
+        PerformanceLogger.shared.start(
+            "Start ARSession"
+        )
         arView.session.run(
             configuration
+        )
+        
+        PerformanceLogger.shared.end(
+            "Start ARSession"
         )
 
         let anchor = AnchorEntity(
@@ -39,17 +68,20 @@ struct CameraARView: UIViewRepresentable {
         
         arView.scene.addAnchor(anchor)
         
-        let simulation = EduardSimulation()
+        
+        // Load preloaded eduard
+        if let model = eduardModelStore.model {
+            let eduard = model.clone(recursive: true)
+            anchor.addChild(eduard)
 
-        Task {
-            do {
-                let eduard = try await simulation.loadEntity()
-                anchor.addChild(eduard)
-            } catch {
-                print("Could not load Eduard:", error)
-            }
+            print("Used preloaded Eduard model")
+        } else {
+            print("Eduard model is not loaded yet")
         }
+        
+        
 
+        
         
 
         return arView

@@ -9,9 +9,23 @@ import SwiftUI
 
 @main
 struct EdukARt_RebuildApp: App {
+    
+    @StateObject private var eduardModelStore = EduardModelStore()
+    
+    init() {
+            PerformanceLogger.shared.start("App to Main Menu")
+        }
+    
     var body: some Scene {
+        
+        
+        
+        
         WindowGroup {
-            ContentView()
+            ContentView(
+                eduardModelStore: eduardModelStore
+            )
+            
         }
     }
 }

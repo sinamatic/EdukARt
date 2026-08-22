@@ -8,7 +8,12 @@
 import SwiftUI
 
 struct MainMenuView: View {
+    @ObservedObject var eduardModelStore: EduardModelStore
+    
+    
+    
     var body: some View {
+        
         
         ZStack {
             Image("Keyvisual")
@@ -43,25 +48,35 @@ struct MainMenuView: View {
                     .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
                 
                 
-                // Test Stuff
+                
                 NavigationLink {
-                    CameraARView()
-                        .ignoresSafeArea()
+                    CameraARView(
+                        
+                        eduardModelStore: eduardModelStore
+                    )
+                    .ignoresSafeArea()
                 } label: {
-                    Text("TEST")
+                    Text(
+                        eduardModelStore.model == nil
+                            ? "Loading Eduard..."
+                            : "AR Test"
+                    )
                 }
-                .buttonStyle(MenuButtonStyle(color: .gray))
-                
-                
-            }
-            .padding(30)
-            
-            
-            
+                .disabled(eduardModelStore.model == nil)
+
+                .onChange(of: eduardModelStore.model == nil) { _, isNil in
+                    print("MENU model is nil:", isNil)
+                }
+
+                }
+                .padding(30)
+
+                }
+        
+        
+        .onAppear {
+            PerformanceLogger.shared.end("App to Main Menu")
         }
-        
-        
-        
         
         
     }
@@ -94,6 +109,8 @@ struct MainMenuView: View {
     
     
     #Preview {
-        MainMenuView()
+        MainMenuView(
+            eduardModelStore: EduardModelStore()
+        )
         
     }

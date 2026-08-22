@@ -9,14 +9,51 @@ import SwiftUI
 
 struct ContentView: View {
 
+    @ObservedObject var eduardModelStore: EduardModelStore
+
+    @State private var showLogo = true
+
     var body: some View {
+
+        if showLogo {
+
+            Image("EduArtSinamaticIcon")
+            
+                .resizable()
+                .scaledToFit()
+                .ignoresSafeArea()
+                    // Eduard schon im Hintergrund laden
+                .task {
+
+                        // Eduard parallel im Hintergrund laden
+                        Task {
+                            await eduardModelStore.load()
+                        }
+
+                        // Logo mindestens 2 Sekunden anzeigen
+                        try? await Task.sleep(
+                            for: .seconds(2)
+                        )
+
+                        showLogo = false
+                    
+                }
+
+            
+        } else {
+
             NavigationStack {
-                MainMenuView()
+                MainMenuView(
+                                    eduardModelStore: eduardModelStore
+                                )
                     .preferredColorScheme(.dark)
             }
         }
     }
+}
 
 #Preview {
-    ContentView()
+    ContentView(
+        eduardModelStore: EduardModelStore()
+    )
 }
