@@ -275,7 +275,16 @@ struct CameraARView: UIViewRepresentable {
         var aprilTagAnchors:
             [Int: AnchorEntity] = [:]
         
-        
+        // --------------------------------------------------
+        // Eduard AprilTag Localization
+        // --------------------------------------------------
+        //
+        // Eduard is placed only once on the first
+        // successfully localized AprilTag.
+        // --------------------------------------------------
+
+        var isEduardLocalized =
+            false
         
         // --------------------------------------------------
         // AprilTag Map Builder
@@ -487,6 +496,17 @@ struct CameraARView: UIViewRepresentable {
                             for: mapPose
                         )
                     }
+                    
+                    // ----------------------------------------------
+                    // Place Eduard on first localized AprilTag
+                    // ----------------------------------------------
+                    
+                    DispatchQueue.main.async {
+
+                        self.placeEduard(
+                            on: mapPose
+                        )
+                    }
 
 
                     // ----------------------------------------------
@@ -610,8 +630,84 @@ struct CameraARView: UIViewRepresentable {
                 "# AR CUBE PLACED | TAG \(mapPose.id)"
             )
         }
+        
+        // MARK: - Place Eduard on First AprilTag
+
+        private func placeEduard(
+            on mapPose: AprilTagMapPose
+        ) {
+
+            // --------------------------------------------------
+            // Only localize Eduard once
+            // --------------------------------------------------
+
+            guard isEduardLocalized == false
+            else {
+                return
+            }
+
+
+            // --------------------------------------------------
+            // Eduard model must exist
+            // --------------------------------------------------
+
+            guard let eduard
+            else {
+                return
+            }
+
+
+            // --------------------------------------------------
+            // Apply complete AprilTag world transform
+            // --------------------------------------------------
+            //
+            // Position AND rotation are copied from the
+            // AprilTag into Eduard.
+            // --------------------------------------------------
+
+//            eduard.setTransformMatrix(
+//                mapPose.worldTransform,
+//                relativeTo: nil
+//            ) // Rotated 180° in X
+            
+            let modelRotationOffset =
+                simd_float4x4(
+                    simd_quatf(
+                        angle: .pi,
+                        axis: SIMD3<Float>(
+                            1,
+                            0,
+                            0
+                        )
+                    )
+                )
+
+            let correctedTransform =
+                mapPose.worldTransform
+                * modelRotationOffset
+
+            eduard.setTransformMatrix(
+                correctedTransform,
+                relativeTo: nil
+            )
+
+            
+
+            // --------------------------------------------------
+            // Lock localization
+            // --------------------------------------------------
+
+            isEduardLocalized =
+                true
+
+
+            print(
+                "# EDUARD LOCALIZED | APRILTAG \(mapPose.id)"
+            )
+        }
+        
+
+
+
     }
-    
-    
-    
 }
