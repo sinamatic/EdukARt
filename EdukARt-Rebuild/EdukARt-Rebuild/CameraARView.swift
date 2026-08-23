@@ -86,10 +86,10 @@ struct CameraARView: UIViewRepresentable {
         // --------------------------------------------------
         // RealityKit Statistics
         // --------------------------------------------------
-
-        arView.debugOptions.insert(
-            .showStatistics
-        )
+//
+//        arView.debugOptions.insert(
+//            .showStatistics
+//        )
 
 
         // --------------------------------------------------
