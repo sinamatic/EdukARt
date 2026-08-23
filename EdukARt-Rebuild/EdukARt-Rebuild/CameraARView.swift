@@ -262,6 +262,24 @@ struct CameraARView: UIViewRepresentable {
         weak var arView: ARView?
         var worldAnchor: AnchorEntity?
         var eduard: Entity?
+        
+        // --------------------------------------------------
+        // AR objects placed on AprilTags
+        // --------------------------------------------------
+        //
+        // Stores one RealityKit anchor per AprilTag.
+        // This prevents creating a new cube every time
+        // the same tag is detected again.
+        // --------------------------------------------------
+
+        var aprilTagAnchors:
+            [Int: AnchorEntity] = [:]
+        
+        
+        
+        // --------------------------------------------------
+        // AprilTag Map Builder
+        // --------------------------------------------------
         let mapBuilder: AprilTagMapBuilder
         
         init(
@@ -437,16 +455,19 @@ struct CameraARView: UIViewRepresentable {
                 for detection in detections {
 
                     guard let mapPose =
-                        aprilTagLocalization
-                            .localize(
-                                detection: detection,
-                                frame: frame,
-                                intrinsics: intrinsics
-                            )
-
+                        aprilTagLocalization.localize(
+                            detection: detection,
+                            frame: frame,
+                            intrinsics: intrinsics
+                        )
                     else {
                         continue
                     }
+
+
+                    // ----------------------------------------------
+                    // Update 2D AprilTag map
+                    // ----------------------------------------------
 
                     DispatchQueue.main.async {
 
@@ -455,25 +476,33 @@ struct CameraARView: UIViewRepresentable {
                         )
                     }
 
-                    // ------------------------------------------
-                    // Console Output
-                    // ------------------------------------------
+
+                    // ----------------------------------------------
+                    // Place AR cube on AprilTag
+                    // ----------------------------------------------
+
+                    DispatchQueue.main.async {
+
+                        self.placeCube(
+                            for: mapPose
+                        )
+                    }
+
+
+                    // ----------------------------------------------
+                    // Debug output
+                    // ----------------------------------------------
 
                     print(
                         String(
                             format:
-                            "# ID %d | X %+7.3f | Z %+7.3f | Rotation %+7.2f° | Height %+7.3f",
-
+                                "# ID %d | X %+7.3f | Z %+7.3f | Rotation %+7.2f° | Height %+7.3f",
                             mapPose.id,
-
                             mapPose.x,
-
                             mapPose.z,
-
                             mapPose.rotation
                                 * 180
                                 / .pi,
-
                             mapPose.height
                         )
                     )
@@ -488,5 +517,101 @@ struct CameraARView: UIViewRepresentable {
                 )
             }
         }
+        
+        // MARK: - Place AR Cube
+
+        private func placeCube(
+            for mapPose: AprilTagMapPose
+        ) {
+
+            // ARView must exist.
+            guard let arView
+            else {
+                return
+            }
+
+
+            // --------------------------------------------------
+            // Only one cube per AprilTag
+            // --------------------------------------------------
+
+            guard aprilTagAnchors[
+                mapPose.id
+            ] == nil
+
+            else {
+                return
+            }
+
+
+            // --------------------------------------------------
+            // Cube
+            // --------------------------------------------------
+
+            let cubeSize:
+                Float = 0.08
+
+
+            let cube =
+                ModelEntity(
+                    mesh:
+                        .generateBox(
+                            size:
+                                cubeSize
+                        ),
+
+                    materials: [
+                        SimpleMaterial(
+                            color:
+                                .green,
+
+                            isMetallic:
+                                false
+                        )
+                    ]
+                )
+
+
+            // --------------------------------------------------
+            // Anchor at detected AprilTag pose
+            // --------------------------------------------------
+
+            let anchor =
+                AnchorEntity(
+                    world:
+                        mapPose.worldTransform
+                )
+
+
+            // --------------------------------------------------
+            // Add cube
+            // --------------------------------------------------
+
+            anchor.addChild(
+                cube
+            )
+
+
+            arView.scene.addAnchor(
+                anchor
+            )
+
+
+            // --------------------------------------------------
+            // Store anchor
+            // --------------------------------------------------
+
+            aprilTagAnchors[
+                mapPose.id
+            ] = anchor
+
+
+            print(
+                "# AR CUBE PLACED | TAG \(mapPose.id)"
+            )
+        }
     }
+    
+    
+    
 }
