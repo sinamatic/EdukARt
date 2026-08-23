@@ -3,146 +3,198 @@
 //  EdukARt-Rebuild
 //
 //  Created by Sina Steinmüller on 21.08.26.
-//  https://developer.apple.com/documentation/realitykit/loading-entities-from-a-file
-//  https://developer.apple.com/documentation/realitykit/entity/load(named:in:)
+//
+//  RealityKit:
+//  https://developer.apple.com/documentation/realitykit
+//
+//  SwiftAprilTag:
+//  https://github.com/keyqcloud/SwiftAprilTag
+//
 
 import SwiftUI
 import RealityKit
 import ARKit
 import Combine
 import SwiftAprilTag
-
 import SwiftUIJoystick
 
+
 struct CameraARView: UIViewRepresentable {
-    
+
     @ObservedObject var eduardModelStore: EduardModelStore
-    
+
     @ObservedObject var joystickMonitor: JoystickMonitor
+
     @ObservedObject var turnJoystickMonitor: JoystickMonitor
 
+
+    // MARK: - Coordinator
+
     func makeCoordinator() -> Coordinator {
+
         Coordinator()
     }
 
-    func makeUIView(context: Context) -> ARView {
-        
-        PerformanceLogger.shared.end(
-            "Button to CameraARView"
-        )
+
+    // MARK: - Create ARView
+
+    func makeUIView(
+        context: Context
+    ) -> ARView {
 
         PerformanceLogger.shared.start(
             "Create ARView"
         )
-       
-        // Create AR View
+
+
+        // --------------------------------------------------
+        // Create ARView
+        // --------------------------------------------------
+
         let arView = ARView(
             frame: .zero,
             cameraMode: .ar,
-                       automaticallyConfigureSession: false
+            automaticallyConfigureSession: false
         )
-        
-        context.coordinator.arView = arView
-        
-        // Coordinator constantly AR Frames
+
+        context.coordinator.arView =
+            arView
+
+
+        // --------------------------------------------------
+        // ARSession Delegate
+        // --------------------------------------------------
+
         arView.session.delegate =
             context.coordinator
-        
-        // Dection not on Main Thread anymore
+
         arView.session.delegateQueue =
             DispatchQueue(
                 label: "AprilTagDetectionQueue",
                 qos: .userInitiated
             )
-        
-        func makeCoordinator() -> Coordinator {
-            Coordinator()
-        }
-        
-        
-        
+
+
         PerformanceLogger.shared.end(
             "Create ARView"
         )
-        
+
+
+        // --------------------------------------------------
+        // RealityKit Statistics
+        // --------------------------------------------------
+
         arView.debugOptions.insert(
             .showStatistics
         )
-        
-        
-        
+
+
+        // --------------------------------------------------
+        // ARKit World Tracking
+        // --------------------------------------------------
+        //
+        // No plane detection is required.
+        //
+        // ARKit is used to continuously track the
+        // iPhone pose in the world coordinate system.
+        // --------------------------------------------------
 
         let configuration =
             ARWorldTrackingConfiguration()
 
-        configuration.planeDetection = [
-            .horizontal
-        ]
 
         PerformanceLogger.shared.start(
             "Start ARSession"
         )
+
         arView.session.run(
             configuration
         )
-        
+
         PerformanceLogger.shared.end(
             "Start ARSession"
         )
 
-        PerformanceLogger.shared.start(
-            "Find Floor Anchor"
+
+        // --------------------------------------------------
+        // World Anchor
+        // --------------------------------------------------
+
+        let worldAnchor =
+            AnchorEntity(
+                world: .zero
+            )
+
+        arView.scene.addAnchor(
+            worldAnchor
         )
 
-        let anchor = AnchorEntity(
-            plane: .horizontal,
-            classification: .floor,
-            minimumBounds: [0.3, 0.3]
-        )
-        
-        arView.scene.addAnchor(anchor)
+        context.coordinator.worldAnchor =
+            worldAnchor
 
-        
-        
-        // Load preloaded eduard
-        if let model = eduardModelStore.model {
-            let eduard = model.clone(recursive: true)
-            anchor.addChild(eduard)
-            
-            context.coordinator.eduard = eduard
 
-            print("Used preloaded Eduard model")
-            
-            
-            
+        // --------------------------------------------------
+        // Load preloaded Eduard
+        // --------------------------------------------------
+
+        if let model =
+            eduardModelStore.model {
+
+            let eduard =
+                model.clone(
+                    recursive: true
+                )
+
+            worldAnchor.addChild(
+                eduard
+            )
+
+            context.coordinator.eduard =
+                eduard
+
+            print(
+                "# Used preloaded Eduard model"
+            )
+
         } else {
-            print("Eduard model is not loaded yet")
-        }
-        
-        
-        
-        
 
-        
-        
+            print(
+                "# Eduard model is not loaded yet"
+            )
+        }
+
 
         return arView
-        
-        
     }
+
+
+    // MARK: - Update ARView
 
     func updateUIView(
         _ uiView: ARView,
         context: Context
     ) {
 
-        guard let eduard = context.coordinator.eduard else {
+        guard let eduard =
+            context.coordinator.eduard
+        else {
             return
         }
+
+
+        // --------------------------------------------------
+        // Joystick Control
+        // --------------------------------------------------
 
         let forward =
             Float(
                 joystickMonitor.xyPoint.y
+                / 180
+            )
+
+        let sideways =
+            Float(
+                joystickMonitor.xyPoint.x
                 / 180
             )
 
@@ -152,254 +204,259 @@ struct CameraARView: UIViewRepresentable {
                 / 120
             )
 
-        let sideways =
-            Float(
-                joystickMonitor.xyPoint.x
-                / 180
-            )
 
-        let movementSpeed: Float = 0.02
-        let rotationSpeed: Float = 0.03
+        let movementSpeed: Float =
+            0.02
 
-        eduard.position.x += sideways * movementSpeed
-        eduard.position.z += forward * movementSpeed
+        let rotationSpeed: Float =
+            0.03
+
+
+        // Translation
+
+        eduard.position.x +=
+            sideways * movementSpeed
+
+        eduard.position.z +=
+            forward * movementSpeed
+
+
+        // Rotation
 
         if abs(turn) > 0.05 {
+
             let rotation =
                 simd_quatf(
-                    angle: turn * rotationSpeed,
-                    axis: SIMD3<Float>(0, 1, 0)
+                    angle:
+                        turn
+                        * rotationSpeed,
+
+                    axis:
+                        SIMD3<Float>(
+                            0,
+                            1,
+                            0
+                        )
                 )
 
             eduard.transform.rotation =
-                rotation * eduard.transform.rotation
+                rotation
+                * eduard.transform.rotation
         }
     }
-    
-    
-    final class Coordinator: NSObject, ARSessionDelegate {
-        
-        var eduard: Entity?
-        
-        // place cube on top of april tag
+
+
+
+    // ======================================================
+    // MARK: - Coordinator
+    // ======================================================
+
+    final class Coordinator:
+        NSObject,
+        ARSessionDelegate
+    {
+
         weak var arView: ARView?
 
-        var debugAnchor: AnchorEntity?
-        var trackedTagID: Int?
-        var didPrintTableHeader = false
-        
-        // April Tag sample from https://github.com/keyqcloud/SwiftAprilTag
-        let detector = try! Detector(
-            families: [.tag36h11]
-        )
-        
-        var isDetecting = false
-        var frameCounter = 0
+        var worldAnchor: AnchorEntity?
 
+        var eduard: Entity?
+
+
+        // --------------------------------------------------
+        // AprilTag Detector
+        // --------------------------------------------------
+
+        let detector =
+            try! Detector(
+                families: [
+                    .tag36h11
+                ]
+            )
+
+
+        // --------------------------------------------------
+        // AprilTag Localization
+        // --------------------------------------------------
+        //
+        // Tag 0 defines the origin and orientation
+        // of the EdukARt 2D map.
+        //
+        // 96 mm = measured black AprilTag square.
+        // --------------------------------------------------
+
+        let aprilTagLocalization =
+            AprilTagLocalization(
+                tagSize: 0.096
+            )
+
+
+        // --------------------------------------------------
+        // Detection Control
+        // --------------------------------------------------
+
+        var isDetecting =
+            false
+
+        var frameCounter =
+            0
+
+
+
+        // ==================================================
+        // MARK: - ARSession Frames
+        // ==================================================
 
         func session(
             _ session: ARSession,
             didUpdate frame: ARFrame
         ) {
 
-            // Check only every 6th frame
+            // --------------------------------------------------
+            // Only analyse every sixth ARFrame
+            // --------------------------------------------------
+
             frameCounter += 1
 
-            guard frameCounter % 6 == 0 else {
+            guard frameCounter % 6 == 0
+            else {
                 return
             }
 
-            // Prevent multiple detections at the same time
-            guard isDetecting == false else {
+
+            // --------------------------------------------------
+            // Prevent simultaneous AprilTag detections
+            // --------------------------------------------------
+
+            guard isDetecting == false
+            else {
                 return
             }
 
-            isDetecting = true
+            isDetecting =
+                true
 
             defer {
-                isDetecting = false
+
+                isDetecting =
+                    false
             }
 
-            let pixelBuffer = frame.capturedImage
+
+            // --------------------------------------------------
+            // Camera image
+            // --------------------------------------------------
+
+            let pixelBuffer =
+                frame.capturedImage
+
 
             do {
-                let detections = try detector.detect(
-                    pixelBuffer: pixelBuffer
+
+                // ----------------------------------------------
+                // Detect ALL visible AprilTags
+                // ----------------------------------------------
+
+                let detections =
+                    try detector.detect(
+                        pixelBuffer:
+                            pixelBuffer
+                    )
+
+
+                // ----------------------------------------------
+                // Camera Intrinsics
+                // ----------------------------------------------
+
+                let cameraMatrix =
+                    frame.camera.intrinsics
+
+
+                let intrinsics =
+                    CameraIntrinsics(
+
+                        fx: Double(
+                            cameraMatrix
+                                .columns.0.x
+                        ),
+
+                        fy: Double(
+                            cameraMatrix
+                                .columns.1.y
+                        ),
+
+                        cx: Double(
+                            cameraMatrix
+                                .columns.2.x
+                        ),
+
+                        cy: Double(
+                            cameraMatrix
+                                .columns.2.y
+                        )
+                    )
+
+
+                // ----------------------------------------------
+                // Localize every detected AprilTag
+                // ----------------------------------------------
+                
+                // Select smallest detected non-zero tag
+                // as map reference.
+                
+                aprilTagLocalization.selectReferenceTag(
+                    from: detections
                 )
                 
-                // source: SwiftAprilTag's documented pose-estimation example
-
-                let cameraMatrix = frame.camera.intrinsics
-
-                let intrinsics = CameraIntrinsics(
-                    fx: Double(cameraMatrix.columns.0.x),
-                    fy: Double(cameraMatrix.columns.1.y),
-                    cx: Double(cameraMatrix.columns.2.x),
-                    cy: Double(cameraMatrix.columns.2.y)
-                )
-
-                let tagSize = 0.096
-
                 for detection in detections {
 
-                    print("# AprilTag ID: \(detection.id)")
+                    guard let mapPose =
+                        aprilTagLocalization
+                            .localize(
 
-                    for (index, corner) in detection.corners.enumerated() {
-                        print(
-                            "# Corner \(index): \(corner)"
-                        )
-                    }
+                                detection:
+                                    detection,
 
-                    if let pose = detection.estimatePose(
-                        intrinsics: intrinsics,
-                        tagSize: tagSize
-                    ) {
+                                frame:
+                                    frame,
 
-//                        print(
-//                            "# Position relative to camera:",
-//                            pose.translation
-//                        )
-//
-//                        print(
-//                            "# Rotation:",
-//                            pose.rotation
-//                        )
-//
-//                        print(
-//                            "# Reprojection error:",
-//                            pose.reprojectionError
-//                        )
-//
-//                        print("# -------------------------")
-                        
-                        // Lock the test onto the first detected AprilTag
-                        if trackedTagID == nil {
-                            trackedTagID = detection.id
-                        }
-
-                        guard detection.id == trackedTagID else {
-                            continue
-                        }
-
-
-                        // MARK: Camera coordinates
-
-                        let cameraX = Float(pose.translation[0])
-                        let cameraY = Float(pose.translation[1])
-                        let cameraZ = Float(pose.translation[2])
-
-
-                        // MARK: Convert AprilTag camera coordinates to ARKit camera coordinates
-
-                        // AprilTag / OpenCV:
-                        // x = right
-                        // y = down
-                        // z = forward
-                        //
-                        // ARKit:
-                        // x = right
-                        // y = up
-                        // z = backward
-
-                        let tagPositionCamera = SIMD4<Float>(
-                            cameraX,
-                            -cameraY,
-                            -cameraZ,
-                            1
-                        )
-
-
-                        // MARK: Camera coordinates -> ARKit world coordinates
-
-                        let tagPositionWorld =
-                            frame.camera.transform * tagPositionCamera
-
-                        let worldPosition = SIMD3<Float>(
-                            tagPositionWorld.x,
-                            tagPositionWorld.y,
-                            tagPositionWorld.z
-                        )
-
-
-                        // MARK: Debug Cube
-
-                        DispatchQueue.main.async { [weak self] in
-
-                            guard let self,
-                                  let arView = self.arView
-                            else {
-                                return
-                            }
-
-                            let cubeSize: Float = 0.096 // same as April Tag size
-
-                            // places Green Cube on top of first detected April Tag
-                            if self.debugAnchor == nil {
-
-                                let anchor = AnchorEntity(
-                                    world: worldPosition
-                                )
-
-                                let mesh = MeshResource.generateBox(
-                                    size: cubeSize
-                                )
-
-                                let color = UIColor(
-                                    Color("BrandGreen")
-                                )
-                                .withAlphaComponent(0.5) // transparency
-
-                                let material = SimpleMaterial(
-                                    color: color,
-                                    isMetallic: false
-                                )
-
-                                let cube = ModelEntity(
-                                    mesh: mesh,
-                                    materials: [material]
-                                )
-
-                                anchor.addChild(cube)
-                                arView.scene.addAnchor(anchor)
-
-                                self.debugAnchor = anchor
-
-                            } else {
-
-                                self.debugAnchor?.position =
-                                    worldPosition
-                            }
-                        }
-
-
-                        // MARK: Console Table
-                        if didPrintTableHeader == false {
-
-                            print(
-                                "# ID | Cam X | Cam Y | Cam Z | World X | World Y | World Z | Error"
+                                intrinsics:
+                                    intrinsics
                             )
 
-                            didPrintTableHeader = true
-                        }
+                    else {
 
-                        print(
-                            String(
-                                format:
-                                    "# %d | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.2e",
-                                detection.id,
-                                cameraX,
-                                cameraY,
-                                cameraZ,
-                                worldPosition.x,
-                                worldPosition.y,
-                                worldPosition.z,
-                                pose.reprojectionError
-                            )
-                        )
+                        continue
                     }
+
+
+                    // ------------------------------------------
+                    // Console Output
+                    // ------------------------------------------
+
+                    print(
+                        String(
+                            format:
+                            "# ID %d | X %+7.3f | Z %+7.3f | Rotation %+7.2f° | Height %+7.3f",
+
+                            mapPose.id,
+
+                            mapPose.x,
+
+                            mapPose.z,
+
+                            mapPose.rotation
+                                * 180
+                                / .pi,
+
+                            mapPose.height
+                        )
+                    )
                 }
 
+
             } catch {
+
                 print(
                     "# AprilTag detection error:",
                     error
@@ -408,4 +465,3 @@ struct CameraARView: UIViewRepresentable {
         }
     }
 }
-    
