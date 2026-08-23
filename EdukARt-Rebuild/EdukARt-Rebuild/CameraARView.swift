@@ -11,6 +11,8 @@
 //  https://github.com/keyqcloud/SwiftAprilTag
 //
 
+// Technical Bridge to ARKit / RealityKit -> Street, Items, Obstacles, Eduard 3D 
+
 import SwiftUI
 import RealityKit
 import ARKit
@@ -22,17 +24,18 @@ import SwiftUIJoystick
 struct CameraARView: UIViewRepresentable {
 
     @ObservedObject var eduardModelStore: EduardModelStore
-
     @ObservedObject var joystickMonitor: JoystickMonitor
-
     @ObservedObject var turnJoystickMonitor: JoystickMonitor
 
+    @ObservedObject var mapBuilder: AprilTagMapBuilder
 
     // MARK: - Coordinator
 
     func makeCoordinator() -> Coordinator {
 
-        Coordinator()
+        Coordinator(
+            mapBuilder: mapBuilder
+        )
     }
 
 
@@ -257,11 +260,17 @@ struct CameraARView: UIViewRepresentable {
     {
 
         weak var arView: ARView?
-
         var worldAnchor: AnchorEntity?
-
         var eduard: Entity?
+        let mapBuilder: AprilTagMapBuilder
+        
+        init(
+            mapBuilder: AprilTagMapBuilder
+        ) {
 
+            self.mapBuilder =
+                mapBuilder
+        }
 
         // --------------------------------------------------
         // AprilTag Detector
@@ -397,38 +406,54 @@ struct CameraARView: UIViewRepresentable {
                     )
 
 
-                // ----------------------------------------------
-                // Localize every detected AprilTag
-                // ----------------------------------------------
-                
-                // Select smallest detected non-zero tag
-                // as map reference.
-                
+                // --------------------------------------------------
+                // Select reference tag
+                // --------------------------------------------------
+
                 aprilTagLocalization.selectReferenceTag(
                     from: detections
                 )
+                
+                // --------------------------------------------------
+                // Give reference ID to map builder
+                // --------------------------------------------------
+
+                
+                if let referenceID =
+                    aprilTagLocalization.referenceTagID {
+
+                    DispatchQueue.main.async {
+
+                        self.mapBuilder.setReferenceTag(
+                            id: referenceID
+                        )
+                    }
+                }
+                
+                // --------------------------------------------------
+                // Localize visible tags
+                // --------------------------------------------------
                 
                 for detection in detections {
 
                     guard let mapPose =
                         aprilTagLocalization
                             .localize(
-
-                                detection:
-                                    detection,
-
-                                frame:
-                                    frame,
-
-                                intrinsics:
-                                    intrinsics
+                                detection: detection,
+                                frame: frame,
+                                intrinsics: intrinsics
                             )
 
                     else {
-
                         continue
                     }
 
+                    DispatchQueue.main.async {
+
+                        self.mapBuilder.add(
+                            pose: mapPose
+                        )
+                    }
 
                     // ------------------------------------------
                     // Console Output

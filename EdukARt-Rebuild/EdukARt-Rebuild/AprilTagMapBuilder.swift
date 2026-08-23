@@ -8,6 +8,7 @@
 
 import Foundation
 import simd
+import Combine
 
 
 // MARK: - Stored Map Tag
@@ -30,7 +31,7 @@ struct AprilTagMapPoint: Identifiable {
 
 // MARK: - AprilTag Map Builder
 
-final class AprilTagMapBuilder {
+final class AprilTagMapBuilder: ObservableObject {
 
     // --------------------------------------------------
     // Settings
@@ -43,7 +44,7 @@ final class AprilTagMapBuilder {
     // New tags should normally be no more than
     // about 2 metres away from an already mapped tag.
     private let maximumNeighborDistance:
-        Float = 2.0
+        Float = 3.0
 
 
     // --------------------------------------------------
@@ -58,7 +59,7 @@ final class AprilTagMapBuilder {
     // Finished map points
     // --------------------------------------------------
 
-    private(set) var mapPoints:
+    @Published private(set) var mapPoints:
         [AprilTagMapPoint] = []
 
 

@@ -49,9 +49,11 @@ struct MainMenuView: View {
                 
                 
                 NavigationLink {
-                    ARControlTestView(
-                        eduardModelStore: eduardModelStore
-                    )
+                    GameView(
+                            eduardModelStore:
+                                eduardModelStore
+                        )
+
                 } label: {
                     Text("AR Test")
                 }
