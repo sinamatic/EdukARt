@@ -215,16 +215,46 @@ struct CameraARView: UIViewRepresentable {
             0.03
 
 
-        // Translation
+//        // Translation - Forward is always x, rotation of eduard not relevant
+//
+//        eduard.position.x +=
+//            sideways * movementSpeed
+//
+//        eduard.position.z +=
+//            forward * movementSpeed
+        
+        
+        // --------------------------------------------------
+        // Movement relative to Eduard's current orientation
+        // --------------------------------------------------
 
-        eduard.position.x +=
-            sideways * movementSpeed
+        // Local movement:
+        // X = sideways
+        // Z = forward/backward
+        let localMovement =
+            SIMD3<Float>(
+                sideways,
+                -forward,
+                0
+            )
 
-        eduard.position.z +=
-            forward * movementSpeed
+        // Rotate movement vector with Eduard's
+        // current orientation.
+        let worldMovement =
+            eduard.transform.rotation
+            .act(
+                localMovement
+            )
+
+        // Apply movement in AR world coordinates.
+        eduard.position +=
+            worldMovement
+            * movementSpeed
 
 
+        // --------------------------------------------------
         // Rotation
+        // --------------------------------------------------
 
         if abs(turn) > 0.05 {
 
