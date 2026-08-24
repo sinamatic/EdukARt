@@ -3,6 +3,29 @@
 //  EdukARt-Rebuild
 //
 //  Created by Sina Steinmüller on 21.08.26.
+//  CameraARView provides the RealityKit-based augmented reality environment
+//  used during gameplay. It connects the SwiftUI game interface with an
+//  ARKit world-tracking session and manages the virtual Eduard robot.
+//
+//  The Coordinator continuously receives AR frames and uses SwiftAprilTag
+//  to detect AprilTags in the camera image. Detected tags are passed to
+//  AprilTagLocalization, which estimates their poses and transforms them
+//  into the ARKit world coordinate system. The resulting poses are forwarded
+//  to AprilTagMapBuilder to construct the two-dimensional map.
+//
+//  The first successfully localized AprilTag is additionally used to place
+//  and orient the virtual Eduard model in the AR environment. A fixed model
+//  rotation offset aligns the coordinate system of the 3D model with the
+//  AprilTag coordinate system.
+//
+//  Joystick input controls the virtual robot relative to its own orientation,
+//  allowing forward and sideways movement to follow the robot's current
+//  heading instead of the global AR coordinate axes.
+//
+//  Sources:
+//  Apple ARKit:
+//  https://developer.apple.com/documentation/arkit
+//
 //
 //  RealityKit:
 //  https://developer.apple.com/documentation/realitykit
@@ -148,10 +171,6 @@ struct CameraARView: UIViewRepresentable {
                     recursive: true
                 )
 
-            worldAnchor.addChild(
-                eduard
-            )
-
             context.coordinator.eduard =
                 eduard
 
@@ -178,8 +197,9 @@ struct CameraARView: UIViewRepresentable {
         context: Context
     ) {
 
-        guard let eduard =
-            context.coordinator.eduard
+        guard
+            context.coordinator.isEduardLocalized,
+            let eduard = context.coordinator.eduard
         else {
             return
         }
@@ -251,6 +271,24 @@ struct CameraARView: UIViewRepresentable {
             worldMovement
             * movementSpeed
 
+        
+//        let targetPosition =
+//            eduard.position
+//            +
+//            worldMovement * movementSpeed
+//
+//        var targetTransform =
+//            eduard.transform
+//
+//        targetTransform.translation =
+//            targetPosition
+//
+//        eduard.move(
+//            to: targetTransform,
+//            relativeTo: eduard.parent,
+//            duration: 0.08,
+//            timingFunction: .linear
+//        )
 
         // --------------------------------------------------
         // Rotation
@@ -520,12 +558,12 @@ struct CameraARView: UIViewRepresentable {
                     // Place AR cube on AprilTag
                     // ----------------------------------------------
 
-                    DispatchQueue.main.async {
-
-                        self.placeCube(
-                            for: mapPose
-                        )
-                    }
+//                    DispatchQueue.main.async {
+//
+//                        self.placeCube(
+//                            for: mapPose
+//                        )
+//                    }
                     
                     // ----------------------------------------------
                     // Place Eduard on first localized AprilTag
@@ -681,7 +719,9 @@ struct CameraARView: UIViewRepresentable {
             // Eduard model must exist
             // --------------------------------------------------
 
-            guard let eduard
+            guard
+                let eduard,
+                let worldAnchor
             else {
                 return
             }
@@ -721,7 +761,9 @@ struct CameraARView: UIViewRepresentable {
                 relativeTo: nil
             )
 
-            
+            worldAnchor.addChild(
+                eduard
+            )
 
             // --------------------------------------------------
             // Lock localization
