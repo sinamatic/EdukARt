@@ -9,64 +9,66 @@ import SwiftUI
 
 struct ContentView: View {
 
-    @ObservedObject var eduardModelStore: EduardModelStore
-    @ObservedObject var robotController = RobotController()
+    @ObservedObject var eduardModelStore:
+        EduardModelStore
 
+    @StateObject private var robotController =
+        RobotController()
 
-    @State private var showLogo = true
+    @State private var showLogo =
+        true
+
 
     var body: some View {
 
         if showLogo {
 
-            Image("EduArtSinamaticIcon")
-            
-                .resizable()
-                .scaledToFit()
-                .ignoresSafeArea()
-                    // Eduard schon im Hintergrund laden
-                .task {
+            Image(
+                "EduArtSinamaticIcon"
+            )
+            .resizable()
+            .scaledToFit()
+            .ignoresSafeArea()
+            .task {
 
-                        // Eduard parallel im Hintergrund laden
-                        Task {
-                            await eduardModelStore.load()
-                        }
-
-                        // Logo mindestens 2 Sekunden anzeigen
-                        try? await Task.sleep(
-                            for: .seconds(2)
-                        )
-
-                        showLogo = false
-                    
+                Task {
+                    await eduardModelStore.load()
                 }
 
-            
+                try? await Task.sleep(
+                    for:
+                        .seconds(2)
+                )
+
+                showLogo =
+                    false
+            }
+
         } else {
 
             NavigationStack {
 
-                           MainMenuView(
-                               eduardModelStore:
-                                   eduardModelStore,
+                MainMenuView(
+                    eduardModelStore:
+                        eduardModelStore,
 
-                               controller:
-                                   robotController
-                           )
-                       }
-                       .ignoresSafeArea()
-                       .preferredColorScheme(
-                           .dark
-                       )
-                   }
-               }
-           }
+                    controller:
+                        robotController
+                )
+            }
+            .ignoresSafeArea()
+            .preferredColorScheme(
+                .dark
+            )
+        }
+    }
+}
 
 
-           #Preview {
+#Preview {
 
-               ContentView(
-                   eduardModelStore:
-                       EduardModelStore()
-               )
-           }
+    ContentView(
+        eduardModelStore:
+            EduardModelStore()
+    )
+}

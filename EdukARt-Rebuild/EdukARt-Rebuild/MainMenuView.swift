@@ -125,7 +125,11 @@ struct MainMenuView: View {
     
     #Preview {
         MainMenuView(
-            eduardModelStore: EduardModelStore()
+            eduardModelStore:
+                EduardModelStore(),
+
+            controller:
+                RobotController()
         )
         
     }

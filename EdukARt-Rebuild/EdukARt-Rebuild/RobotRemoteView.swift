@@ -22,7 +22,7 @@ struct RobotRemoteView: View {
     @State private var cameraExpanded = false
     
     @State private var driveMode: RobotDriveMode = .mechanum
-    @State private var lightMode: Eduard.LightMode = .enabled
+    @State private var lightMode: LightMode = .enabled
     
     @State private var allLightsColor = Color.orange
     @State private var signalColor = Color.orange
@@ -133,26 +133,19 @@ private extension RobotRemoteView {
                             RobotDriveMode.allCases
                         ) { mode in
 
-                            Button {
-
-                                driveMode =
-                                    mode
-
-                                controller.setDriveMode(
-                                    mode
-                                )
-
-                            } label: {
-
-                                Text(
-                                    mode.rawValue
-                                )
-                            }
+                            Text(
+                                mode.rawValue
+                            )
+                            .tag(
+                                mode
+                            )
                         }
                     }
                     .pickerStyle(.segmented)
                     .onChange(of: driveMode) { _, mode in
-                        controller.setDriveMode(driveMode)
+                        controller.setDriveMode(
+                            mode
+                        )
                     }
                 }
             }
@@ -226,6 +219,67 @@ private extension RobotRemoteView {
                     shape: .circle
                 )
                 .frame(maxWidth: .infinity)
+                .onChange(
+                    of:
+                        joystickMonitor.xyPoint
+                ) { _, input in
+
+                    let center:
+                        CGFloat = 90
+
+                    controller.updateJoystickInput(
+                        x:
+                            Float(
+                                (
+                                    input.x
+                                    - center
+                                )
+                                / center
+                            ),
+
+                        y:
+                            Float(
+                                (
+                                    input.y
+                                    - center
+                                )
+                                / center
+                            )
+                    )
+                }
+                .onChange(
+                    of:
+                        turnJoystickMonitor.xyPoint
+                ) { _, input in
+
+                    let center:
+                        CGFloat = 60
+
+                    let rotation =
+                        (
+                            input.x
+                            - center
+                        )
+                        / center
+
+
+                    if rotation < -0.1 {
+
+                        controller.startMechanumRotation(
+                            .left
+                        )
+
+                    } else if rotation > 0.1 {
+
+                        controller.startMechanumRotation(
+                            .right
+                        )
+
+                    } else {
+
+                        controller.stopMechanumRotation()
+                    }
+                }
 
                 Text(
                     "Forward: \(joystickMonitor.xyPoint.y, specifier: "%.2f")   Sideways: \(joystickMonitor.xyPoint.x, specifier: "%.2f")   Turn: \(turnJoystickMonitor.xyPoint.x, specifier: "%.2f")"
@@ -357,7 +411,7 @@ private extension RobotRemoteView {
     }
     
     func lightButtons(
-        _ modes: [Eduard.LightMode]
+        _ modes: [LightMode]
     ) -> some View {
         
         LazyVGrid(
@@ -375,7 +429,7 @@ private extension RobotRemoteView {
                         mode
 
                     controller.sendLightMode(
-                        mode
+                        mode.eduardLightMode
                     )
 
                 } label: {
@@ -515,6 +569,34 @@ private enum LightMode: String, CaseIterable, Identifiable {
             return "arrowtriangle.right.fill"
         }
     }
+
+    var eduardLightMode: Eduard.LightMode {
+        switch self {
+        case .enabled:
+            return .enabled
+
+        case .loading:
+            return .loading
+
+        case .slowBlinking:
+            return .connectionLost
+
+        case .fastBlinking:
+            return .rotation
+
+        case .running:
+            return .running
+
+        case .rainbowRunning:
+            return .rainbow
+
+        case .flashLeft:
+            return .flashLeft
+
+        case .flashRight:
+            return .flashRight
+        }
+    }
 }
 
 // MARK: - Light Button Style
@@ -554,5 +636,9 @@ private struct LightButtonStyle: ButtonStyle {
 
 #Preview {
     NavigationStack {
-        RobotRemoteView(controller: robotController)}
+        RobotRemoteView(
+            controller:
+                RobotController()
+        )
     }
+}
