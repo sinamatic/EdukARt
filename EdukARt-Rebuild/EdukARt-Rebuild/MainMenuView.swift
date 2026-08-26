@@ -36,7 +36,10 @@ struct MainMenuView: View {
                     .buttonStyle(MenuButtonStyle(color: Color("BrandGreen")))
                 
                 NavigationLink{
-                    CoursesView()
+                    CoursesView(
+                        eduardModelStore: eduardModelStore,
+                        gameMapStore: gameMapStore
+                    )
                 } label: {Text("Courses")}
                     .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
                 

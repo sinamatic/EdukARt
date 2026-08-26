@@ -31,6 +31,7 @@ struct ContentView: View {
             )
             .resizable()
             .scaledToFit()
+            .scaleEffect(0.6)
             .ignoresSafeArea()
             .task {
 
