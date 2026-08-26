@@ -16,19 +16,28 @@ struct AprilTagMapView: View {
     let mapWidthFactor: CGFloat
     let mapAlignment: Alignment
     let showsClearTrackButton: Bool
+    let backgroundColor: Color
+    let borderColor: Color
+    let borderLineWidth: CGFloat
 
     init(
         mapBuilder: AprilTagMapBuilder,
         track: Track,
         mapWidthFactor: CGFloat = 1.0 / 3.0,
         mapAlignment: Alignment = .topTrailing,
-        showsClearTrackButton: Bool = true
+        showsClearTrackButton: Bool = true,
+        backgroundColor: Color = Color.black.opacity(0.52),
+        borderColor: Color = Color.white.opacity(0.7),
+        borderLineWidth: CGFloat = 1
     ) {
         self.mapBuilder = mapBuilder
         self.track = track
         self.mapWidthFactor = mapWidthFactor
         self.mapAlignment = mapAlignment
         self.showsClearTrackButton = showsClearTrackButton
+        self.backgroundColor = backgroundColor
+        self.borderColor = borderColor
+        self.borderLineWidth = borderLineWidth
     }
 
 
@@ -83,8 +92,7 @@ struct AprilTagMapView: View {
                 ZStack {
 
                     // Map background
-                    Color.black
-                        .opacity(0.52)
+                    backgroundColor
 
 
                     if mapBuilder.mapPoints.isEmpty {
@@ -123,9 +131,8 @@ struct AprilTagMapView: View {
                             cornerRadius
                     )
                     .stroke(
-                        Color.white
-                            .opacity(0.7),
-                        lineWidth: 1
+                        borderColor,
+                        lineWidth: borderLineWidth
                     )
                 }
                 .frame(

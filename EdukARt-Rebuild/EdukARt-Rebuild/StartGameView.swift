@@ -125,6 +125,8 @@ struct SavedMapsListView: View {
     var selectedMapID: GameMap.ID?
     var onSelect: ((GameMap) -> Void)?
     var showsCourseActions = false
+    var onEdit: ((GameMap) -> Void)?
+    var onDelete: ((GameMap) -> Void)?
 
     var body: some View {
         Group {
@@ -143,15 +145,16 @@ struct SavedMapsListView: View {
                             .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
-                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 if showsCourseActions {
+                                    Button("Delete", role: .destructive) {
+                                        onDelete?(map)
+                                    }
+
                                     Button("Edit") {
+                                        onEdit?(map)
                                     }
                                     .tint(Color("BrandGreen"))
-
-                                    Button("Delete", role: .destructive) {
-                                        gameMapStore.delete(map)
-                                    }
                                 }
                             }
                     }

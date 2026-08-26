@@ -52,8 +52,13 @@ struct GameView: View {
             
             AprilTagMapView(
                 mapBuilder: mapBuilder,
-                track: track
+                track: track,
+                showsClearTrackButton: false,
+                backgroundColor: .white.opacity(0.1),
+                borderColor: .white.opacity(0.36),
+                borderLineWidth: 2
             )
+            .offset(x: -20)
 
 
 //            // MARK: - Debug Joystick Values

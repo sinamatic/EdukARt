@@ -14,6 +14,10 @@ struct CoursesView: View {
 
     @StateObject private var mapBuilder = AprilTagMapBuilder()
 
+    @State private var editingMap: GameMap?
+    @State private var editedMapName = ""
+    @State private var showsEditDialog = false
+
     var body: some View {
         MapMenuBackground {
             VStack(spacing: 20) {
@@ -38,7 +42,9 @@ struct CoursesView: View {
 
                     SavedMapsListView(
                         gameMapStore: gameMapStore,
-                        showsCourseActions: true
+                        showsCourseActions: true,
+                        onEdit: beginEditing,
+                        onDelete: gameMapStore.delete
                     )
                 }
 
@@ -47,6 +53,42 @@ struct CoursesView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Edit Course", isPresented: $showsEditDialog) {
+            TextField("Name", text: $editedMapName)
+
+            Button("Cancel", role: .cancel) {}
+
+            Button("Save") {
+                saveEditedMap()
+            }
+            .disabled(
+                editedMapName
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .isEmpty
+            )
+        } message: {
+            Text("Rename this course.")
+        }
+    }
+
+    private func beginEditing(_ map: GameMap) {
+        editingMap = map
+        editedMapName = map.name
+        showsEditDialog = true
+    }
+
+    private func saveEditedMap() {
+        let name = editedMapName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard var map = editingMap, name.isEmpty == false else {
+            return
+        }
+
+        map.name = name
+        gameMapStore.save(map)
+        editingMap = nil
+        editedMapName = ""
     }
 }
 
