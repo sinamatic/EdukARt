@@ -10,8 +10,8 @@ import SwiftUI
 
 struct AprilTagMapView: View {
 
-    @ObservedObject var mapBuilder:
-        AprilTagMapBuilder
+    @ObservedObject var mapBuilder: AprilTagMapBuilder
+    @ObservedObject var track: Track
 
 
     // MARK: - Settings
@@ -107,6 +107,14 @@ struct AprilTagMapView: View {
                     lineWidth: 1
                 )
             }
+            
+            Button(
+                "Clear Track"
+            ) {
+
+                track.reset()
+            }
+            
             .frame(
                 maxWidth: .infinity,
                 maxHeight: .infinity,
@@ -204,6 +212,29 @@ struct AprilTagMapView: View {
 
 
         return ZStack {
+            
+            // --------------------------------------------------
+            // Draw Track
+            // --------------------------------------------------
+
+            trackPath(
+                bounds:
+                    bounds,
+
+                scale:
+                    scale,
+
+                horizontalOffset:
+                    horizontalOffset,
+
+                verticalOffset:
+                    verticalOffset
+            )
+
+
+            // --------------------------------------------------
+            // Draw AprilTags
+            // --------------------------------------------------
 
             ForEach(
                 mapBuilder.mapPoints
@@ -244,6 +275,165 @@ struct AprilTagMapView: View {
             height: size
         )
     }
+    
+    // MARK: - Track Path
+
+    private func trackPath(
+        bounds: MapBounds,
+        scale: CGFloat,
+        horizontalOffset: CGFloat,
+        verticalOffset: CGFloat
+    ) -> some View {
+
+        Path { path in
+
+            guard let firstPoint =
+                track.rawPoints.first
+
+            else {
+                return
+            }
+
+
+            // --------------------------------------------------
+            // First track point
+            // --------------------------------------------------
+
+            let firstScreenPoint =
+                CGPoint(
+
+                    x:
+                        horizontalOffset
+                        +
+                        CGFloat(
+                            firstPoint.x
+                            - bounds.minX
+                        )
+                        * scale,
+
+                    y:
+                        verticalOffset
+                        +
+                        CGFloat(
+                            firstPoint.y
+                            - bounds.minZ
+                        )
+                        * scale
+                )
+
+
+            path.move(
+                to:
+                    firstScreenPoint
+            )
+
+
+            // --------------------------------------------------
+            // Remaining track points
+            // --------------------------------------------------
+
+            for point
+            in track.rawPoints.dropFirst() {
+
+                let screenPoint =
+                    CGPoint(
+
+                        x:
+                            horizontalOffset
+                            +
+                            CGFloat(
+                                point.x
+                                - bounds.minX
+                            )
+                            * scale,
+
+                        y:
+                            verticalOffset
+                            +
+                            CGFloat(
+                                point.y
+                                - bounds.minZ
+                            )
+                            * scale
+                    )
+
+
+                path.addLine(
+                    to:
+                        screenPoint
+                )
+            }
+        }
+        .stroke(
+            Color.brandGreen,
+            style:
+                StrokeStyle(
+                    lineWidth:
+                        4,
+
+                    lineCap:
+                        .round,
+
+                    lineJoin:
+                        .round
+                )
+        )
+    }
+    
+    // MARK: - Track Drawing Gesture
+
+    private func trackDrawingGesture(
+        bounds: MapBounds,
+        scale: CGFloat,
+        horizontalOffset: CGFloat,
+        verticalOffset: CGFloat
+    ) -> some Gesture {
+
+        DragGesture(
+            minimumDistance:
+                0
+        )
+        .onChanged { value in
+
+            // --------------------------------------------------
+            // Screen -> Map
+            // --------------------------------------------------
+
+            let mapX =
+                bounds.minX
+                +
+                Float(
+                    (
+                        value.location.x
+                        - horizontalOffset
+                    )
+                    / scale
+                )
+
+
+            let mapZ =
+                bounds.minZ
+                +
+                Float(
+                    (
+                        value.location.y
+                        - verticalOffset
+                    )
+                    / scale
+                )
+
+
+            track.addPoint(
+                x:
+                    mapX,
+
+                z:
+                    mapZ
+            )
+        }
+    }
+    
+    
 
 
     // MARK: - AprilTag Symbol

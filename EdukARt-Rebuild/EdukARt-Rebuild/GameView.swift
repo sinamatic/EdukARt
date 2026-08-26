@@ -25,9 +25,8 @@ struct GameView: View {
 
     // MARK: - AprilTag Map
 
-    @StateObject private var mapBuilder =
-        AprilTagMapBuilder()
-
+    @StateObject private var mapBuilder = AprilTagMapBuilder()
+    @StateObject private var track = Track()
 
     var body: some View {
 
@@ -51,7 +50,8 @@ struct GameView: View {
             .ignoresSafeArea()
             
             AprilTagMapView(
-                mapBuilder: mapBuilder
+                mapBuilder: mapBuilder,
+                track: track
             )
 
 
