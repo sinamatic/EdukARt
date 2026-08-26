@@ -11,6 +11,8 @@ import UIKit
 
 struct RobotRemoteView: View {
     
+    @ObservedObject var controller: RobotController
+    
     @StateObject private var joystickMonitor = JoystickMonitor()
     @StateObject private var turnJoystickMonitor = JoystickMonitor()
     
@@ -19,8 +21,8 @@ struct RobotRemoteView: View {
     @State private var lightsExpanded = false
     @State private var cameraExpanded = false
     
-    @State private var driveMode: DriveMode = .mecanum
-    @State private var lightMode: LightMode = .enabled
+    @State private var driveMode: RobotDriveMode = .mechanum
+    @State private var lightMode: Eduard.LightMode = .enabled
     
     @State private var allLightsColor = Color.orange
     @State private var signalColor = Color.orange
@@ -106,7 +108,7 @@ private extension RobotRemoteView {
                         }
                         
                         Button {
-                            print("Enable Robot")
+                            controller.sendEnable()
                         } label: {
                             Label("Enable", systemImage: "power")
                                 .font(.caption.weight(.semibold))
@@ -127,14 +129,30 @@ private extension RobotRemoteView {
                         .foregroundStyle(.white.opacity(0.68))
                     
                     Picker("Drive Mode", selection: $driveMode) {
-                        ForEach(DriveMode.allCases) { mode in
-                            Text(mode.title)
-                                .tag(mode)
+                        ForEach(
+                            RobotDriveMode.allCases
+                        ) { mode in
+
+                            Button {
+
+                                driveMode =
+                                    mode
+
+                                controller.setDriveMode(
+                                    mode
+                                )
+
+                            } label: {
+
+                                Text(
+                                    mode.rawValue
+                                )
+                            }
                         }
                     }
                     .pickerStyle(.segmented)
                     .onChange(of: driveMode) { _, mode in
-                        print("Drive Mode:", mode.title)
+                        controller.setDriveMode(driveMode)
                     }
                 }
             }
@@ -182,7 +200,9 @@ private extension RobotRemoteView {
 
                     
                     Spacer()
-                    Text(driveMode.title)
+                    Text(
+                                driveMode.rawValue
+                            )
                         .font(.caption)
                         .foregroundStyle(.brandGreen)
                     
@@ -337,7 +357,7 @@ private extension RobotRemoteView {
     }
     
     func lightButtons(
-        _ modes: [LightMode]
+        _ modes: [Eduard.LightMode]
     ) -> some View {
         
         LazyVGrid(
@@ -350,9 +370,14 @@ private extension RobotRemoteView {
             ForEach(modes) { mode in
                 
                 Button {
-                    lightMode = mode
-                    print("Light Mode:", mode.title)
-                    
+
+                    lightMode =
+                        mode
+
+                    controller.sendLightMode(
+                        mode
+                    )
+
                 } label: {
                     VStack(spacing: 6) {
                         
@@ -417,28 +442,6 @@ private extension RobotRemoteView {
         .clipShape(
             RoundedRectangle(cornerRadius: 8)
         )
-    }
-}
-
-// MARK: - Drive Mode
-
-private enum DriveMode: String, CaseIterable, Identifiable {
-    
-    case mecanum
-    case offroad
-    
-    var id: Self {
-        self
-    }
-    
-    var title: String {
-        switch self {
-        case .mecanum:
-            return "Mecanum"
-            
-        case .offroad:
-            return "Offroad"
-        }
     }
 }
 
@@ -551,6 +554,5 @@ private struct LightButtonStyle: ButtonStyle {
 
 #Preview {
     NavigationStack {
-        RobotRemoteView()
+        RobotRemoteView(controller: robotController)}
     }
-}

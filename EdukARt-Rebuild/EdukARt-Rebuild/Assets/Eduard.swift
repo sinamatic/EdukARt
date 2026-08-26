@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import Network
 
 
 final class Eduard {
@@ -236,6 +237,91 @@ final class Eduard {
         "edu_robot/msg/SetLightingColor"
 
 
+    
+    // ======================================================
+    // MARK: - ROS Value
+    // ======================================================
+
+    private indirect enum ROSValue:
+        Encodable {
+
+        case bool(Bool)
+        case int(Int)
+        case double(Double)
+        case string(String)
+        case array([ROSValue])
+        case object([String: ROSValue])
+
+
+        func encode(
+            to encoder: Encoder
+        ) throws {
+
+            var container =
+                encoder.singleValueContainer()
+
+
+            switch self {
+
+            case .bool(let value):
+                try container.encode(value)
+
+            case .int(let value):
+                try container.encode(value)
+
+            case .double(let value):
+                try container.encode(value)
+
+            case .string(let value):
+                try container.encode(value)
+
+            case .array(let value):
+                try container.encode(value)
+
+            case .object(let value):
+                try container.encode(value)
+            }
+        }
+    }
+
+
+    // ======================================================
+    // MARK: - ROS Commands
+    // ======================================================
+
+    private struct ROSPublishCommand:
+        Encodable {
+
+        let kind =
+            "publish"
+
+        let topic:
+            String
+
+        let messageType:
+            String
+
+        let message:
+            [String: ROSValue]
+    }
+
+
+    private struct ROSServiceCommand:
+        Encodable {
+
+        let kind =
+            "service"
+
+        let service:
+            String
+
+        let serviceType:
+            String
+
+        let request:
+            [String: ROSValue]
+    }
+    
     // ======================================================
     // MARK: - Values
     // ======================================================
@@ -280,36 +366,70 @@ final class Eduard {
 
     private var activeRainbowMode:
         LightingMode = .running
+    
+    
+    // MARK: - Init
+
+    init() {
+
+        let endpointHost =
+            NWEndpoint.Host(
+                targetHost
+            )
+
+        let endpointPort =
+            NWEndpoint.Port(
+                rawValue:
+                    targetPort
+            )
+            ?? 50505
+
+
+        connection =
+            NWConnection(
+                host:
+                    endpointHost,
+
+                port:
+                    endpointPort,
+
+                using:
+                    .udp
+            )
+
+
+        connection.start(
+            queue:
+                .global(
+                    qos:
+                        .userInitiated
+                )
+        )
+    }
 
 
     // ======================================================
-    // MARK: - Communication
-    // ======================================================
-    //
-    // The existing Eduard ROS/UDP sender will be inserted
-    // here once its current implementation is available.
-    //
-    // It needs to provide:
-    //
-    // send(
-    //     topic: String,
-    //     messageType: String,
-    //     message: ...
-    // )
-    //
-    // call(
-    //     service: String,
-    //     serviceType: String,
-    //     request: ...
-    // )
-    //
+    // MARK: - UDP Transport
     // ======================================================
 
+    private let targetHost =
+        "192.168.0.100"
+
+    private let targetPort:
+        UInt16 = 50505
+
+    private var connection:
+        NWConnection
+
+    private let encoder =
+        JSONEncoder()
 
     deinit {
 
         rainbowTimer?
             .invalidate()
+
+        connection.cancel()
     }
 
 
@@ -336,25 +456,32 @@ final class Eduard {
 
             request: [
 
-                "mode": [
+                "mode":
+                    .object([
 
-                    "mode":
-                        enabled
-                        ? remoteControlledModeValue
-                        : disabledModeValue,
+                        "mode":
+                            .double(
+                                enabled
+                                ? remoteControlledModeValue
+                                : disabledModeValue
+                            ),
 
-                    "drive_kinematic":
-                        driveMode
-                            .driveKinematicValue,
+                        "drive_kinematic":
+                            .double(
+                                driveMode
+                                    .driveKinematicValue
+                            ),
 
-                    "feature_mode":
-                        0
-                ],
+                        "feature_mode":
+                            .double(0)
+                    ]),
 
                 "disable_feature":
-                    enabled
-                    ? 0
-                    : 1
+                    .double(
+                        enabled
+                        ? 0
+                        : 1
+                    )
             ]
         )
 
@@ -363,7 +490,6 @@ final class Eduard {
             stop()
         }
     }
-
 
     // ======================================================
     // MARK: - Drive
@@ -383,33 +509,40 @@ final class Eduard {
 
             message: [
 
-                "linear": [
+                "linear":
+                    .object([
 
-                    "x":
-                        command.forward,
+                        "x":
+                            .double(
+                                command.forward
+                            ),
 
-                    "y":
-                        command.sideways,
+                        "y":
+                            .double(
+                                command.sideways
+                            ),
 
-                    "z":
-                        0
-                ],
+                        "z":
+                            .double(0)
+                    ]),
 
-                "angular": [
+                "angular":
+                    .object([
 
-                    "x":
-                        0,
+                        "x":
+                            .double(0),
 
-                    "y":
-                        0,
+                        "y":
+                            .double(0),
 
-                    "z":
-                        command.rotation
-                ]
+                        "z":
+                            .double(
+                                command.rotation
+                            )
+                    ])
             ]
         )
     }
-
 
     // MARK: - Stop
 
@@ -1058,19 +1191,176 @@ final class Eduard {
     // ======================================================
     // MARK: - ROS Transport
     // ======================================================
-    //
-    // IMPORTANT:
-    //
-    // These two functions are intentionally left as the
-    // only missing low-level part.
-    //
-    // Your old project used EduardROSCommandTransport here,
-    // but its implementation is not contained in the
-    // available source material.
-    //
-    // Paste the existing transport implementation here
-    // rather than recreating its UDP packet format.
-    // ======================================================
+    
+    
+
+    func reconnect() {
+
+        connection.cancel()
+
+        connection =
+            makeConnection()
+
+        connection.start(
+            queue:
+                .global(
+                    qos:
+                        .userInitiated
+                )
+        )
+    }
+
+
+    // MARK: - Publish
+
+    private func send(
+        topic: String,
+        messageType: String,
+        message: [String: ROSValue]
+    ) {
+
+        let command =
+            ROSPublishCommand(
+                topic:
+                    topic,
+
+                messageType:
+                    messageType,
+
+                message:
+                    message
+            )
+
+
+        sendCommand(
+            command
+        )
+    }
+
+
+    // MARK: - Service Call
+
+    private func call(
+        service: String,
+        serviceType: String,
+        request: [String: ROSValue]
+    ) {
+
+        let command =
+            ROSServiceCommand(
+                service:
+                    service,
+
+                serviceType:
+                    serviceType,
+
+                request:
+                    request
+            )
+
+
+        sendCommand(
+            command
+        )
+    }
+
+
+    // MARK: - Send UDP Command
+
+    private func sendCommand<
+        Command: Encodable
+    >(
+        _ command: Command
+    ) {
+
+        guard let encodedCommand =
+            try? encoder.encode(
+                command
+            )
+
+        else {
+
+            print(
+                "# EDUARD UDP ERROR | Could not encode command"
+            )
+
+            return
+        }
+
+
+        if let json =
+            String(
+                data:
+                    encodedCommand,
+
+                encoding:
+                    .utf8
+            ) {
+
+            print(
+                "# EDUARD UDP SEND | \(json)"
+            )
+        }
+
+
+        var packet =
+            encodedCommand
+
+
+        // Python receiver expects every JSON
+        // command to end with a newline.
+        packet.append(
+            0x0A
+        )
+
+
+        connection.send(
+            content:
+                packet,
+
+            completion:
+                .contentProcessed { error in
+
+                    if let error {
+
+                        print(
+                            "# EDUARD UDP ERROR | \(error)"
+                        )
+                    }
+                }
+        )
+    }
+
+
+    // MARK: - Create Connection
+
+    private func makeConnection()
+        -> NWConnection {
+
+        let endpointHost =
+            NWEndpoint.Host(
+                targetHost
+            )
+
+        let endpointPort =
+            NWEndpoint.Port(
+                rawValue:
+                    targetPort
+            )
+            ?? 50505
+
+
+        return NWConnection(
+            host:
+                endpointHost,
+
+            port:
+                endpointPort,
+
+            using:
+                .udp
+        )
+    }
 
     private func send(
         topic: String,

@@ -102,7 +102,7 @@ final class RobotController:
 
     @Published private(set)
     var statusMessage =
-        "Connect the iPhone to the EduardBlue3 WiFi network first."
+        "Ready to enable Eduard."
 
 
     // MARK: - Robot Localization
@@ -202,16 +202,19 @@ final class RobotController:
 
     func connect() {
 
-        guard isConnected == false
-        else {
-            return
-        }
+        eduard.reconnect()
 
         isConnected =
             true
 
         statusMessage =
-            "Connected."
+            "Ready for Eduard."
+    }
+
+
+    func reconnect() {
+
+        connect()
     }
 
     func disconnect() {
@@ -245,14 +248,13 @@ final class RobotController:
 
     func sendEnable() {
 
-        guard isConnected
-        else {
+        // Recreate the UDP connection.
+        //
+        // This is especially important if the user
+        // opened WiFi Settings and connected to Eduard
+        // after the app had already been started.
 
-            statusMessage =
-                "Confirm the WiFi connection before sending Enable."
-
-            return
-        }
+        eduard.reconnect()
 
 
         eduard.setEnabled(
@@ -262,23 +264,22 @@ final class RobotController:
         )
 
 
+        isConnected =
+            true
+
         isEnabled =
             true
 
+
         statusMessage =
             "Enable active."
+
 
         startCommandLoop()
     }
 
 
     func sendDisable() {
-
-        guard isConnected
-        else {
-            return
-        }
-
 
         stopCommandLoop()
 
@@ -421,11 +422,6 @@ final class RobotController:
 
         case .real:
 
-            guard isConnected
-            else {
-                return
-            }
-
             eduard.setLightMode(
                 mode
             )
@@ -441,12 +437,9 @@ final class RobotController:
 
         case .synchronized:
 
-            if isConnected {
-
-                eduard.setLightMode(
-                    mode
-                )
-            }
+            eduard.setLightMode(
+                mode
+            )
 
             // Does nothing when the AR model is hidden.
             eduardSimulation
@@ -524,8 +517,7 @@ final class RobotController:
 
         case .real:
 
-            guard isConnected,
-                  isEnabled
+            guard isEnabled
 
             else {
                 return
@@ -555,8 +547,7 @@ final class RobotController:
 
         case .synchronized:
 
-            guard isConnected,
-                  isEnabled
+            guard isEnabled
 
             else {
                 return

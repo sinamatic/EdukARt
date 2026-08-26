@@ -9,6 +9,7 @@ import SwiftUI
 
 struct MainMenuView: View {
     @ObservedObject var eduardModelStore: EduardModelStore
+    @ObservedObject var controller: RobotController
     
     
     
@@ -36,7 +37,7 @@ struct MainMenuView: View {
                     .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
                 
                 NavigationLink{
-                    RobotRemoteView() }
+                    RobotRemoteView(controller: controller)}
                 label: {Text("Robot Remote")}
                 
                     .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))

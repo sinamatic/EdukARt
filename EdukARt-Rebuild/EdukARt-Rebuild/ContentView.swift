@@ -10,6 +10,8 @@ import SwiftUI
 struct ContentView: View {
 
     @ObservedObject var eduardModelStore: EduardModelStore
+    @ObservedObject var robotController = RobotController()
+
 
     @State private var showLogo = true
 
@@ -43,19 +45,28 @@ struct ContentView: View {
         } else {
 
             NavigationStack {
-                MainMenuView(
-                                    eduardModelStore: eduardModelStore
-                                )
-                .ignoresSafeArea()
-                    .preferredColorScheme(.dark)
-                    
-            }
-        }
-    }
-}
 
-#Preview {
-    ContentView(
-        eduardModelStore: EduardModelStore()
-    )
-}
+                           MainMenuView(
+                               eduardModelStore:
+                                   eduardModelStore,
+
+                               controller:
+                                   robotController
+                           )
+                       }
+                       .ignoresSafeArea()
+                       .preferredColorScheme(
+                           .dark
+                       )
+                   }
+               }
+           }
+
+
+           #Preview {
+
+               ContentView(
+                   eduardModelStore:
+                       EduardModelStore()
+               )
+           }
