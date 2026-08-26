@@ -246,6 +246,15 @@ final class RobotController:
     // MARK: - Enable / Disable
     // ======================================================
 
+    func toggleEnabled() {
+
+        if isEnabled {
+            sendDisable()
+        } else {
+            sendEnable()
+        }
+    }
+    
     func sendEnable() {
 
         // Recreate the UDP connection.
@@ -280,7 +289,8 @@ final class RobotController:
 
 
     func sendDisable() {
-
+        stopJoystick()
+        stopMechanumRotation()
         stopCommandLoop()
 
         eduard.setEnabled(
@@ -398,7 +408,6 @@ final class RobotController:
 
         sendCurrentCommand()
     }
-
 
     func stopMechanumRotation() {
 

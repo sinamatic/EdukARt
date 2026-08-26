@@ -21,6 +21,7 @@ struct ContentView: View {
 
     var body: some View {
 
+        ZStack {
         if showLogo {
 
             Image(
@@ -45,21 +46,33 @@ struct ContentView: View {
             }
 
         } else {
-
-            NavigationStack {
-
-                MainMenuView(
-                    eduardModelStore:
-                        eduardModelStore,
-
-                    controller:
-                        robotController
+            
+            
+                
+                NavigationStack {
+                    
+                    MainMenuView(
+                        eduardModelStore:
+                            eduardModelStore,
+                        
+                        controller:
+                            robotController
+                    )
+                }
+                .ignoresSafeArea()
+                .preferredColorScheme(
+                    .dark
                 )
             }
-            .ignoresSafeArea()
-            .preferredColorScheme(
-                .dark
-            )
+            
+            if showLogo == false {
+                RobotControlOverlay(
+                               controller:
+                                   robotController
+                           )
+                       }
+                
+                
         }
     }
 }

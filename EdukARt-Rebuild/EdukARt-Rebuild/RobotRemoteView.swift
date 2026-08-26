@@ -108,9 +108,11 @@ private extension RobotRemoteView {
                         }
                         
                         Button {
-                            controller.sendEnable()
+                            controller.toggleEnabled()
                         } label: {
-                            Label("Enable", systemImage: "power")
+                            Label(controller.isEnabled
+                                  ? "Disable"
+                                  : "Enable", systemImage: "power")
                                 .font(.caption.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
@@ -224,27 +226,12 @@ private extension RobotRemoteView {
                         joystickMonitor.xyPoint
                 ) { _, input in
 
-                    let center:
-                        CGFloat = 90
-
                     controller.updateJoystickInput(
                         x:
-                            Float(
-                                (
-                                    input.x
-                                    - center
-                                )
-                                / center
-                            ),
+                            Float(input.x / 180),
 
                         y:
-                            Float(
-                                (
-                                    input.y
-                                    - center
-                                )
-                                / center
-                            )
+                            Float(input.y / 180)
                     )
                 }
                 .onChange(
@@ -252,33 +239,36 @@ private extension RobotRemoteView {
                         turnJoystickMonitor.xyPoint
                 ) { _, input in
 
-                    let center:
-                        CGFloat = 60
-
-                    let rotation =
-                        (
+                    let x =
+                        Float(
                             input.x
-                            - center
+                            / 120
                         )
-                        / center
 
 
-                    if rotation < -0.1 {
+                    if abs(x) < 0.1 {
+
+                        controller.stopMechanumRotation()
+
+                    } else if x < 0 {
 
                         controller.startMechanumRotation(
                             .left
                         )
 
-                    } else if rotation > 0.1 {
+                    } else {
 
                         controller.startMechanumRotation(
                             .right
                         )
-
-                    } else {
-
-                        controller.stopMechanumRotation()
                     }
+                }
+                
+                .onDisappear {
+
+                    controller.stopJoystick()
+
+                    controller.stopMechanumRotation()
                 }
 
                 Text(
