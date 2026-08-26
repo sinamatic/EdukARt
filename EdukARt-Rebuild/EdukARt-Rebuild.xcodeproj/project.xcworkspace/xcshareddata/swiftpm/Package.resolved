@@ -1,6 +1,15 @@
 {
-  "originHash" : "13717d6ab333748691b81446de11c6650dd59a8be45b6aeb34f8ffe9e1a7ad12",
+  "originHash" : "8f7609f4fee06ba083c7da7f496ea67588d8a7ea83be6c077e676fb0abf6cdd4",
   "pins" : [
+    {
+      "identity" : "pingx",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/shineRR/pingx",
+      "state" : {
+        "revision" : "3fd8211bde0ce53e33ae9c27f8807a379ba78d21",
+        "version" : "1.1.0"
+      }
+    },
     {
       "identity" : "swiftapriltag",
       "kind" : "remoteSourceControl",

@@ -99,12 +99,11 @@ private extension RobotRemoteView {
                                 .font(.caption.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
-                                .background(.white.opacity(0.14))
+                                .background(controller.isConnected ? .green.opacity(0.8) : .red.opacity(0.8))
                                 .foregroundStyle(.white)
                                 .clipShape(
                                     RoundedRectangle(cornerRadius: 8)
                                 )
-                            // toDo change color to green when connected
                         }
                         
                         Button {
@@ -116,12 +115,11 @@ private extension RobotRemoteView {
                                 .font(.caption.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
-                                .background(.white.opacity(0.14))
-                                .foregroundStyle(.white)
+                                .background(controller.isEnabled ? .green.opacity(0.8) : .yellow.opacity(0.9))
+                                .foregroundStyle(controller.isEnabled ? .white : .black)
                                 .clipShape(
                                     RoundedRectangle(cornerRadius: 8)
                                 )
-                            // toDo change color to green when enabled, maybe use light switch ros topic?
                         }
                     }
                     .buttonStyle(.plain)
@@ -239,29 +237,13 @@ private extension RobotRemoteView {
                         turnJoystickMonitor.xyPoint
                 ) { _, input in
 
-                    let x =
-                        Float(
-                            input.x
-                            / 120
-                        )
+                    let rotationInput =
+                        Float(input.x / 120)
 
-
-                    if abs(x) < 0.1 {
-
-                        controller.stopMechanumRotation()
-
-                    } else if x < 0 {
-
-                        controller.startMechanumRotation(
-                            .left
-                        )
-
-                    } else {
-
-                        controller.startMechanumRotation(
-                            .right
-                        )
-                    }
+                    controller.updateMechanumRotationInput(
+                        x:
+                            rotationInput
+                    )
                 }
                 
                 .onDisappear {
@@ -364,7 +346,8 @@ private extension RobotRemoteView {
             )
             .foregroundStyle(.white)
             .onChange(of: allLightsColor) { _, color in
-                print("All Lights Color:", color)
+                let rgb = color.rgbComponents
+                controller.eduard.setAllLightsColor(red: rgb.red, green: rgb.green, blue: rgb.blue)
             }
             
             lightButtons([
@@ -390,7 +373,8 @@ private extension RobotRemoteView {
             )
             .foregroundStyle(.white)
             .onChange(of: signalColor) { _, color in
-                print("Blinker Color:", color)
+                let rgb = color.rgbComponents
+                controller.eduard.setSignalColor(red: rgb.red, green: rgb.green, blue: rgb.blue)
             }
             
             lightButtons([
@@ -442,6 +426,7 @@ private extension RobotRemoteView {
             }
         }
     }
+
 }
 
 // MARK: - Camera
@@ -621,6 +606,23 @@ private struct LightButtonStyle: ButtonStyle {
                 .easeOut(duration: 0.1),
                 value: configuration.isPressed
             )
+    }
+}
+
+
+private extension Color {
+
+    var rgbComponents: (red: Int, green: Int, blue: Int) {
+        let uiColor = UIColor(self)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        uiColor.getRed(&red, green: &green, blue: &blue, alpha: nil)
+        return (
+            Int((red * 255).rounded()),
+            Int((green * 255).rounded()),
+            Int((blue * 255).rounded())
+        )
     }
 }
 

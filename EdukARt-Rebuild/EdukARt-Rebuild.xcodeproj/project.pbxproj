@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		90819FA8303A106D00090B99 /* SwiftAprilTag in Frameworks */ = {isa = PBXBuildFile; productRef = 90819FA7303A106D00090B99 /* SwiftAprilTag */; };
 		90B4CBC6303846AE005FB20C /* SwiftUIJoystick in Frameworks */ = {isa = PBXBuildFile; productRef = 90B4CBC5303846AE005FB20C /* SwiftUIJoystick */; };
+		90EDCBCB303F56C6008E7D2E /* pingx in Frameworks */ = {isa = PBXBuildFile; productRef = 90EDCBCA303F56C6008E7D2E /* pingx */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				90EDCBCB303F56C6008E7D2E /* pingx in Frameworks */,
 				90819FA8303A106D00090B99 /* SwiftAprilTag in Frameworks */,
 				90B4CBC6303846AE005FB20C /* SwiftUIJoystick in Frameworks */,
 			);
@@ -74,6 +76,7 @@
 			packageProductDependencies = (
 				90B4CBC5303846AE005FB20C /* SwiftUIJoystick */,
 				90819FA7303A106D00090B99 /* SwiftAprilTag */,
+				90EDCBCA303F56C6008E7D2E /* pingx */,
 			);
 			productName = "EdukARt-Rebuild";
 			productReference = 90092AA13037942B00D9DE91 /* EdukARt-Rebuild.app */;
@@ -106,6 +109,7 @@
 			packageReferences = (
 				90B4CBC4303846AE005FB20C /* XCRemoteSwiftPackageReference "SwiftUIJoystick" */,
 				90819FA6303A106D00090B99 /* XCRemoteSwiftPackageReference "SwiftAprilTag" */,
+				90EDCBC9303F56C6008E7D2E /* XCRemoteSwiftPackageReference "pingx" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 90092AA23037942B00D9DE91 /* Products */;
@@ -365,6 +369,14 @@
 				minimumVersion = 1.5.0;
 			};
 		};
+		90EDCBC9303F56C6008E7D2E /* XCRemoteSwiftPackageReference "pingx" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/shineRR/pingx";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -377,6 +389,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 90B4CBC4303846AE005FB20C /* XCRemoteSwiftPackageReference "SwiftUIJoystick" */;
 			productName = SwiftUIJoystick;
+		};
+		90EDCBCA303F56C6008E7D2E /* pingx */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 90EDCBC9303F56C6008E7D2E /* XCRemoteSwiftPackageReference "pingx" */;
+			productName = pingx;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

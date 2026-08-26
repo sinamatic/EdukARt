@@ -63,15 +63,6 @@ final class RobotController:
     }
 
 
-    // MARK: - Rotation Direction
-
-    enum RotationDirection {
-
-        case left
-        case right
-    }
-
-
     // MARK: - Robots
 
     let eduard:
@@ -125,14 +116,17 @@ final class RobotController:
             y: 0.0
         )
 
-    private var activeRotationDirection:
-        RotationDirection?
+    private var mechanumRotationInput =
+        0.0
 
 
     // MARK: - Settings
 
     private let commandRepeatInterval =
         0.05
+
+    private let connectionCheckInterval =
+        2.0
 
     private let joystickDeadZone =
         0.05
@@ -151,6 +145,12 @@ final class RobotController:
 
     private var commandTimer:
         Timer?
+
+    private var connectionTimer:
+        Timer?
+
+    private var isCheckingConnection =
+        false
 
 
     // MARK: - Connection State
@@ -186,12 +186,17 @@ final class RobotController:
 
         self.eduardSimulation =
             eduardSimulation
+
+        startConnectionChecks()
     }
 
 
     deinit {
 
         commandTimer?
+            .invalidate()
+
+        connectionTimer?
             .invalidate()
     }
 
@@ -217,6 +222,21 @@ final class RobotController:
         connect()
     }
 
+    func checkConnection() {
+        guard isCheckingConnection == false else { return }
+        isCheckingConnection =
+            true
+
+        eduard.checkConnection { [weak self] isConnected in
+            DispatchQueue.main.async {
+                self?.isCheckingConnection =
+                    false
+
+                self?.updateConnectionState(isConnected)
+            }
+        }
+    }
+
     func disconnect() {
 
         stopCommandLoop()
@@ -228,8 +248,8 @@ final class RobotController:
         activeJoystickDirection =
             .idle
 
-        activeRotationDirection =
-            nil
+        mechanumRotationInput =
+            0
 
         isConnected =
             false
@@ -239,6 +259,28 @@ final class RobotController:
 
         statusMessage =
             "Disconnected."
+    }
+
+    private func updateConnectionState(_ connected: Bool) {
+        let wasConnected =
+            isConnected
+
+        isConnected =
+            connected
+
+        if connected == false {
+            isEnabled =
+                false
+
+            stopCommandLoop()
+        }
+
+        if connected != wasConnected || connected == false {
+            statusMessage =
+                connected
+                ? "Eduard connected."
+                : "No active connection to Eduard."
+        }
     }
 
 
@@ -392,9 +434,8 @@ final class RobotController:
     // MARK: - Rotation
     // ======================================================
 
-    func startMechanumRotation(
-        _ direction:
-            RotationDirection
+    func updateMechanumRotationInput(
+        x: Float
     ) {
 
         guard driveMode == .mechanum
@@ -403,16 +444,24 @@ final class RobotController:
         }
 
 
-        activeRotationDirection =
-            direction
+        let input =
+            Double(x)
+
+        mechanumRotationInput =
+            abs(input) < joystickDeadZone
+            ? 0
+            : min(
+                max(input, -1),
+                1
+            )
 
         sendCurrentCommand()
     }
 
     func stopMechanumRotation() {
 
-        activeRotationDirection =
-            nil
+        mechanumRotationInput =
+            0
 
         sendCurrentCommand()
     }
@@ -457,7 +506,6 @@ final class RobotController:
                 )
         }
     }
-
 
     // ======================================================
     // MARK: - Robot Pose
@@ -603,29 +651,22 @@ final class RobotController:
             Double
 
 
-        switch activeRotationDirection {
+        if driveMode == .mechanum {
 
-        case .left:
             rotation =
-                maxAngularSpeed
+                -mechanumRotationInput
+                * maxAngularSpeed
 
-        case .right:
+        } else if driveMode == .offroad {
+
             rotation =
-                -maxAngularSpeed
+                -joystickInput.x
+                * maxAngularSpeed
 
-        case nil:
+        } else {
 
-            if driveMode == .offroad {
-
-                rotation =
-                    -joystickInput.x
-                    * maxAngularSpeed
-
-            } else {
-
-                rotation =
-                    0
-            }
+            rotation =
+                0
         }
 
 
@@ -721,6 +762,25 @@ final class RobotController:
 
         commandTimer =
             nil
+    }
+
+
+    private func startConnectionChecks() {
+
+        checkConnection()
+
+        connectionTimer =
+            Timer.scheduledTimer(
+                withTimeInterval:
+                    connectionCheckInterval,
+
+                repeats:
+                    true
+            ) { [weak self] _ in
+
+                self?
+                    .checkConnection()
+            }
     }
 
 

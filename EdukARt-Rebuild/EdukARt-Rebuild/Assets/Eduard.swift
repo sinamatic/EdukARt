@@ -9,6 +9,7 @@
 
 import Foundation
 import Network
+import pingx
 
 
 final class Eduard {
@@ -420,6 +421,9 @@ final class Eduard {
 
     private var connection:
         NWConnection
+
+    private let connectionPinger =
+        Pinger()
 
     private let encoder =
         JSONEncoder()
@@ -895,24 +899,24 @@ final class Eduard {
             message: [
 
                 "lighting_name":
-                    command.lightingName,
+                    .string(command.lightingName),
 
                 "r":
-                    command.red,
+                    .int(command.red),
 
                 "g":
-                    command.green,
+                    .int(command.green),
 
                 "b":
-                    command.blue,
+                    .int(command.blue),
 
-                "brightness": [
+                "brightness": .object([
                     "data":
-                        command.brightness
-                ],
+                        .double(command.brightness)
+                ]),
 
                 "mode":
-                    command.mode.rawValue
+                    .int(command.mode.rawValue)
             ]
         )
     }
@@ -1210,6 +1214,18 @@ final class Eduard {
         )
     }
 
+    func checkConnection(timeout: TimeInterval = 1, completion: @escaping (Bool) -> Void) {
+        guard let destination = try? IPv4Address(address: targetHost) else {
+            completion(false)
+            return
+        }
+
+        let request = Request(destination: destination, timeoutInterval: .seconds(timeout))
+        connectionPinger.ping(request: request) { result in
+            completion((try? result.get()) != nil)
+        }
+    }
+
 
     // MARK: - Publish
 
@@ -1362,22 +1378,4 @@ final class Eduard {
         )
     }
 
-    private func send(
-        topic: String,
-        messageType: String,
-        message: [String: Any]
-    ) {
-
-        // Existing UDP/ROS transport goes here.
-    }
-
-
-    private func call(
-        service: String,
-        serviceType: String,
-        request: [String: Any]
-    ) {
-
-        // Existing UDP/ROS transport goes here.
-    }
 }
