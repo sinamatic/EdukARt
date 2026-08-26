@@ -73,6 +73,7 @@ public struct JoystickView: View {
                 locksInPlace: false
             )
             .frame(width: 120, height: 70)
+            .offset(x: 10)
             
             JoystickBuilder(
                 monitor: joystickMonitor,

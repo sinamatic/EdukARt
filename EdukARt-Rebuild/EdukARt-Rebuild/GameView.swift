@@ -56,12 +56,12 @@ struct GameView: View {
             )
 
 
-            // MARK: - Debug Joystick Values
-
-            Text(
-                "Forward: \(joystickMonitor.xyPoint.y, specifier: "%.1f")  Sideways: \(joystickMonitor.xyPoint.x, specifier: "%.1f")  Turn: \(turnJoystickMonitor.xyPoint.x, specifier: "%.1f")"
-            )
-            .font(.caption)
+//            // MARK: - Debug Joystick Values
+//
+//            Text(
+//                "Forward: \(joystickMonitor.xyPoint.y, specifier: "%.1f")  Sideways: \(joystickMonitor.xyPoint.x, specifier: "%.1f")  Turn: \(turnJoystickMonitor.xyPoint.x, specifier: "%.1f")"
+//            )
+//            .font(.caption)
 
 
             // MARK: - Joystick

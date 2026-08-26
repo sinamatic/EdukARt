@@ -8,30 +8,22 @@
 //
 
 import SwiftUI
-
+import SwiftUIJoystick
 
 // MARK: - Create Map View
 
 struct CreateMapView: View {
 
-    @ObservedObject var mapBuilder:
-        AprilTagMapBuilder
+    @ObservedObject var eduardModelStore: EduardModelStore
+    @ObservedObject var mapBuilder: AprilTagMapBuilder
+    @ObservedObject var gameMapStore: GameMapStore
 
-    @ObservedObject var gameMapStore:
-        GameMapStore
-    
+    @StateObject private var joystickMonitor = JoystickMonitor()
+    @StateObject private var turnJoystickMonitor = JoystickMonitor()
     @StateObject private var track = Track()
-    
-    @State private var isCreatingMap =
-        false
 
-
-    @State private var mapName =
-        ""
-
-    @State private var showNameDialog =
-        false
-
+    @State private var mapName = ""
+    @State private var showNameDialog = false
 
     // MARK: - Body
 
@@ -39,219 +31,185 @@ struct CreateMapView: View {
 
         ZStack {
 
-            // --------------------------------------------------
-            // Semi-transparent background
-            // --------------------------------------------------
+            CameraARView(
+                eduardModelStore: eduardModelStore,
+                joystickMonitor: joystickMonitor,
+                turnJoystickMonitor: turnJoystickMonitor,
+                mapBuilder: mapBuilder
+            )
+            .ignoresSafeArea()
 
-            Color.black
-                .opacity(0.8)
-                .ignoresSafeArea()
+            VStack(spacing: 0) {
+                Color.black
+                    .opacity(0.5)
+                    .frame(height: 190)
 
+                Color.black
+                    .opacity(0.2)
 
-            // --------------------------------------------------
-            // Content
-            // --------------------------------------------------
+                Color.black
+                    .opacity(0.5)
+                    .frame(height: 160)
+            }
+            .ignoresSafeArea()
 
-            VStack(
-                spacing: 20
-            ) {
+            AprilTagMapView(
+                mapBuilder: mapBuilder,
+                track: track,
+                mapWidthFactor: 2.0 / 3.0,
+                mapAlignment: .center,
+                showsClearTrackButton: false
+            )
+            .ignoresSafeArea()
 
-                // MARK: Title
-
-                Button(
-                    "Create Map"
-                ) {
-
-                    mapBuilder.reset()
-
-                    isCreatingMap =
-                        true
-                }
-                
-                .font(
-                    .title2
-                        .bold()
-                )
-                .foregroundStyle(
-                    .white
-                )
-
-
-                // MARK: Instructions
-
-                Text(
-                    mapBuilder.referenceTagID == nil
-                    ? "Scan the first AprilTag to define the map reference."
-                    : "Move through the room and scan the remaining AprilTags."
-                )
-                .font(
-                    .subheadline
-                )
-                .foregroundStyle(
-                    .white.opacity(0.8)
-                )
-
-
-                // MARK: Reference Tag
-
-                if let referenceTagID =
-                    mapBuilder.referenceTagID {
-
-                    HStack {
-
-                        Circle()
-                            .fill(
-                                .white
-                            )
-                            .frame(
-                                width: 8,
-                                height: 8
-                            )
-
-                        Text(
-                            "Reference Tag #\(referenceTagID)"
-                        )
-                        .font(
-                            .headline
-                        )
-                        .foregroundStyle(
-                            .white
-                        )
-                    }
-                }
-
-
-                // MARK: AprilTag Map
-
-                AprilTagMapView(
-                    mapBuilder: mapBuilder,
-                    track: track
-                )
-
+            VStack(spacing: 0) {
+                headerView
+                    .frame(height: 138, alignment: .top)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
 
                 Spacer()
 
-
-                // MARK: Detected Tags
-
-                Text(
-                    "\(mapBuilder.mapPoints.count) AprilTags mapped"
-                )
-                .font(
-                    .caption
-                )
-                .foregroundStyle(
-                    .white.opacity(0.7)
-                )
-
-
-                // MARK: Save
-
-                Button(
-                    "Save AprilTag Positions"
-                ) {
-
-                    showNameDialog =
-                        true
-                }
-                .buttonStyle(
-                    .borderedProminent
-                )
-                .disabled(
-                    mapBuilder.referenceTagID == nil
-                )
-                
-                
+                footerView
+                    .frame(height: 116, alignment: .bottom)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
             }
-            .padding(24)
-            
-            if isCreatingMap {
-
-                CreateMapView(
-                    mapBuilder:
-                        mapBuilder,
-
-                    gameMapStore:
-                        gameMapStore
-                )
-            }
-            
-            
+        }
+        .navigationTitle("Create Map")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            mapBuilder.reset()
+            track.reset()
+            mapName = ""
         }
         .alert(
             "Map Name",
-            isPresented:
-                $showNameDialog
+            isPresented: $showNameDialog
         ) {
-
             TextField(
                 "Name",
-                text:
-                    $mapName
+                text: $mapName
             )
-
 
             Button(
                 "Cancel",
-                role:
-                    .cancel
+                role: .cancel
             ) {}
 
-
-            Button(
-                "Save"
-            ) {
-
+            Button("Save") {
                 saveMap()
             }
             .disabled(
                 mapName
-                    .trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    )
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
                     .isEmpty
             )
-
         } message: {
-
-            Text(
-                "Enter a name for the new game map."
-            )
+            Text("Enter a name for the new game map.")
         }
     }
 
+    // MARK: - Header
+
+    private var headerView: some View {
+        VStack(spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Create Map")
+                        .font(.title2.bold())
+                        .foregroundStyle(.white)
+
+                    Text(
+                        mapBuilder.referenceTagID == nil
+                        ? "Scan the first AprilTag to define the map reference."
+                        : "Move through the room and scan the remaining AprilTags."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(2)
+                    .frame(height: 40, alignment: .topLeading)
+                }
+
+                Spacer()
+
+                Button("Reset") {
+                    mapBuilder.reset()
+                    track.reset()
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+            }
+
+            Group {
+                if let referenceTagID = mapBuilder.referenceTagID {
+                    HStack {
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 8, height: 8)
+
+                        Text("Reference Tag #\(referenceTagID)")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                    }
+                } else {
+                    Color.clear
+                }
+            }
+            .frame(height: 28)
+        }
+    }
+
+    // MARK: - Footer
+
+    private var footerView: some View {
+        VStack(spacing: 14) {
+            Text("\(mapBuilder.mapPoints.count) AprilTags mapped")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.7))
+
+            Button("Save AprilTag Positions") {
+                showNameDialog = true
+            }
+            .buttonStyle(CreateMapButtonStyle(color: Color("BrandGreen")))
+            .disabled(mapBuilder.referenceTagID == nil)
+            .opacity(mapBuilder.referenceTagID == nil ? 0.45 : 1)
+        }
+    }
 
     // MARK: - Save Map
 
     private func saveMap() {
 
-        let name =
-            mapName
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
+        let name = mapName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
-
-        guard name.isEmpty == false
-        else {
+        guard name.isEmpty == false else {
             return
         }
 
-
-        guard let gameMap =
-            mapBuilder.createGameMap(
-                name:
-                    name
-            )
-        else {
+        guard let gameMap = mapBuilder.createGameMap(name: name) else {
             return
         }
 
+        gameMapStore.save(gameMap)
+        mapName = ""
+    }
+}
 
-        gameMapStore.save(
-            gameMap
-        )
+private struct CreateMapButtonStyle: ButtonStyle {
+
+    let color: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .foregroundStyle(.white)
+            .padding()
+            .background(color)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }

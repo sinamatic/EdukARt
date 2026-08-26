@@ -28,7 +28,10 @@ struct MainMenuView: View {
                 
                 
                 NavigationLink {
-                    StartGameView()
+                    StartGameView(
+                        eduardModelStore: eduardModelStore,
+                        gameMapStore: gameMapStore
+                    )
                 } label: {Text("Start Game")}
                     .buttonStyle(MenuButtonStyle(color: Color("BrandGreen")))
                 

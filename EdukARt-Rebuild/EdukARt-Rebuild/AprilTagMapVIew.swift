@@ -13,14 +13,26 @@ struct AprilTagMapView: View {
     @ObservedObject var mapBuilder: AprilTagMapBuilder
     @ObservedObject var track: Track
 
+    let mapWidthFactor: CGFloat
+    let mapAlignment: Alignment
+    let showsClearTrackButton: Bool
+
+    init(
+        mapBuilder: AprilTagMapBuilder,
+        track: Track,
+        mapWidthFactor: CGFloat = 1.0 / 3.0,
+        mapAlignment: Alignment = .topTrailing,
+        showsClearTrackButton: Bool = true
+    ) {
+        self.mapBuilder = mapBuilder
+        self.track = track
+        self.mapWidthFactor = mapWidthFactor
+        self.mapAlignment = mapAlignment
+        self.showsClearTrackButton = showsClearTrackButton
+    }
+
 
     // MARK: - Settings
-
-    // Size of the square map relative to the screen width.
-    //
-    // 1 / 3 = one third of the available screen width.
-    private let mapWidthFactor:
-        CGFloat = 1.0 / 3.0
 
     // Inner spacing between the map border
     // and the AprilTag positions.
@@ -54,72 +66,83 @@ struct AprilTagMapView: View {
 
         GeometryReader { geometry in
 
+            let maximumMapSize =
+                min(
+                    geometry.size.width,
+                    geometry.size.height
+                )
+
             let mapSize =
-                geometry.size.width
-                * mapWidthFactor
+                min(
+                    geometry.size.width * mapWidthFactor,
+                    maximumMapSize
+                )
+
+            ZStack(alignment: .topTrailing) {
+
+                ZStack {
+
+                    // Map background
+                    Color.black
+                        .opacity(0.52)
 
 
-            ZStack {
+                    if mapBuilder.mapPoints.isEmpty {
 
-                // Map background
-                Color.black
-                    .opacity(0.65)
+                        Text(
+                            "No AprilTags mapped yet"
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .font(
+                            .caption
+                        )
 
+                    } else {
 
-                if mapBuilder.mapPoints.isEmpty {
-
-                    Text(
-                        "No AprilTags mapped yet"
+                        mapContent(
+                            size: mapSize
+                        )
+                    }
+                }
+                .frame(
+                    width: mapSize,
+                    height: mapSize
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            cornerRadius
                     )
-                    .foregroundStyle(
-                        .white
-                    )
-                    .font(
-                        .caption
-                    )
+                )
+                .overlay {
 
-                } else {
-
-                    mapContent(
-                        size: mapSize
+                    RoundedRectangle(
+                        cornerRadius:
+                            cornerRadius
+                    )
+                    .stroke(
+                        Color.white
+                            .opacity(0.7),
+                        lineWidth: 1
                     )
                 }
-            }
-            .frame(
-                width: mapSize,
-                height: mapSize
-            )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius:
-                        cornerRadius
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: mapAlignment
                 )
-            )
-            .overlay {
 
-                RoundedRectangle(
-                    cornerRadius:
-                        cornerRadius
-                )
-                .stroke(
-                    Color.white
-                        .opacity(0.7),
-                    lineWidth: 1
-                )
-            }
-            
-            Button(
-                "Clear Track"
-            ) {
+                if showsClearTrackButton {
+                    Button(
+                        "Clear Track"
+                    ) {
 
-                track.reset()
+                        track.reset()
+                    }
+                }
             }
-            
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity,
-                alignment: .topTrailing
-            )
         }
     }
 
@@ -451,48 +474,31 @@ struct AprilTagMapView: View {
                 )
 
 
-            // White border
+            // Tag border
             Rectangle()
                 .stroke(
-                    Color.white,
+                    point.isReference
+                    ? Color.red.opacity(0.85)
+                    : Color.white,
                     lineWidth: 2
                 )
 
 
-            // Reference tag
-            if point.isReference {
+            Text(
+                "\(point.id)"
+            )
+            .foregroundStyle(
+                .white
+            )
+            .font(
+                .system(
+                    size:
+                        tagFontSize,
 
-                Circle()
-                    .fill(
-                        Color.white
-                    )
-                    .frame(
-                        width:
-                            referenceDotSize,
-
-                        height:
-                            referenceDotSize
-                    )
-
-            } else {
-
-                // Other map tags
-                Text(
-                    "\(point.id)"
+                    weight:
+                        .bold
                 )
-                .foregroundStyle(
-                    .white
-                )
-                .font(
-                    .system(
-                        size:
-                            tagFontSize,
-
-                        weight:
-                            .bold
-                    )
-                )
-            }
+            )
         }
         .frame(
             width:
