@@ -14,9 +14,11 @@ struct ContentView: View {
 
     @StateObject private var robotController =
         RobotController()
+    
+    @StateObject private var gameMapStore =
+        GameMapStore()
 
-    @State private var showLogo =
-        true
+    @State private var showLogo = true
 
 
     var body: some View {
@@ -56,7 +58,11 @@ struct ContentView: View {
                             eduardModelStore,
                         
                         controller:
-                            robotController
+                            robotController,
+                        
+                        gameMapStore:
+                            gameMapStore
+                        
                     )
                 }
                 .ignoresSafeArea()

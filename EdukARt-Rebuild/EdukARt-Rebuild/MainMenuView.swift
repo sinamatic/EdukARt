@@ -10,6 +10,7 @@ import SwiftUI
 struct MainMenuView: View {
     @ObservedObject var eduardModelStore: EduardModelStore
     @ObservedObject var controller: RobotController
+    @ObservedObject var gameMapStore: GameMapStore
     
     
     
@@ -129,7 +130,11 @@ struct MainMenuView: View {
                 EduardModelStore(),
 
             controller:
-                RobotController()
+                RobotController(),
+            
+            gameMapStore:
+                GameMapStore()
+            
         )
         
     }

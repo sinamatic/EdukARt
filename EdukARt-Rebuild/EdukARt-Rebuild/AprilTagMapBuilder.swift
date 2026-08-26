@@ -163,7 +163,7 @@ final class AprilTagMapBuilder: ObservableObject {
         else {
 
             print(
-                "# MAP BUILDER WAITING | ID \(pose.id) has no known neighbour within 2 m"
+                "# MAP BUILDER WAITING | ID \(pose.id) has no known neighbour within \(maximumNeighborDistance) m"
             )
 
             return
@@ -410,6 +410,50 @@ final class AprilTagMapBuilder: ObservableObject {
         return atan2(
             sineSum,
             cosineSum
+        )
+    }
+    
+    // MARK: - Create Game Map
+
+    func createGameMap(
+        name: String
+    ) -> GameMap? {
+
+        // A map cannot be saved without a reference tag.
+        guard let referenceTagID
+        else {
+            return nil
+        }
+
+        // Convert the temporary AprilTag map points
+        // into persistent map data.
+        let storedTags =
+            mapPoints.map { point in
+
+                StoredAprilTag(
+                    id:
+                        point.id,
+
+                    x:
+                        point.x,
+
+                    z:
+                        point.z,
+
+                    rotation:
+                        point.rotation
+                )
+            }
+
+        return GameMap(
+            name:
+                name,
+
+            referenceTagID:
+                referenceTagID,
+
+            aprilTags:
+                storedTags
         )
     }
 
