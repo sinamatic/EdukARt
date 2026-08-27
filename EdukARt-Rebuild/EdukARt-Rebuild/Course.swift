@@ -68,7 +68,7 @@ final class Course:
         // --------------------------------------------------
 
         let minimumPointDistance:
-            Float = 0.03
+            Float = 0.01
 
 
         let distance =
@@ -99,5 +99,4 @@ final class Course:
         rawPoints.removeAll()
     }
 }
-
 

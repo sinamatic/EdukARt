@@ -20,36 +20,37 @@ struct CoursesView: View {
 
     var body: some View {
         MapMenuBackground {
-            VStack(spacing: 20) {
-                MapMenuPanel {
-                    Text("Courses")
-                        .mapMenuTitleStyle()
+            MapMenuPanel(fillsHeight: true) {
+                Text("Courses")
+                    .mapMenuTitleStyle()
 
-                    NavigationLink {
-                        CreateMapView(
-                            eduardModelStore: eduardModelStore,
-                            mapBuilder: mapBuilder,
-                            gameMapStore: gameMapStore
-                        )
-                    } label: {
-                        Text("Create Course")
-                    }
-                    .buttonStyle(MapMenuButtonStyle(color: Color("BrandGreen")))
-
-                    Text("Saved Maps")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-
-                    SavedMapsListView(
-                        gameMapStore: gameMapStore,
-                        showsCourseActions: true,
-                        onEdit: beginEditing,
-                        onDelete: gameMapStore.delete
+                NavigationLink {
+                    CreateMapView(
+                        eduardModelStore: eduardModelStore,
+                        mapBuilder: mapBuilder,
+                        gameMapStore: gameMapStore
                     )
+                } label: {
+                    Text("Create Course")
                 }
+                .buttonStyle(MapMenuButtonStyle(color: Color("BrandGreen")))
 
-                Spacer()
+                Text("Saved Maps")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+
+                Text("Swipe a course to edit or delete it.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.65))
+
+                SavedMapsListView(
+                    gameMapStore: gameMapStore,
+                    showsCourseActions: true,
+                    onEdit: beginEditing,
+                    onDelete: gameMapStore.delete
+                )
             }
+            .padding(.bottom, 50)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)

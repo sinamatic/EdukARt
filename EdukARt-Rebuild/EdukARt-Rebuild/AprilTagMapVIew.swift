@@ -16,6 +16,7 @@ struct AprilTagMapView: View {
     let mapWidthFactor: CGFloat
     let mapAlignment: Alignment
     let showsClearCourseButton: Bool
+    let allowsCourseDrawing: Bool
     let backgroundColor: Color
     let borderColor: Color
     let borderLineWidth: CGFloat
@@ -26,6 +27,7 @@ struct AprilTagMapView: View {
         mapWidthFactor: CGFloat = 1.0 / 3.0,
         mapAlignment: Alignment = .topTrailing,
         showsClearCourseButton: Bool = true,
+        allowsCourseDrawing: Bool = false,
         backgroundColor: Color = Color.black.opacity(0.52),
         borderColor: Color = Color.white.opacity(0.7),
         borderLineWidth: CGFloat = 1
@@ -35,6 +37,7 @@ struct AprilTagMapView: View {
         self.mapWidthFactor = mapWidthFactor
         self.mapAlignment = mapAlignment
         self.showsClearCourseButton = showsClearCourseButton
+        self.allowsCourseDrawing = allowsCourseDrawing
         self.backgroundColor = backgroundColor
         self.borderColor = borderColor
         self.borderLineWidth = borderLineWidth
@@ -46,7 +49,7 @@ struct AprilTagMapView: View {
     // Inner spacing between the map border
     // and the AprilTag positions.
     private let mapPadding:
-        CGFloat = 10
+        CGFloat = 28
 
     // Minimum displayed map extent in metres.
     //
@@ -242,7 +245,8 @@ struct AprilTagMapView: View {
 
 
         return ZStack {
-            
+            backgroundColor.opacity(0.001)
+
             // --------------------------------------------------
             // Draw Course
             // --------------------------------------------------
@@ -303,6 +307,15 @@ struct AprilTagMapView: View {
         .frame(
             width: size,
             height: size
+        )
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            courseDrawingGesture(
+                bounds: bounds,
+                scale: scale,
+                horizontalOffset: horizontalOffset,
+                verticalOffset: verticalOffset
+            )
         )
     }
     
@@ -424,6 +437,10 @@ struct AprilTagMapView: View {
                 0
         )
         .onChanged { value in
+
+            guard allowsCourseDrawing else {
+                return
+            }
 
             // --------------------------------------------------
             // Screen -> Map

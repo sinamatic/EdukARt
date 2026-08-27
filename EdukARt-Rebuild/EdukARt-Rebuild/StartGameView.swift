@@ -106,12 +106,14 @@ struct MapMenuBackground<Content: View>: View {
 
 struct MapMenuPanel<Content: View>: View {
 
+    var fillsHeight = false
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             content
         }
+        .frame(maxHeight: fillsHeight ? .infinity : nil, alignment: .top)
         .padding(18)
         .background(Color.black.opacity(0.76))
         .clipShape(RoundedRectangle(cornerRadius: 18))
@@ -161,7 +163,7 @@ struct SavedMapsListView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .frame(maxHeight: 320)
+                .frame(maxHeight: 366)
             }
         }
     }
@@ -216,7 +218,7 @@ struct MapCardView: View {
         .padding(12)
         .background(
             isSelected
-            ? Color("BrandGreen").opacity(0.28)
+            ? Color("BrandGreen").opacity(0.42)
             : Color("BlackOverlay")
         )
         .overlay {
