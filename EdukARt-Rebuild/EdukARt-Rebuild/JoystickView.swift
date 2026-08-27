@@ -39,17 +39,17 @@ public struct JoystickView: View {
     }
     
     public var body: some View {
-        HStack(alignment: .bottom, spacing: 40) {
+        HStack(alignment: .bottom, spacing: 20) {
             TranslationJoystickControl(
                 monitor: turnJoystickMonitor,
                 width: 120,
                 maximumMonitorValue: 120,
                 background: {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 50)
+                        RoundedRectangle(cornerRadius: 35)
                             .fill(.white.opacity(0.1))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 50)
+                                RoundedRectangle(cornerRadius: 35)
                                     .stroke(
                                         .white.opacity(0.36),
                                         lineWidth: 2
@@ -57,13 +57,13 @@ public struct JoystickView: View {
                             )
                         
                         Image(systemName: "arrow.counterclockwise")
-                            .offset(x: -40)
+                            .offset(x: -34)
                         
                         Image(systemName: "arrow.clockwise")
-                            .offset(x: 40)
+                            .offset(x: 34)
                     }
                     .foregroundStyle(.white)
-                    .frame(width: 150, height: 70)
+                    .frame(width: 120, height: 70)
                 },
                 foreground: {
                     Circle()
@@ -72,7 +72,6 @@ public struct JoystickView: View {
                 }
             )
             .frame(width: 120, height: 70)
-            .offset(x: 10)
             
             TranslationJoystickControl(
                 monitor: joystickMonitor,
@@ -117,6 +116,7 @@ public struct JoystickView: View {
             )
         }
         .padding(.bottom, 10)
+        .padding(.horizontal, 8)
     }
 }
 
