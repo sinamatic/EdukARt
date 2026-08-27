@@ -22,10 +22,10 @@ struct StartGameView: View {
         MapMenuBackground {
             VStack(spacing: 20) {
                 MapMenuPanel {
-                    Text("Select Map")
+                    Text("Select Course")
                         .mapMenuTitleStyle()
 
-                    Text("Select a map to start the game or go back to Courses to create or edit maps.")
+                    Text("Select a Course to start the game or go to Courses to create or edit them.")
                         .mapMenuSubtitleStyle()
 
                     SavedMapsListView(

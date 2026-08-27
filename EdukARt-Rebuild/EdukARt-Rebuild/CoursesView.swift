@@ -32,7 +32,7 @@ struct CoursesView: View {
                             gameMapStore: gameMapStore
                         )
                     } label: {
-                        Text("Create Map")
+                        Text("Create Course")
                     }
                     .buttonStyle(MapMenuButtonStyle(color: Color("BrandGreen")))
 

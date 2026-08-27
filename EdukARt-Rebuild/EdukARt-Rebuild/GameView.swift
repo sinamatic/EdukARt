@@ -27,7 +27,7 @@ struct GameView: View {
     // MARK: - AprilTag Map
 
     @StateObject private var mapBuilder = AprilTagMapBuilder()
-    @StateObject private var track = Track()
+    @StateObject private var course = Course()
 
     var body: some View {
 
@@ -52,8 +52,8 @@ struct GameView: View {
             
             AprilTagMapView(
                 mapBuilder: mapBuilder,
-                track: track,
-                showsClearTrackButton: false,
+                course: course,
+                showsClearCourseButton: false,
                 backgroundColor: .white.opacity(0.1),
                 borderColor: .white.opacity(0.36),
                 borderLineWidth: 2

@@ -1,5 +1,5 @@
 //
-//  Track.swift
+//  Course.swift
 //  EdukARt-Rebuild
 //
 //  Created by Sina Steinmüller on 26.08.26.
@@ -10,9 +10,9 @@ import simd
 import Combine
 
 
-// MARK: - Track
+// MARK: - Course
 
-final class Track:
+final class Course:
     ObservableObject {
 
     // Raw points recorded from finger input.

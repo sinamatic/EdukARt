@@ -20,7 +20,7 @@ struct CreateMapView: View {
 
     @StateObject private var joystickMonitor = JoystickMonitor()
     @StateObject private var turnJoystickMonitor = JoystickMonitor()
-    @StateObject private var track = Track()
+    @StateObject private var course = Course()
 
     @State private var mapName = ""
     @State private var showNameDialog = false
@@ -55,16 +55,16 @@ struct CreateMapView: View {
 
             AprilTagMapView(
                 mapBuilder: mapBuilder,
-                track: track,
+                course: course,
                 mapWidthFactor: 2.0 / 3.0,
                 mapAlignment: .center,
-                showsClearTrackButton: false
+                showsClearCourseButton: false
             )
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 headerView
-                    .frame(height: 138, alignment: .top)
+                    .frame(height: 170, alignment: .top)
                     .padding(.horizontal, 24)
                     .padding(.top, 16)
 
@@ -76,11 +76,11 @@ struct CreateMapView: View {
                     .padding(.bottom, 24)
             }
         }
-        .navigationTitle("Create Map")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             mapBuilder.reset()
-            track.reset()
+            course.reset()
             mapName = ""
         }
         .alert(
@@ -114,32 +114,26 @@ struct CreateMapView: View {
 
     private var headerView: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Create Map")
-                        .font(.title2.bold())
-                        .foregroundStyle(.white)
-
-                    Text(
-                        mapBuilder.referenceTagID == nil
-                        ? "Scan the first AprilTag to define the map reference."
-                        : "Move through the room and scan the remaining AprilTags."
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.8))
-                    .lineLimit(2)
-                    .frame(height: 40, alignment: .topLeading)
-                }
-
-                Spacer()
+            ZStack(alignment: .trailing) {
+                Text("① Create Map")
+                    .mapMenuTitleStyle()
 
                 Button("Reset") {
                     mapBuilder.reset()
-                    track.reset()
+                    course.reset()
                 }
                 .buttonStyle(.bordered)
                 .tint(.white)
             }
+
+            Text(
+                mapBuilder.referenceTagID == nil
+                ? "Scan the first AprilTag to define the map reference."
+                : "Move through the room and scan the remaining AprilTags."
+            )
+            .mapMenuSubtitleStyle()
+            .lineLimit(2)
+            .frame(height: 40, alignment: .top)
 
             Group {
                 if let referenceTagID = mapBuilder.referenceTagID {
@@ -171,7 +165,7 @@ struct CreateMapView: View {
             Button("Save AprilTag Positions") {
                 showNameDialog = true
             }
-            .buttonStyle(CreateMapButtonStyle(color: Color("BrandGreen")))
+            .buttonStyle(MapMenuButtonStyle(color: Color("BrandGreen")))
             .disabled(mapBuilder.referenceTagID == nil)
             .opacity(mapBuilder.referenceTagID == nil ? 0.45 : 1)
         }
@@ -197,19 +191,3 @@ struct CreateMapView: View {
     }
 }
 
-private struct CreateMapButtonStyle: ButtonStyle {
-
-    let color: Color
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-            .foregroundStyle(.white)
-            .padding()
-            .background(color)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}

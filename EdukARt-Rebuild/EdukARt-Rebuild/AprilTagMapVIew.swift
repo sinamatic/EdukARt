@@ -11,30 +11,30 @@ import SwiftUI
 struct AprilTagMapView: View {
 
     @ObservedObject var mapBuilder: AprilTagMapBuilder
-    @ObservedObject var track: Track
+    @ObservedObject var course: Course
 
     let mapWidthFactor: CGFloat
     let mapAlignment: Alignment
-    let showsClearTrackButton: Bool
+    let showsClearCourseButton: Bool
     let backgroundColor: Color
     let borderColor: Color
     let borderLineWidth: CGFloat
 
     init(
         mapBuilder: AprilTagMapBuilder,
-        track: Track,
+        course: Course,
         mapWidthFactor: CGFloat = 1.0 / 3.0,
         mapAlignment: Alignment = .topTrailing,
-        showsClearTrackButton: Bool = true,
+        showsClearCourseButton: Bool = true,
         backgroundColor: Color = Color.black.opacity(0.52),
         borderColor: Color = Color.white.opacity(0.7),
         borderLineWidth: CGFloat = 1
     ) {
         self.mapBuilder = mapBuilder
-        self.track = track
+        self.course = course
         self.mapWidthFactor = mapWidthFactor
         self.mapAlignment = mapAlignment
-        self.showsClearTrackButton = showsClearTrackButton
+        self.showsClearCourseButton = showsClearCourseButton
         self.backgroundColor = backgroundColor
         self.borderColor = borderColor
         self.borderLineWidth = borderLineWidth
@@ -141,12 +141,12 @@ struct AprilTagMapView: View {
                     alignment: mapAlignment
                 )
 
-                if showsClearTrackButton {
+                if showsClearCourseButton {
                     Button(
-                        "Clear Track"
+                        "Clear Course"
                     ) {
 
-                        track.reset()
+                        course.reset()
                     }
                 }
             }
@@ -244,10 +244,10 @@ struct AprilTagMapView: View {
         return ZStack {
             
             // --------------------------------------------------
-            // Draw Track
+            // Draw Course
             // --------------------------------------------------
 
-            trackPath(
+            coursePath(
                 bounds:
                     bounds,
 
@@ -306,9 +306,9 @@ struct AprilTagMapView: View {
         )
     }
     
-    // MARK: - Track Path
+    // MARK: - Course Path
 
-    private func trackPath(
+    private func coursePath(
         bounds: MapBounds,
         scale: CGFloat,
         horizontalOffset: CGFloat,
@@ -318,7 +318,7 @@ struct AprilTagMapView: View {
         Path { path in
 
             guard let firstPoint =
-                track.rawPoints.first
+                course.rawPoints.first
 
             else {
                 return
@@ -326,7 +326,7 @@ struct AprilTagMapView: View {
 
 
             // --------------------------------------------------
-            // First track point
+            // First course point
             // --------------------------------------------------
 
             let firstScreenPoint =
@@ -359,11 +359,11 @@ struct AprilTagMapView: View {
 
 
             // --------------------------------------------------
-            // Remaining track points
+            // Remaining course points
             // --------------------------------------------------
 
             for point
-            in track.rawPoints.dropFirst() {
+            in course.rawPoints.dropFirst() {
 
                 let screenPoint =
                     CGPoint(
@@ -410,9 +410,9 @@ struct AprilTagMapView: View {
         )
     }
     
-    // MARK: - Track Drawing Gesture
+    // MARK: - Course Drawing Gesture
 
-    private func trackDrawingGesture(
+    private func courseDrawingGesture(
         bounds: MapBounds,
         scale: CGFloat,
         horizontalOffset: CGFloat,
@@ -453,7 +453,7 @@ struct AprilTagMapView: View {
                 )
 
 
-            track.addPoint(
+            course.addPoint(
                 x:
                     mapX,
 
