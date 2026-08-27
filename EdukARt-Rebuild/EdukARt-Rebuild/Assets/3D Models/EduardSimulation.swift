@@ -63,7 +63,7 @@ final class EduardSimulation {
     // MARK: - Settings
 
     private let movementUpdateInterval:
-        Float = 0.025 // change speed of AR Model
+        Float = 0.01 // change speed of AR Model
 
 
     // MARK: - Show

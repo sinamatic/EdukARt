@@ -283,10 +283,7 @@ struct GameView: View {
 
             if isARMenuOpen {
 
-                VStack(
-                    alignment:
-                        .leading,
-
+                HStack(
                     spacing:
                         8
                 ) {
@@ -303,10 +300,7 @@ struct GameView: View {
                                 "scope",
 
                             title:
-                                "PlaceOnTag",
-
-                            subtitle:
-                                "Reference origin"
+                                "PlaceOnTag"
                         )
                     }
 
@@ -323,10 +317,7 @@ struct GameView: View {
                                 "arrow.triangle.2.circlepath",
 
                             title:
-                                "Sync",
-
-                            subtitle:
-                                "Copy robot pose"
+                                "Sync"
                         )
                     }
 
@@ -343,11 +334,6 @@ struct GameView: View {
 
                             title:
                                 "Live Sync",
-
-                            subtitle:
-                                controller.isLiveSyncEnabled
-                                ? "Aktiv"
-                                : "Inaktiv",
 
                             statusIcon:
                                 controller.isLiveSyncEnabled
@@ -378,10 +364,7 @@ struct GameView: View {
                             title:
                                 controller.isSimulationVisible
                                 ? "Hide AR"
-                                : "Show AR",
-
-                            subtitle:
-                                "Model visibility"
+                                : "Show AR"
                         )
                     }
                 }
@@ -427,22 +410,18 @@ struct GameView: View {
     private func arMenuRow(
         icon: String,
         title: String,
-        subtitle: String,
         statusIcon: String? = nil,
         statusColor: Color = .white
     ) -> some View {
 
         VStack(
-            alignment:
-                .leading,
-
             spacing:
-                2
+                3
         ) {
 
-            HStack(
-                spacing:
-                    7
+            ZStack(
+                alignment:
+                    .topTrailing
             ) {
 
                 Image(
@@ -451,11 +430,10 @@ struct GameView: View {
                 )
                 .frame(
                     width:
-                        18
-                )
+                        28,
 
-                Text(
-                    title
+                    height:
+                        22
                 )
 
                 if let statusIcon {
@@ -467,27 +445,32 @@ struct GameView: View {
                     .foregroundStyle(
                         statusColor
                     )
+                    .font(
+                        .caption2
+                    )
+                    .offset(
+                        x:
+                            8,
+
+                        y:
+                            -4
+                    )
                 }
             }
 
             Text(
-                subtitle
+                title
             )
             .font(
                 .caption2
             )
-            .foregroundStyle(
-                .white.opacity(
-                    0.72
-                )
+            .lineLimit(
+                1
             )
         }
         .frame(
-            minWidth:
-                118,
-
-            alignment:
-                .leading
+            width:
+                58
         )
         .contentShape(
             Rectangle()
