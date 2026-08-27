@@ -315,6 +315,13 @@ struct GameMapPreview: View {
                             width: 12,
                             height: 12
                         )
+                        .rotationEffect(
+                            .radians(
+                                Double(
+                                    -tag.rotation
+                                )
+                            )
+                        )
                         .overlay {
 
                             Text(

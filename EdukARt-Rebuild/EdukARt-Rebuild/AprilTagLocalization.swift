@@ -469,11 +469,6 @@ final class AprilTagLocalization {
             relativeTransform
                 .columns.3.z
 
-        let height =
-            relativeTransform
-                .columns.3.y
-
-
         let robotXAxis =
             relativeTransform
                 .columns.0
@@ -489,7 +484,7 @@ final class AprilTagLocalization {
             position:
                 SIMD3<Float>(
                     mapX,
-                    height,
+                    0,
                     mapZ
                 ),
 

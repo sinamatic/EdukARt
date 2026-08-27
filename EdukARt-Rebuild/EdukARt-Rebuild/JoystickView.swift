@@ -40,10 +40,10 @@ public struct JoystickView: View {
     
     public var body: some View {
         HStack(alignment: .bottom, spacing: 40) {
-            JoystickBuilder(
+            TranslationJoystickControl(
                 monitor: turnJoystickMonitor,
                 width: 120,
-                shape: .rect,
+                maximumMonitorValue: 120,
                 background: {
                     ZStack {
                         RoundedRectangle(cornerRadius: 50)
@@ -69,16 +69,15 @@ public struct JoystickView: View {
                     Circle()
                         .fill(.brandGreen.opacity(0.9))
                         .frame(width: 32, height: 32)
-                },
-                locksInPlace: false
+                }
             )
             .frame(width: 120, height: 70)
             .offset(x: 10)
             
-            JoystickBuilder(
+            TranslationJoystickControl(
                 monitor: joystickMonitor,
                 width: dragDiameter,
-                shape: shape,
+                maximumMonitorValue: dragDiameter,
                 background: {
                     ZStack {
                         
@@ -114,11 +113,132 @@ public struct JoystickView: View {
                             width: knobSize,
                             height: knobSize
                         )
-                },
-                locksInPlace: false
+                }
             )
         }
         .padding(.bottom, 10)
+    }
+}
+
+private struct TranslationJoystickControl<Background: View, Foreground: View>: View {
+
+    @ObservedObject var monitor:
+        JoystickMonitor
+
+    let width:
+        CGFloat
+
+    let maximumMonitorValue:
+        CGFloat
+
+    @ViewBuilder let background:
+        () -> Background
+
+    @ViewBuilder let foreground:
+        () -> Foreground
+
+    @State private var knobOffset:
+        CGSize = .zero
+
+    private var maxOffset:
+        CGFloat {
+
+        width / 2
+    }
+
+    var body: some View {
+
+        ZStack {
+
+            background()
+
+            foreground()
+                .offset(
+                    knobOffset
+                )
+        }
+        .contentShape(
+            Rectangle()
+        )
+        .gesture(
+
+            DragGesture(
+                minimumDistance:
+                    0
+            )
+            .onChanged { value in
+
+                let distance =
+                    sqrt(
+                        value.translation.width
+                            * value.translation.width
+                        +
+                        value.translation.height
+                            * value.translation.height
+                    )
+
+
+                var offset =
+                    value.translation
+
+
+                if distance > maxOffset {
+
+                    let scale =
+                        maxOffset / distance
+
+                    offset =
+                        CGSize(
+                            width:
+                                value.translation.width
+                                * scale,
+
+                            height:
+                                value.translation.height
+                                * scale
+                        )
+                }
+
+
+                knobOffset =
+                    offset
+
+
+                let input =
+                    CGPoint(
+                        x:
+                            offset.width
+                            / maxOffset
+                            * maximumMonitorValue,
+
+                        y:
+                            offset.height
+                            / maxOffset
+                            * maximumMonitorValue
+                    )
+
+
+                monitor.xyPoint =
+                    input
+            }
+            .onEnded { _ in
+
+                withAnimation(
+                    .easeOut(
+                        duration:
+                            0.15
+                    )
+                ) {
+
+                    knobOffset =
+                        .zero
+                }
+
+
+                monitor.xyPoint =
+                    .zero
+            }
+        )
     }
 }
 
