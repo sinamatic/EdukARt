@@ -14,6 +14,7 @@ struct MainMenuView: View {
     
     
     
+    
     var body: some View {
         
         
@@ -56,17 +57,22 @@ struct MainMenuView: View {
                     .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
                 
                 
-                NavigationLink {
-                    GameView(
-                            eduardModelStore:
-                                eduardModelStore
-                        )
+                if let selectedMap =
+                    gameMapStore.maps.first {
 
-                } label: {
-                    Text("AR Test")
+                    NavigationLink {
+                        GameView(
+                                eduardModelStore:
+                                    eduardModelStore,
+                                map: selectedMap
+                            )
+
+                    } label: {
+                        Text("AR Test")
+                    }
+
+                    .disabled(eduardModelStore.model == nil)
                 }
-                
-                .disabled(eduardModelStore.model == nil)
                 
                 
                 

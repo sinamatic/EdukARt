@@ -14,6 +14,10 @@ struct GameView: View {
     @ObservedObject var eduardModelStore:
         EduardModelStore
 
+    let map:
+            GameMap
+    
+    
     // MARK: - Joystick
 
     @StateObject private var joystickMonitor =

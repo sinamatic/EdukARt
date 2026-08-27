@@ -19,6 +19,14 @@ struct CreateMapView: View {
     @StateObject private var joystickMonitor = JoystickMonitor()
     @StateObject private var turnJoystickMonitor = JoystickMonitor()
     @StateObject private var course = Course()
+    
+    // AprilTag geometry is frozen when Step 1 is completed.
+    // Steps 2 and 3 no longer depend on live measurements.
+    @State private var frozenAprilTags:
+        [StoredAprilTag] = []
+
+    @State private var frozenReferenceTagID:
+        Int?
 
     @State private var creationStep = CreationStep.createMap
     @State private var mapName = ""
@@ -46,11 +54,25 @@ struct CreateMapView: View {
     }
 
     private var canContinue: Bool {
+
         switch creationStep {
+
         case .createMap:
-            mapBuilder.referenceTagID != nil
-        case .drawRoad, .itemsObstacles:
-            true
+
+            return
+                mapBuilder.referenceTagID != nil
+                && mapBuilder.mapPoints.isEmpty == false
+
+
+        case .drawRoad:
+
+            return
+                course.trackPoints.count >= 2
+
+
+        case .itemsObstacles:
+
+            return true
         }
     }
 
@@ -74,18 +96,98 @@ struct CreateMapView: View {
                     Color.black.opacity(0.5).frame(height: 160)
                 }
 
-                AprilTagMapView(
-                    mapBuilder: mapBuilder,
-                    course: course,
-                    mapWidthFactor: 1.0,
-                    mapAlignment: .center,
-                    showsClearCourseButton: false,
-                    allowsCourseDrawing: creationStep == .drawRoad,
-                    backgroundColor: showsCamera ? Color.black.opacity(0.52) : Color.black
-                )
-                .frame(width: mapSize, height: mapSize)
-                .position(x: mapCenterX, y: mapCenterY)
+                if creationStep == .createMap {
 
+                    // ----------------------------------------------
+                    // STEP 1
+                    // Live AprilTag measurement preview
+                    // ----------------------------------------------
+
+                    AprilTagMapView(
+                        mapBuilder:
+                            mapBuilder,
+
+                        course:
+                            course,
+
+                        mapWidthFactor:
+                            1.0,
+
+                        mapAlignment:
+                            .center,
+
+                        showsClearCourseButton:
+                            false,
+
+                        allowsCourseDrawing:
+                            false,
+
+                        backgroundColor:
+                            showsCamera
+                            ? Color.black.opacity(0.52)
+                            : Color.black
+                    )
+                    .frame(
+                        width:
+                            mapSize,
+
+                        height:
+                            mapSize
+                    )
+                    .position(
+                        x:
+                            mapCenterX,
+
+                        y:
+                            mapCenterY
+                    )
+
+                } else if let referenceTagID =
+                    frozenReferenceTagID {
+
+                    // ----------------------------------------------
+                    // STEP 2 + STEP 3
+                    // Frozen persistent map geometry
+                    // ----------------------------------------------
+
+                    GameMapView(
+                        aprilTags:
+                            frozenAprilTags,
+
+                        referenceTagID:
+                            referenceTagID,
+
+                        course:
+                            course,
+
+                        allowsCourseDrawing:
+                            creationStep == .drawRoad,
+
+                        backgroundColor:
+                            .black,
+
+                        borderColor:
+                            .white.opacity(0.7),
+
+                        borderLineWidth:
+                            1
+                    )
+                    .frame(
+                        width:
+                            mapSize,
+
+                        height:
+                            mapSize
+                    )
+                    .position(
+                        x:
+                            mapCenterX,
+
+                        y:
+                            mapCenterY
+                    )
+                }
+                
                 stepControls(
                     mapLeftX: mapLeftX,
                     mapRightX: mapRightX,
@@ -117,6 +219,8 @@ struct CreateMapView: View {
         .onAppear {
             mapBuilder.reset()
             course.reset()
+            frozenReferenceTagID =
+                    nil
             mapName = ""
             creationStep = .createMap
         }
@@ -249,22 +353,92 @@ struct CreateMapView: View {
         targetStep: CreationStep
     ) -> some View {
         Button {
-            creationStep = targetStep
+
+            changeStep(
+                to:
+                    targetStep
+            )
+
         } label: {
             Image(systemName: systemName)
                 .font(.largeTitle)
                 .foregroundStyle(.white)
         }
     }
+    
+    // MARK: - Change Step
+
+    private func changeStep(
+        to targetStep: CreationStep
+    ) {
+
+        // Leaving Step 1 freezes the AprilTag geometry.
+        if creationStep == .createMap,
+           targetStep == .drawRoad {
+
+            freezeAprilTagMap()
+        }
+
+
+        creationStep =
+            targetStep
+    }
+    
+    // MARK: - Freeze AprilTag Map
+
+    private func freezeAprilTagMap() {
+
+        guard let referenceTagID =
+            mapBuilder.referenceTagID
+        else {
+            return
+        }
+
+
+        frozenReferenceTagID =
+            referenceTagID
+
+
+        frozenAprilTags =
+            mapBuilder.mapPoints.map { point in
+
+                StoredAprilTag(
+                    id:
+                        point.id,
+
+                    x:
+                        point.x,
+
+                    z:
+                        point.z,
+
+                    rotation:
+                        point.rotation
+                )
+            }
+    }
 
     private func resetCurrentStep() {
+
         switch creationStep {
+
         case .createMap:
+
             mapBuilder.reset()
             course.reset()
+
+            frozenAprilTags.removeAll()
+            frozenReferenceTagID = nil
+
+
         case .drawRoad:
+
             course.reset()
+
+
         case .itemsObstacles:
+
+            // Items will be reset here later.
             break
         }
     }
@@ -286,8 +460,13 @@ struct CreateMapView: View {
 
                 if creationStep == .itemsObstacles {
                     showNameDialog = true
-                } else if let nextStep = creationStep.nextStep {
-                    creationStep = nextStep
+                } else if let nextStep =
+                    creationStep.nextStep {
+
+                    changeStep(
+                        to:
+                            nextStep
+                    )
                 }
             }
             .buttonStyle(MapMenuButtonStyle(color: Color("BrandGreen")))
@@ -349,15 +528,47 @@ struct CreateMapView: View {
     }
 
     private func saveMap() {
-        let name = mapName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let name =
+            mapName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
 
         guard name.isEmpty == false,
-              let gameMap = mapBuilder.createGameMap(name: name) else {
+              let referenceTagID =
+                frozenReferenceTagID
+        else {
             return
         }
 
-        gameMapStore.save(gameMap)
-        mapName = ""
+
+        let gameMap =
+            GameMap(
+                name:
+                    name,
+
+                referenceTagID:
+                    referenceTagID,
+
+                aprilTags:
+                    frozenAprilTags,
+
+                trackPoints:
+                    course.storedTrackPoints()
+            )
+
+
+        gameMapStore.save(
+            gameMap
+        )
+
+
+        mapName =
+            ""
+
         dismiss()
     }
 }

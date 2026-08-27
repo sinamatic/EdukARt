@@ -51,7 +51,11 @@ struct StartGameView: View {
                     if let selectedMap {
                         NavigationLink {
                             GameView(
-                                eduardModelStore: eduardModelStore
+                                eduardModelStore:
+                                    eduardModelStore,
+
+                                map:
+                                    selectedMap
                             )
                         } label: {
                             Text("Start Game")
@@ -236,59 +240,331 @@ struct GameMapPreview: View {
 
     let map: GameMap
 
+
     var body: some View {
+
         GeometryReader { geometry in
-            let bounds = previewBounds
-            let size = min(geometry.size.width, geometry.size.height)
-            let scale = min(
-                (size - 18) / CGFloat(bounds.width),
-                (size - 18) / CGFloat(bounds.height)
-            )
+
+            let bounds =
+                previewBounds
+
+            let size =
+                min(
+                    geometry.size.width,
+                    geometry.size.height
+                )
+
+            let scale =
+                min(
+                    (size - 18)
+                        / CGFloat(bounds.width),
+
+                    (size - 18)
+                        / CGFloat(bounds.height)
+                )
+
 
             ZStack {
-                Color.black.opacity(0.35)
 
-                ForEach(map.aprilTags) { tag in
+                Color.black
+                    .opacity(0.35)
+
+
+                // MARK: - Track
+
+                trackPreview(
+                    bounds:
+                        bounds,
+
+                    scale:
+                        scale
+                )
+
+
+                // MARK: - AprilTags
+
+                ForEach(
+                    map.aprilTags
+                ) { tag in
+
                     Rectangle()
-                        .fill(Color.black)
+                        .fill(
+                            Color.black
+                        )
                         .overlay {
+
                             Rectangle()
                                 .stroke(
-                                    tag.id == map.referenceTagID ? Color.red.opacity(0.85) : Color.white,
-                                    lineWidth: 1
+                                    tag.id
+                                        == map.referenceTagID
+                                    ? Color.red.opacity(0.85)
+                                    : Color.white,
+
+                                    lineWidth:
+                                        1
                                 )
                         }
-                        .frame(width: 12, height: 12)
+                        .frame(
+                            width: 12,
+                            height: 12
+                        )
                         .position(
-                            x: 9 + CGFloat(tag.x - bounds.minX) * scale,
-                            y: 9 + CGFloat(tag.z - bounds.minZ) * scale
+
+                            x:
+                                9
+                                + CGFloat(
+                                    tag.x
+                                    - bounds.minX
+                                )
+                                * scale,
+
+                            y:
+                                9
+                                + CGFloat(
+                                    tag.z
+                                    - bounds.minZ
+                                )
+                                * scale
                         )
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 10
+                )
+            )
             .overlay {
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.white.opacity(0.45), lineWidth: 1.5)
+
+                RoundedRectangle(
+                    cornerRadius: 10
+                )
+                .stroke(
+                    Color.white.opacity(0.45),
+                    lineWidth: 1.5
+                )
             }
-            .shadow(color: .black.opacity(0.28), radius: 4, y: 2)
+            .shadow(
+                color:
+                    .black.opacity(0.28),
+
+                radius:
+                    4,
+
+                y:
+                    2
+            )
         }
     }
 
-    private var previewBounds: PreviewBounds {
-        let minX = map.aprilTags.map { $0.x }.min() ?? 0
-        let maxX = map.aprilTags.map { $0.x }.max() ?? 0
-        let minZ = map.aprilTags.map { $0.z }.min() ?? 0
-        let maxZ = map.aprilTags.map { $0.z }.max() ?? 0
-        let width = max(maxX - minX, 1)
-        let height = max(maxZ - minZ, 1)
-        let extraX = (width - (maxX - minX)) / 2
-        let extraZ = (height - (maxZ - minZ)) / 2
+
+    // MARK: - Track Preview
+
+    @ViewBuilder
+    private func trackPreview(
+        bounds: PreviewBounds,
+        scale: CGFloat
+    ) -> some View {
+
+        let points =
+            map.trackPoints
+
+
+        if points.count >= 2 {
+
+            let segmentCount =
+                points.count - 1
+
+
+            ForEach(
+                0..<segmentCount,
+                id: \.self
+            ) { index in
+
+                let progress =
+                    CGFloat(index)
+                    / CGFloat(
+                        max(
+                            segmentCount - 1,
+                            1
+                        )
+                    )
+
+
+                let start =
+                    points[index]
+
+                let end =
+                    points[index + 1]
+
+
+                Path { path in
+
+                    path.move(
+                        to:
+                            CGPoint(
+                                x:
+                                    9
+                                    + CGFloat(
+                                        start.x
+                                        - bounds.minX
+                                    )
+                                    * scale,
+
+                                y:
+                                    9
+                                    + CGFloat(
+                                        start.z
+                                        - bounds.minZ
+                                    )
+                                    * scale
+                            )
+                    )
+
+
+                    path.addLine(
+                        to:
+                            CGPoint(
+                                x:
+                                    9
+                                    + CGFloat(
+                                        end.x
+                                        - bounds.minX
+                                    )
+                                    * scale,
+
+                                y:
+                                    9
+                                    + CGFloat(
+                                        end.z
+                                        - bounds.minZ
+                                    )
+                                    * scale
+                            )
+                    )
+                }
+                .stroke(
+                    courseColor(
+                        at:
+                            progress
+                    ),
+                    style:
+                        StrokeStyle(
+                            lineWidth: 2.5,
+                            lineCap: .round,
+                            lineJoin: .round
+                        )
+                )
+            }
+        }
+    }
+
+
+    // MARK: - Track Color
+
+    private func courseColor(
+        at progress: CGFloat
+    ) -> Color {
+
+        Color(
+            red:
+                1 - progress,
+
+            green:
+                0.85
+                + progress * 0.15,
+
+            blue:
+                0
+        )
+    }
+
+
+    // MARK: - Bounds
+
+    private var previewBounds:
+        PreviewBounds {
+
+        // Include both AprilTags AND track points.
+        let xValues =
+            map.aprilTags.map {
+                $0.x
+            }
+            +
+            map.trackPoints.map {
+                $0.x
+            }
+
+
+        let zValues =
+            map.aprilTags.map {
+                $0.z
+            }
+            +
+            map.trackPoints.map {
+                $0.z
+            }
+
+
+        let minX =
+            xValues.min() ?? 0
+
+        let maxX =
+            xValues.max() ?? 0
+
+        let minZ =
+            zValues.min() ?? 0
+
+        let maxZ =
+            zValues.max() ?? 0
+
+
+        let realWidth =
+            maxX - minX
+
+        let realHeight =
+            maxZ - minZ
+
+
+        let width =
+            max(
+                realWidth,
+                1
+            )
+
+        let height =
+            max(
+                realHeight,
+                1
+            )
+
+
+        let extraX =
+            (
+                width
+                - realWidth
+            )
+            / 2
+
+        let extraZ =
+            (
+                height
+                - realHeight
+            )
+            / 2
+
 
         return PreviewBounds(
-            minX: minX - extraX,
-            minZ: minZ - extraZ,
-            width: width,
-            height: height
+            minX:
+                minX - extraX,
+
+            minZ:
+                minZ - extraZ,
+
+            width:
+                width,
+
+            height:
+                height
         )
     }
 }

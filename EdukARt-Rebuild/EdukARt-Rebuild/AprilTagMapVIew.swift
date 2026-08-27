@@ -446,7 +446,7 @@ struct AprilTagMapView: View {
                 )
 
 
-            course.addPoint(
+            course.addRawPoint(
                 x:
                     mapX,
 
