@@ -328,98 +328,74 @@ struct AprilTagMapView: View {
         verticalOffset: CGFloat
     ) -> some View {
 
-        Path { path in
-
-            guard let firstPoint =
-                course.rawPoints.first
-
-            else {
-                return
-            }
-
-
-            // --------------------------------------------------
-            // First course point
-            // --------------------------------------------------
-
-            let firstScreenPoint =
-                CGPoint(
-
-                    x:
-                        horizontalOffset
-                        +
-                        CGFloat(
-                            firstPoint.x
-                            - bounds.minX
-                        )
-                        * scale,
-
-                    y:
-                        verticalOffset
-                        +
-                        CGFloat(
-                            firstPoint.y
-                            - bounds.minZ
-                        )
-                        * scale
-                )
-
-
-            path.move(
-                to:
-                    firstScreenPoint
-            )
-
-
-            // --------------------------------------------------
-            // Remaining course points
-            // --------------------------------------------------
-
-            for point
-            in course.rawPoints.dropFirst() {
-
-                let screenPoint =
+        ZStack {
+            let points =
+                course.rawPoints.map { point in
                     CGPoint(
-
                         x:
                             horizontalOffset
                             +
-                            CGFloat(
-                                point.x
-                                - bounds.minX
-                            )
+                            CGFloat(point.x - bounds.minX)
                             * scale,
 
                         y:
                             verticalOffset
                             +
-                            CGFloat(
-                                point.y
-                                - bounds.minZ
-                            )
+                            CGFloat(point.y - bounds.minZ)
                             * scale
                     )
+                }
 
+            ForEach(Array(zip(points.indices, zip(points, points.dropFirst()))), id: \.0) { index, segment in
+                Path { path in
+                    path.move(to: segment.0)
+                    path.addLine(to: segment.1)
+                }
+                .stroke(
+                    courseColor(at: CGFloat(index) / CGFloat(max(points.count - 2, 1))),
+                    style:
+                        StrokeStyle(
+                            lineWidth:
+                                4,
 
-                path.addLine(
-                    to:
-                        screenPoint
+                            lineCap:
+                                .round,
+
+                            lineJoin:
+                                .round
+                        )
                 )
             }
+
+            if let startPoint = points.first {
+                Circle()
+                    .fill(Color.yellow)
+                    .frame(width: 10, height: 10)
+                    .position(startPoint)
+            }
+
+            if points.count > 1, let endPoint = points.last {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 10, height: 10)
+                    .position(endPoint)
+            }
         }
-        .stroke(
-            Color.brandGreen,
-            style:
-                StrokeStyle(
-                    lineWidth:
-                        4,
+    }
 
-                    lineCap:
-                        .round,
+    private func courseColor(
+        at progress: CGFloat
+    ) -> Color {
 
-                    lineJoin:
-                        .round
-                )
+        Color(
+            red:
+                1 - progress,
+
+            green:
+                0.85 + progress * 0.15,
+
+            blue:
+                0
         )
     }
     

@@ -25,6 +25,21 @@ struct CreateMapView: View {
     @State private var showNameDialog = false
 
     private let mapSizeFactor: CGFloat = 2.0 / 3.0
+    private let items = [
+        ("👅", "Tongue"),
+        ("🥚", "Eggs"),
+        ("💩", "Shit")
+    ]
+    private let obstacles = [
+        ("🛢", "Oil"),
+        ("💧", "Water"),
+        ("🪨", "Rock"),
+        ("🌳", "Tree")
+    ]
+
+    private var footerHeight: CGFloat {
+        creationStep == .itemsObstacles ? 250 : 116
+    }
 
     private var showsCamera: Bool {
         creationStep == .createMap && showNameDialog == false
@@ -46,7 +61,7 @@ struct CreateMapView: View {
             let mapCenterY = geometry.size.height / 2
             let mapLeftX = mapCenterX - mapSize / 2
             let mapRightX = mapCenterX + mapSize / 2
-            let mapBottomY = mapCenterY + mapSize / 2
+            let mapTopY = mapCenterY - mapSize / 2
 
             ZStack {
                 backgroundView
@@ -74,7 +89,7 @@ struct CreateMapView: View {
                 stepControls(
                     mapLeftX: mapLeftX,
                     mapRightX: mapRightX,
-                    mapBottomY: mapBottomY,
+                    mapTopY: mapTopY,
                     mapCenterY: mapCenterY,
                     screenWidth: geometry.size.width,
                     screenHeight: geometry.size.height
@@ -82,14 +97,14 @@ struct CreateMapView: View {
 
                 VStack(spacing: 0) {
                     headerView
-                        .frame(height: 150, alignment: .top)
+                        .frame(height: 190, alignment: .top)
                         .padding(.horizontal, 24)
-                        .padding(.top, 88)
+                        .padding(.top, 38)
 
                     Spacer()
 
                     footerView
-                        .frame(height: 116, alignment: .bottom)
+                        .frame(height: footerHeight, alignment: .bottom)
                         .padding(.horizontal, 24)
                         .padding(.bottom, 62)
                 }
@@ -126,27 +141,42 @@ struct CreateMapView: View {
                     .mapMenuTitleStyle()
             }
 
+            if creationStep == .drawRoad {
+                drawRoadHint
+            } else {
+                Text(creationStep.subtitle(referenceTagID: mapBuilder.referenceTagID))
+                    .mapMenuSubtitleStyle()
+                    .lineLimit(4)
+                    .frame(height: 92, alignment: .top)
+            }
+        }
+    }
+
+    private var drawRoadHint: some View {
+        VStack(spacing: 8) {
             Text(creationStep.subtitle(referenceTagID: mapBuilder.referenceTagID))
                 .mapMenuSubtitleStyle()
-                .lineLimit(2)
-                .frame(height: 40, alignment: .top)
 
-            Group {
-                if let referenceTagID = mapBuilder.referenceTagID {
-                    HStack {
-                        Circle()
-                            .fill(.white)
-                            .frame(width: 8, height: 8)
-
-                        Text("Reference Tag #\(referenceTagID)")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                    }
-                } else {
-                    Color.clear
-                }
+            HStack(spacing: 14) {
+                labelDot(color: .yellow, text: "Yellow = Start")
+                labelDot(color: .green, text: "Green = End")
             }
-            .frame(height: 28)
+            .font(.caption.bold())
+            .foregroundStyle(.white.opacity(0.82))
+        }
+        .frame(height: 92, alignment: .top)
+    }
+
+    private func labelDot(
+        color: Color,
+        text: String
+    ) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+
+            Text(text)
         }
     }
 
@@ -174,7 +204,7 @@ struct CreateMapView: View {
     private func stepControls(
         mapLeftX: CGFloat,
         mapRightX: CGFloat,
-        mapBottomY: CGFloat,
+        mapTopY: CGFloat,
         mapCenterY: CGFloat,
         screenWidth: CGFloat,
         screenHeight: CGFloat
@@ -209,7 +239,7 @@ struct CreateMapView: View {
             .tint(.white)
             .position(
                 x: min(mapRightX - 34, screenWidth - 48),
-                y: min(mapBottomY + 34, screenHeight - 92)
+                y: max(mapTopY - 34, 44)
             )
         }
     }
@@ -241,6 +271,10 @@ struct CreateMapView: View {
 
     private var footerView: some View {
         VStack(spacing: 14) {
+            if creationStep == .itemsObstacles {
+                objectPaletteView
+            }
+
             Text(creationStep.footerText(tagCount: mapBuilder.mapPoints.count))
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.7))
@@ -260,6 +294,58 @@ struct CreateMapView: View {
             .disabled(canContinue == false)
             .opacity(canContinue ? 1 : 0.45)
         }
+    }
+
+    private var objectPaletteView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 18) {
+                paletteSection(title: "Items", options: items)
+                paletteSection(title: "Obstacles", options: obstacles)
+            }
+            .padding(.horizontal, 2)
+        }
+        .frame(height: 118)
+    }
+
+    private func paletteSection(
+        title: String,
+        options: [(String, String)]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.bold())
+                .foregroundStyle(.white.opacity(0.75))
+
+            HStack(spacing: 10) {
+                ForEach(options, id: \.1) { option in
+                    objectTile(symbol: option.0, name: option.1)
+                }
+            }
+        }
+    }
+
+    private func objectTile(
+        symbol: String,
+        name: String
+    ) -> some View {
+        VStack(spacing: 6) {
+            Text(symbol)
+                .font(.system(size: 30))
+                .frame(height: 36)
+
+            Text(name)
+                .font(.caption2.bold())
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(width: 82, height: 78)
+        .background(Color.black.opacity(0.55))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.28), lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func saveMap() {
@@ -306,11 +392,11 @@ private enum CreationStep {
     var stepLabel: String {
         switch self {
         case .createMap:
-            "Step ①/3"
+            "Step 1/3"
         case .drawRoad:
-            "Step ②/3"
+            "Step 2/3"
         case .itemsObstacles:
-            "Step ③/3"
+            "Step 3/3"
         }
     }
 
@@ -329,10 +415,10 @@ private enum CreationStep {
         switch self {
         case .createMap:
             referenceTagID == nil
-            ? "Scan the first AprilTag to define the map reference."
-            : "Move through the room and scan the remaining AprilTags."
+            ? "Scan the first AprilTag carefully: the red reference tag is where the map must be placed when the game starts."
+            : "The red reference tag anchors the map in the game. Continue scanning the remaining AprilTags."
         case .drawRoad:
-            "Draw the road directly on the mapped AprilTags."
+            "Draw the road in one stroke."
         case .itemsObstacles:
             "Place items and obstacles on the mapped course."
         }
