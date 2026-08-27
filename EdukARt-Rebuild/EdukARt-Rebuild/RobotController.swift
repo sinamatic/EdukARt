@@ -81,6 +81,12 @@ final class RobotController:
         RobotDriveMode = .mechanum
 
 
+    // MARK: - AR Synchronization
+
+    @Published var isLiveSyncEnabled =
+        false
+
+
     // MARK: - Physical Robot State
 
     @Published private(set)
@@ -507,25 +513,31 @@ final class RobotController:
         }
     }
 
-    // ======================================================
-    // MARK: - Robot Pose
-    // ======================================================
+    // MARK: - Place Simulation at Map Reference
+
+    func placeSimulationAtReference() {
+
+        eduardSimulation.setPose(
+            .zero
+        )
+    }
+
+
+    // MARK: - Real Robot Pose
 
     func updateRealRobotPose(
         _ pose:
             RobotPose
     ) {
 
+        // Always store the current physical pose.
         realRobotPose =
             pose
 
 
-        // Only synchronized mode continuously
-        // transfers the measured real pose.
-
-        guard controlMode
-                == .synchronized
-
+        // Continuously transfer the physical pose
+        // only when Live Sync is enabled.
+        guard isLiveSyncEnabled
         else {
             return
         }

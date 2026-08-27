@@ -10,6 +10,7 @@ import SwiftUI
 struct CoursesView: View {
 
     @ObservedObject var eduardModelStore: EduardModelStore
+    @ObservedObject var controller: RobotController
     @ObservedObject var gameMapStore: GameMapStore
 
     @StateObject private var mapBuilder = AprilTagMapBuilder()
@@ -27,6 +28,7 @@ struct CoursesView: View {
                 NavigationLink {
                     CreateMapView(
                         eduardModelStore: eduardModelStore,
+                        controller: controller,
                         mapBuilder: mapBuilder,
                         gameMapStore: gameMapStore
                     )
@@ -96,6 +98,7 @@ struct CoursesView: View {
 #Preview {
     CoursesView(
         eduardModelStore: EduardModelStore(),
+        controller: RobotController(),
         gameMapStore: GameMapStore()
     )
 }

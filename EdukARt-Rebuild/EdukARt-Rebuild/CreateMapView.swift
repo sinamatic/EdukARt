@@ -11,6 +11,7 @@ import SwiftUIJoystick
 struct CreateMapView: View {
 
     @ObservedObject var eduardModelStore: EduardModelStore
+    @ObservedObject var controller: RobotController
     @ObservedObject var mapBuilder: AprilTagMapBuilder
     @ObservedObject var gameMapStore: GameMapStore
 
@@ -295,6 +296,7 @@ struct CreateMapView: View {
                 joystickMonitor: joystickMonitor,
                 turnJoystickMonitor: turnJoystickMonitor,
                 mapBuilder: mapBuilder,
+                controller: controller,
                 localizationResetID: localizationResetID
             )
         } else {

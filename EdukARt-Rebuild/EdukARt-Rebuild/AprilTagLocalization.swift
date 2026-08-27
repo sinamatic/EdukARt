@@ -119,6 +119,30 @@ final class AprilTagLocalization {
     }
 
 
+    // MARK: - Set Reference Tag
+
+    func setReferenceTag(
+        id: Int
+    ) {
+
+        // Keep the currently selected reference
+        // if it already matches.
+        if referenceTagID == id {
+            return
+        }
+
+        referenceTagID =
+            id
+
+        referenceTagWorldTransform =
+            nil
+
+        print(
+            "# MAP REFERENCE SET | ID \(id)"
+        )
+    }
+
+
     // MARK: - Select Reference Tag
 
     func selectReferenceTag(
@@ -357,6 +381,120 @@ final class AprilTagLocalization {
             rotation: rotation,
             height: height,
             worldTransform: tagWorldTransform
+        )
+    }
+
+
+    // MARK: - Localize Robot
+
+    func localizeRobot(
+        detection: Detection,
+        frame: ARFrame,
+        intrinsics: CameraIntrinsics
+    ) -> RobotPose? {
+
+        guard detection.id == 0
+        else {
+            return nil
+        }
+
+
+        guard let pose =
+            detection.estimatePose(
+                intrinsics: intrinsics,
+                tagSize: tagSize
+            )
+
+        else {
+            return nil
+        }
+
+
+        guard pose.reprojectionError
+                <= maximumReprojectionError
+
+        else {
+
+            print(
+                String(
+                    format:
+                        "# ROBOT TAG REJECTED | ID %d | reprojection error %.3f",
+                    detection.id,
+                    pose.reprojectionError
+                )
+            )
+
+            return nil
+        }
+
+
+        let aprilTagToARKitCamera =
+            simd_float4x4(
+                diagonal:
+                    SIMD4<Float>(
+                        1,
+                        -1,
+                        -1,
+                        1
+                    )
+            )
+
+
+        let robotWorldTransform =
+            frame.camera.transform
+            * aprilTagToARKitCamera
+            * pose.transform
+
+
+        guard let referenceTransform =
+            referenceTagWorldTransform
+
+        else {
+            return nil
+        }
+
+
+        let relativeTransform =
+            simd_inverse(
+                referenceTransform
+            )
+            * robotWorldTransform
+
+
+        let mapX =
+            relativeTransform
+                .columns.3.x
+
+        let mapZ =
+            relativeTransform
+                .columns.3.z
+
+        let height =
+            relativeTransform
+                .columns.3.y
+
+
+        let robotXAxis =
+            relativeTransform
+                .columns.0
+
+        let rotation =
+            atan2(
+                robotXAxis.z,
+                robotXAxis.x
+            )
+
+
+        return RobotPose(
+            position:
+                SIMD3<Float>(
+                    mapX,
+                    height,
+                    mapZ
+                ),
+
+            rotation:
+                rotation
         )
     }
 

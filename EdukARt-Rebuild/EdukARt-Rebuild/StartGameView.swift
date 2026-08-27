@@ -10,6 +10,7 @@ import SwiftUI
 struct StartGameView: View {
 
     @ObservedObject var eduardModelStore: EduardModelStore
+    @ObservedObject var controller: RobotController
     @ObservedObject var gameMapStore: GameMapStore
 
     @State private var selectedMapID: GameMap.ID?
@@ -41,6 +42,7 @@ struct StartGameView: View {
                     NavigationLink {
                         CoursesView(
                             eduardModelStore: eduardModelStore,
+                            controller: controller,
                             gameMapStore: gameMapStore
                         )
                     } label: {
@@ -53,6 +55,9 @@ struct StartGameView: View {
                             GameView(
                                 eduardModelStore:
                                     eduardModelStore,
+
+                                controller:
+                                    controller,
 
                                 map:
                                     selectedMap
@@ -239,6 +244,8 @@ struct MapCardView: View {
 struct GameMapPreview: View {
 
     let map: GameMap
+    var robotPose:
+        RobotPose? = nil
 
 
     var body: some View {
@@ -308,6 +315,24 @@ struct GameMapPreview: View {
                             width: 12,
                             height: 12
                         )
+                        .overlay {
+
+                            Text(
+                                "\(tag.id)"
+                            )
+                            .font(
+                                .system(
+                                    size:
+                                        7,
+
+                                    weight:
+                                        .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                        }
                         .position(
 
                             x:
@@ -322,6 +347,62 @@ struct GameMapPreview: View {
                                 9
                                 + CGFloat(
                                     tag.z
+                                    - bounds.minZ
+                                )
+                                * scale
+                        )
+                }
+
+
+                if let robotPose {
+
+                    Rectangle()
+                        .fill(
+                            Color.blue
+                        )
+                        .frame(
+                            width: 14,
+                            height: 14
+                        )
+                        .overlay {
+
+                            Text(
+                                "0"
+                            )
+                            .font(
+                                .system(
+                                    size:
+                                        8,
+
+                                    weight:
+                                        .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                        }
+                        .rotationEffect(
+                            .radians(
+                                Double(
+                                    robotPose.rotation
+                                )
+                            )
+                        )
+                        .position(
+
+                            x:
+                                9
+                                + CGFloat(
+                                    robotPose.position.x
+                                    - bounds.minX
+                                )
+                                * scale,
+
+                            y:
+                                9
+                                + CGFloat(
+                                    robotPose.position.z
                                     - bounds.minZ
                                 )
                                 * scale
@@ -493,6 +574,15 @@ struct GameMapPreview: View {
             map.trackPoints.map {
                 $0.x
             }
+            +
+            (
+                robotPose.map {
+                    [
+                        $0.position.x
+                    ]
+                }
+                ?? []
+            )
 
 
         let zValues =
@@ -503,6 +593,15 @@ struct GameMapPreview: View {
             map.trackPoints.map {
                 $0.z
             }
+            +
+            (
+                robotPose.map {
+                    [
+                        $0.position.z
+                    ]
+                }
+                ?? []
+            )
 
 
         let minX =
@@ -613,6 +712,7 @@ extension Text {
 #Preview {
     StartGameView(
         eduardModelStore: EduardModelStore(),
+        controller: RobotController(),
         gameMapStore: GameMapStore()
     )
 }

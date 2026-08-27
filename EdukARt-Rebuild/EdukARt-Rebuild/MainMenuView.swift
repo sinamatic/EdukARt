@@ -31,6 +31,7 @@ struct MainMenuView: View {
                 NavigationLink {
                     StartGameView(
                         eduardModelStore: eduardModelStore,
+                        controller: controller,
                         gameMapStore: gameMapStore
                     )
                 } label: {Text("Start Game")}
@@ -39,6 +40,7 @@ struct MainMenuView: View {
                 NavigationLink{
                     CoursesView(
                         eduardModelStore: eduardModelStore,
+                        controller: controller,
                         gameMapStore: gameMapStore
                     )
                 } label: {Text("Courses")}
@@ -64,6 +66,8 @@ struct MainMenuView: View {
                         GameView(
                                 eduardModelStore:
                                     eduardModelStore,
+                                controller:
+                                    controller,
                                 map: selectedMap
                             )
 

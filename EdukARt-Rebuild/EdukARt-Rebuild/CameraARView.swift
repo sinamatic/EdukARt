@@ -51,15 +51,27 @@ struct CameraARView: UIViewRepresentable {
     @ObservedObject var turnJoystickMonitor: JoystickMonitor
 
     @ObservedObject var mapBuilder: AprilTagMapBuilder
+    @ObservedObject var controller:
+        RobotController
     let localizationResetID:
         Int
+    let requiredReferenceTagID:
+        Int
+    let onReferenceTagLocalized:
+        () -> Void
+    let onRobotPoseUpdated:
+        (RobotPose) -> Void
 
     init(
         eduardModelStore: EduardModelStore,
         joystickMonitor: JoystickMonitor,
         turnJoystickMonitor: JoystickMonitor,
         mapBuilder: AprilTagMapBuilder,
-        localizationResetID: Int = 0
+        controller: RobotController,
+        localizationResetID: Int = 0,
+        requiredReferenceTagID: Int = 0,
+        onReferenceTagLocalized: @escaping () -> Void = {},
+        onRobotPoseUpdated: @escaping (RobotPose) -> Void = { _ in }
     ) {
 
         self.eduardModelStore =
@@ -74,8 +86,20 @@ struct CameraARView: UIViewRepresentable {
         self.mapBuilder =
             mapBuilder
 
+        self.controller =
+            controller
+
         self.localizationResetID =
             localizationResetID
+
+        self.requiredReferenceTagID =
+            requiredReferenceTagID
+
+        self.onReferenceTagLocalized =
+            onReferenceTagLocalized
+
+        self.onRobotPoseUpdated =
+            onRobotPoseUpdated
     }
 
     // MARK: - Coordinator
@@ -83,7 +107,20 @@ struct CameraARView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator {
 
         Coordinator(
-            mapBuilder: mapBuilder
+            mapBuilder:
+                mapBuilder,
+
+            controller:
+                controller,
+
+            requiredReferenceTagID:
+                requiredReferenceTagID,
+
+            onReferenceTagLocalized:
+                onReferenceTagLocalized,
+
+            onRobotPoseUpdated:
+                onRobotPoseUpdated
         )
     }
 
@@ -169,20 +206,20 @@ struct CameraARView: UIViewRepresentable {
 
 
         // --------------------------------------------------
-        // World Anchor
+        // Map Anchor
         // --------------------------------------------------
 
-        let worldAnchor =
+        let mapAnchor =
             AnchorEntity(
                 world: .zero
             )
 
         arView.scene.addAnchor(
-            worldAnchor
+            mapAnchor
         )
 
-        context.coordinator.worldAnchor =
-            worldAnchor
+        context.coordinator.mapAnchor =
+            mapAnchor
 
 
         // --------------------------------------------------
@@ -192,13 +229,42 @@ struct CameraARView: UIViewRepresentable {
         if let model =
             eduardModelStore.model {
 
+            let simulationRoot =
+                Entity()
+
+            context.coordinator.simulationRoot =
+                simulationRoot
+
+
             let eduard =
                 model.clone(
                     recursive: true
                 )
 
+            eduard.orientation =
+                simd_quatf(
+                    angle:
+                        .pi,
+
+                    axis:
+                        SIMD3<Float>(
+                            1,
+                            0,
+                            0
+                        )
+                )
+
+            simulationRoot.addChild(
+                eduard
+            )
+
             context.coordinator.eduard =
                 eduard
+
+            controller.eduardSimulation.show(
+                entity:
+                    simulationRoot
+            )
 
             print(
                 "# Used preloaded Eduard model"
@@ -230,129 +296,27 @@ struct CameraARView: UIViewRepresentable {
                 .aprilTagLocalization
                 .reset()
 
+            if context.coordinator.requiredReferenceTagID > 0 {
+
+                context.coordinator
+                    .aprilTagLocalization
+                    .setReferenceTag(
+                        id:
+                            context.coordinator
+                                .requiredReferenceTagID
+                    )
+            }
+
             context.coordinator
                 .lastLocalizationResetID =
                 localizationResetID
         }
 
 
-        guard
-            context.coordinator.isEduardLocalized,
-            let eduard = context.coordinator.eduard
-        else {
-            return
-        }
-
-
-        // --------------------------------------------------
-        // Joystick Control
-        // --------------------------------------------------
-
-        let forward =
-            Float(
-                joystickMonitor.xyPoint.y
-                / 180
-            )
-
-        let sideways =
-            Float(
-                joystickMonitor.xyPoint.x
-                / 180
-            )
-
-        let turn =
-            Float(
-                -turnJoystickMonitor.xyPoint.x
-                / 120
-            )
-
-
-        let movementSpeed: Float =
-            0.02
-
-        let rotationSpeed: Float =
-            0.03
-
-
-//        // Translation - Forward is always x, rotation of eduard not relevant
-//
-//        eduard.position.x +=
-//            sideways * movementSpeed
-//
-//        eduard.position.z +=
-//            forward * movementSpeed
-        
-        
-        // --------------------------------------------------
-        // Movement relative to Eduard's current orientation
-        // --------------------------------------------------
-
-        // Local movement:
-        // X = sideways
-        // Z = forward/backward
-        let localMovement =
-            SIMD3<Float>(
-                sideways,
-                -forward,
-                0
-            )
-
-        // Rotate movement vector with Eduard's
-        // current orientation.
-        let worldMovement =
-            eduard.transform.rotation
-            .act(
-                localMovement
-            )
-
-        // Apply movement in AR world coordinates.
-        eduard.position +=
-            worldMovement
-            * movementSpeed
-
-        
-//        let targetPosition =
-//            eduard.position
-//            +
-//            worldMovement * movementSpeed
-//
-//        var targetTransform =
-//            eduard.transform
-//
-//        targetTransform.translation =
-//            targetPosition
-//
-//        eduard.move(
-//            to: targetTransform,
-//            relativeTo: eduard.parent,
-//            duration: 0.08,
-//            timingFunction: .linear
-//        )
-
-        // --------------------------------------------------
-        // Rotation
-        // --------------------------------------------------
-
-        if abs(turn) > 0.05 {
-
-            let rotation =
-                simd_quatf(
-                    angle:
-                        turn
-                        * rotationSpeed,
-
-                    axis:
-                        SIMD3<Float>(
-                            0,
-                            1,
-                            0
-                        )
-                )
-
-            eduard.transform.rotation =
-                rotation
-                * eduard.transform.rotation
-        }
+        // Apply the latest logical simulation pose
+        // to the RealityKit entity.
+        context.coordinator
+            .updateSimulationEntity()
     }
 
 
@@ -367,7 +331,8 @@ struct CameraARView: UIViewRepresentable {
     {
 
         weak var arView: ARView?
-        var worldAnchor: AnchorEntity?
+        var mapAnchor: AnchorEntity?
+        var simulationRoot: Entity?
         var eduard: Entity?
 
         var lastLocalizationResetID:
@@ -386,27 +351,53 @@ struct CameraARView: UIViewRepresentable {
             [Int: AnchorEntity] = [:]
         
         // --------------------------------------------------
-        // Eduard AprilTag Localization
-        // --------------------------------------------------
-        //
-        // Eduard is placed only once on the first
-        // successfully localized AprilTag.
-        // --------------------------------------------------
-
-        var isEduardLocalized =
-            false
-        
-        // --------------------------------------------------
         // AprilTag Map Builder
         // --------------------------------------------------
         let mapBuilder: AprilTagMapBuilder
+        let controller:
+            RobotController
+        let requiredReferenceTagID:
+            Int
+        let onReferenceTagLocalized:
+            () -> Void
+        let onRobotPoseUpdated:
+            (RobotPose) -> Void
         
         init(
-            mapBuilder: AprilTagMapBuilder
+            mapBuilder: AprilTagMapBuilder,
+            controller: RobotController,
+            requiredReferenceTagID: Int,
+            onReferenceTagLocalized: @escaping () -> Void,
+            onRobotPoseUpdated: @escaping (RobotPose) -> Void
         ) {
 
             self.mapBuilder =
                 mapBuilder
+
+            self.controller =
+                controller
+
+            self.requiredReferenceTagID =
+                requiredReferenceTagID
+
+            self.onReferenceTagLocalized =
+                onReferenceTagLocalized
+
+            self.onRobotPoseUpdated =
+                onRobotPoseUpdated
+
+
+            super.init()
+
+
+            if requiredReferenceTagID > 0 {
+
+                aprilTagLocalization
+                    .setReferenceTag(
+                        id:
+                            requiredReferenceTagID
+                    )
+            }
         }
 
         // --------------------------------------------------
@@ -547,9 +538,21 @@ struct CameraARView: UIViewRepresentable {
                 // Select reference tag
                 // --------------------------------------------------
 
-                aprilTagLocalization.selectReferenceTag(
-                    from: detections
-                )
+                if requiredReferenceTagID > 0 {
+
+                    aprilTagLocalization
+                        .setReferenceTag(
+                            id:
+                                requiredReferenceTagID
+                        )
+
+                } else {
+
+                    aprilTagLocalization.selectReferenceTag(
+                        from:
+                            detections
+                    )
+                }
                 
                 // --------------------------------------------------
                 // Give reference ID to map builder
@@ -573,6 +576,27 @@ struct CameraARView: UIViewRepresentable {
                 
                 for detection in detections {
 
+                    if let robotPose =
+                        aprilTagLocalization.localizeRobot(
+                            detection:
+                                detection,
+
+                            frame:
+                                frame,
+
+                            intrinsics:
+                                intrinsics
+                        ) {
+
+                        DispatchQueue.main.async {
+
+                            self.onRobotPoseUpdated(
+                                robotPose
+                            )
+                        }
+                    }
+
+
                     guard let mapPose =
                         aprilTagLocalization.localize(
                             detection: detection,
@@ -581,6 +605,22 @@ struct CameraARView: UIViewRepresentable {
                         )
                     else {
                         continue
+                    }
+
+
+                    if detection.id
+                        == requiredReferenceTagID {
+
+                        DispatchQueue.main.async {
+
+                            self.localizeMapAnchor(
+                                with:
+                                    mapPose.worldTransform
+                            )
+
+                            self
+                                .onReferenceTagLocalized()
+                        }
                     }
 
 
@@ -607,18 +647,6 @@ struct CameraARView: UIViewRepresentable {
 //                        )
 //                    }
                     
-                    // ----------------------------------------------
-                    // Place Eduard on first localized AprilTag
-                    // ----------------------------------------------
-                    
-                    DispatchQueue.main.async {
-
-                        self.placeEduard(
-                            on: mapPose
-                        )
-                    }
-
-
                     // ----------------------------------------------
                     // Debug output
                     // ----------------------------------------------
@@ -741,83 +769,77 @@ struct CameraARView: UIViewRepresentable {
             )
         }
         
-        // MARK: - Place Eduard on First AprilTag
+        // MARK: - Localize Map Anchor
 
-        private func placeEduard(
-            on mapPose: AprilTagMapPose
+        private func localizeMapAnchor(
+            with referenceWorldTransform:
+                simd_float4x4
         ) {
 
-            // --------------------------------------------------
-            // Only localize Eduard once
-            // --------------------------------------------------
-
-            guard isEduardLocalized == false
+            guard let mapAnchor
             else {
                 return
             }
 
 
-            // --------------------------------------------------
-            // Eduard model must exist
-            // --------------------------------------------------
-
-            guard
-                let eduard,
-                let worldAnchor
-            else {
-                return
-            }
-
-
-            // --------------------------------------------------
-            // Apply complete AprilTag world transform
-            // --------------------------------------------------
-            //
-            // Position AND rotation are copied from the
-            // AprilTag into Eduard.
-            // --------------------------------------------------
-
-//            eduard.setTransformMatrix(
-//                mapPose.worldTransform,
-//                relativeTo: nil
-//            ) // Rotated 180° in X
-            
-            let modelRotationOffset =
-                simd_float4x4(
-                    simd_quatf(
-                        angle: .pi,
-                        axis: SIMD3<Float>(
-                            1,
-                            0,
-                            0
-                        )
-                    )
-                )
-
-            let correctedTransform =
-                mapPose.worldTransform
-                * modelRotationOffset
-
-            eduard.setTransformMatrix(
-                correctedTransform,
-                relativeTo: nil
+            mapAnchor.setTransformMatrix(
+                referenceWorldTransform,
+                relativeTo:
+                    nil
             )
-
-            worldAnchor.addChild(
-                eduard
-            )
-
-            // --------------------------------------------------
-            // Lock localization
-            // --------------------------------------------------
-
-            isEduardLocalized =
-                true
 
 
             print(
-                "# EDUARD LOCALIZED | APRILTAG \(mapPose.id)"
+                "# MAP ANCHOR LOCALIZED"
             )
+        }
+
+
+        // MARK: - Update Simulation Entity
+
+        func updateSimulationEntity() {
+
+            guard
+                let mapAnchor,
+                let simulationRoot
+            else {
+                return
+            }
+
+
+            // Attach Eduard to the localized map coordinate system.
+            if simulationRoot.parent !== mapAnchor {
+
+                simulationRoot.removeFromParent()
+
+                mapAnchor.addChild(
+                    simulationRoot
+                )
+            }
+
+
+            let pose =
+                controller
+                    .eduardSimulation
+                    .pose
+
+
+            simulationRoot.position =
+                pose.position
+
+
+            simulationRoot.orientation =
+                simd_quatf(
+                    angle:
+                        pose.rotation,
+
+                    axis:
+                        SIMD3<Float>(
+                            0,
+                            1,
+                            0
+                        )
+                )
         }
         
 

@@ -58,7 +58,7 @@ struct RobotControlOverlay: View {
     }
 }
 
-private struct RobotStatusIconButtonStyle: ButtonStyle {
+struct RobotStatusIconButtonStyle: ButtonStyle {
     let isEnabled: Bool
 
     func makeBody(configuration: Configuration) -> some View {

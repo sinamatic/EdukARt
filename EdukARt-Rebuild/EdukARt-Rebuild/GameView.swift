@@ -14,8 +14,14 @@ struct GameView: View {
     @ObservedObject var eduardModelStore:
         EduardModelStore
 
+    @ObservedObject var controller:
+        RobotController
+
     let map:
             GameMap
+
+    @State private var isMapLocalized =
+        false
     
     
     // MARK: - Joystick
@@ -49,40 +55,241 @@ struct GameView: View {
                     turnJoystickMonitor,
 
                 mapBuilder:
-                    mapBuilder
+                    mapBuilder,
+
+                controller:
+                    controller,
+
+                requiredReferenceTagID:
+                    map.referenceTagID,
+
+                onReferenceTagLocalized: {
+
+                    withAnimation(
+                        .easeInOut(
+                            duration:
+                                0.45
+                        )
+                    ) {
+
+                        isMapLocalized =
+                            true
+                    }
+                },
+
+                onRobotPoseUpdated: { pose in
+
+                    controller.updateRealRobotPose(
+                        pose
+                    )
+                }
             )
             .ignoresSafeArea()
 
 
             // MARK: - Saved Game Map
 
-            VStack {
+            GameMapPreview(
+                map:
+                    map,
 
-                HStack {
+                robotPose:
+                    controller.realRobotPose
+            )
+            .frame(
+                width:
+                    isMapLocalized
+                    ? 180
+                    : 360,
 
-                    Spacer()
+                height:
+                    isMapLocalized
+                    ? 180
+                    : 360
+            )
+            .frame(
+                maxWidth:
+                    .infinity,
+
+                maxHeight:
+                    .infinity,
+
+                alignment:
+                    isMapLocalized
+                    ? .topTrailing
+                    : .center
+            )
+            .padding(
+                .top,
+                isMapLocalized
+                ? 20
+                : 0
+            )
+            .padding(
+                .trailing,
+                isMapLocalized
+                ? 20
+                : 0
+            )
+            .animation(
+                .easeInOut(
+                    duration:
+                        0.45
+                ),
+                value:
+                    isMapLocalized
+            )
 
 
-                    GameMapPreview(
-                        map:
-                            map
+            if isMapLocalized == false {
+
+                VStack(
+                    spacing:
+                        8
+                ) {
+
+                    Text(
+                        "Localize Course"
+                    )
+                    .font(
+                        .largeTitle.bold()
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+
+
+                    Text(
+                        "Scan AprilTag #\(map.referenceTagID)"
+                    )
+                    .font(
+                        .headline
+                    )
+                    .foregroundStyle(
+                        .white.opacity(0.8)
+                    )
+                }
+                .frame(
+                    maxWidth:
+                        .infinity,
+
+                    maxHeight:
+                        .infinity,
+
+                    alignment:
+                        .top
+                )
+                .padding(
+                    .top,
+                    70
+                )
+            }
+
+
+            // MARK: - AR Robot Control
+
+            HStack(
+                spacing:
+                    7
+            ) {
+
+                Button {
+
+                    controller
+                        .placeSimulationAtReference()
+
+                } label: {
+
+                    Image(
+                        systemName:
+                            "arkit"
+                    )
+                    .font(
+                        .subheadline.weight(
+                            .bold
+                        )
                     )
                     .frame(
                         width:
-                            180,
+                            34,
 
                         height:
-                            180
+                            34
                     )
-                    .padding(
-                        .trailing,
-                        20
+                    .accessibilityLabel(
+                        "Place AR Robot at Reference"
                     )
                 }
+                .buttonStyle(
+                    RobotStatusIconButtonStyle(
+                        isEnabled:
+                            controller.realRobotPose != nil
+                    )
+                )
 
 
-                Spacer()
+                Toggle(
+                    "Live Sync",
+                    isOn:
+                        $controller.isLiveSyncEnabled
+                )
+                .font(
+                    .caption.bold()
+                )
+                .foregroundStyle(
+                    .white
+                )
+                .toggleStyle(
+                    .switch
+                )
             }
+            .padding(
+                .leading,
+                7
+            )
+            .padding(
+                .trailing,
+                8
+            )
+            .padding(
+                .vertical,
+                5
+            )
+            .background(
+                .black.opacity(
+                    0.58
+                )
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        8,
+
+                    style:
+                        .continuous
+                )
+            )
+            .frame(
+                maxWidth:
+                    .infinity,
+
+                maxHeight:
+                    .infinity,
+
+                alignment:
+                    .topTrailing
+            )
+            .padding(
+                .trailing,
+                112
+            )
+            .padding(
+                20
+            )
+            .offset(
+                y:
+                    -20
+            )
 
 
 //            // MARK: - Debug Joystick Values
@@ -95,21 +302,24 @@ struct GameView: View {
 
             // MARK: - Joystick
 
-            VStack {
+            if isMapLocalized {
 
-                Spacer()
+                VStack {
 
-                JoystickView(
-                    joystickMonitor:
-                        joystickMonitor,
+                    Spacer()
 
-                    turnJoystickMonitor:
-                        turnJoystickMonitor,
+                    JoystickView(
+                        joystickMonitor:
+                            joystickMonitor,
 
-                    width: 180,
+                        turnJoystickMonitor:
+                            turnJoystickMonitor,
 
-                    shape: .circle
-                )
+                        width: 180,
+
+                        shape: .circle
+                    )
+                }
             }
 
 
