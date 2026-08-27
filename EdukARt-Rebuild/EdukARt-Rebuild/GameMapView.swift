@@ -42,13 +42,13 @@ struct GameMapView: View {
     // MARK: - Settings
 
     private let mapPadding:
-        CGFloat = 14
+        CGFloat = 28
 
     private let minimumExtent:
         Float = 1.0
 
     private let tagSize:
-        CGFloat = 28
+        CGFloat = 24
 
     private let cornerRadius:
         CGFloat = 18
@@ -212,8 +212,6 @@ struct GameMapView: View {
         }
 
 
-        // Final processed centerline.
-        if course.trackPoints.count >= 2 // --------------------------------------------------
             // Final processed centerline
             // --------------------------------------------------
             //
@@ -485,43 +483,92 @@ struct GameMapView: View {
         size: CGSize
     ) -> MapLayout {
 
-        let minX =
+        let realMinX =
             aprilTags
                 .map { $0.x }
                 .min()
             ?? 0
 
-        let maxX =
+        let realMaxX =
             aprilTags
                 .map { $0.x }
                 .max()
             ?? 0
 
-        let minZ =
+        let realMinZ =
             aprilTags
                 .map { $0.z }
                 .min()
             ?? 0
 
-        let maxZ =
+        let realMaxZ =
             aprilTags
                 .map { $0.z }
                 .max()
             ?? 0
 
+
+        // --------------------------------------------------
+        // Actual mapped size
+        // --------------------------------------------------
+
+        let realWidth =
+            realMaxX
+            - realMinX
+
+        let realHeight =
+            realMaxZ
+            - realMinZ
+
+
+        // --------------------------------------------------
+        // Minimum visible map extent
+        // --------------------------------------------------
 
         let width =
             max(
-                maxX - minX,
+                realWidth,
                 minimumExtent
             )
 
         let height =
             max(
-                maxZ - minZ,
+                realHeight,
                 minimumExtent
             )
 
+
+        // --------------------------------------------------
+        // Add artificial empty space symmetrically
+        // --------------------------------------------------
+
+        let extraX =
+            (
+                width
+                - realWidth
+            )
+            / 2
+
+        let extraZ =
+            (
+                height
+                - realHeight
+            )
+            / 2
+
+
+        let minX =
+            realMinX
+            - extraX
+
+        let minZ =
+            realMinZ
+            - extraZ
+
+
+        // --------------------------------------------------
+        // Available screen area
+        // --------------------------------------------------
 
         let usableWidth =
             max(
@@ -540,32 +587,23 @@ struct GameMapView: View {
             )
 
 
-        // IMPORTANT:
-        // X and Z use exactly the same scale.
+        // X and Z use the same scale.
         let scale =
             min(
                 usableWidth
-                    / CGFloat(
-                        width
-                    ),
+                    / CGFloat(width),
 
                 usableHeight
-                    / CGFloat(
-                        height
-                    )
+                    / CGFloat(height)
             )
 
 
         let contentWidth =
-            CGFloat(
-                width
-            )
+            CGFloat(width)
             * scale
 
         let contentHeight =
-            CGFloat(
-                height
-            )
+            CGFloat(height)
             * scale
 
 

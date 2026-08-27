@@ -28,6 +28,9 @@ struct CreateMapView: View {
     @State private var frozenReferenceTagID:
         Int?
 
+    @State private var localizationResetID:
+        Int = 0
+
     @State private var creationStep = CreationStep.createMap
     @State private var mapName = ""
     @State private var showNameDialog = false
@@ -291,7 +294,8 @@ struct CreateMapView: View {
                 eduardModelStore: eduardModelStore,
                 joystickMonitor: joystickMonitor,
                 turnJoystickMonitor: turnJoystickMonitor,
-                mapBuilder: mapBuilder
+                mapBuilder: mapBuilder,
+                localizationResetID: localizationResetID
             )
         } else {
             ZStack {
@@ -416,6 +420,11 @@ struct CreateMapView: View {
                         point.rotation
                 )
             }
+
+
+        print(
+            "# MAP FROZEN | Reference ID \(referenceTagID)"
+        )
     }
 
     private func resetCurrentStep() {
@@ -425,10 +434,15 @@ struct CreateMapView: View {
         case .createMap:
 
             mapBuilder.reset()
+
             course.reset()
 
             frozenAprilTags.removeAll()
-            frozenReferenceTagID = nil
+
+            frozenReferenceTagID =
+                nil
+
+            localizationResetID += 1
 
 
         case .drawRoad:
@@ -527,6 +541,8 @@ struct CreateMapView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
+    // MARK: - Save Map
+
     private func saveMap() {
 
         let name =
@@ -559,6 +575,11 @@ struct CreateMapView: View {
                 trackPoints:
                     course.storedTrackPoints()
             )
+
+
+        print(
+            "# MAP SAVED | Reference ID \(referenceTagID)"
+        )
 
 
         gameMapStore.save(

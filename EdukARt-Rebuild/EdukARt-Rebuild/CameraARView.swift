@@ -51,6 +51,32 @@ struct CameraARView: UIViewRepresentable {
     @ObservedObject var turnJoystickMonitor: JoystickMonitor
 
     @ObservedObject var mapBuilder: AprilTagMapBuilder
+    let localizationResetID:
+        Int
+
+    init(
+        eduardModelStore: EduardModelStore,
+        joystickMonitor: JoystickMonitor,
+        turnJoystickMonitor: JoystickMonitor,
+        mapBuilder: AprilTagMapBuilder,
+        localizationResetID: Int = 0
+    ) {
+
+        self.eduardModelStore =
+            eduardModelStore
+
+        self.joystickMonitor =
+            joystickMonitor
+
+        self.turnJoystickMonitor =
+            turnJoystickMonitor
+
+        self.mapBuilder =
+            mapBuilder
+
+        self.localizationResetID =
+            localizationResetID
+    }
 
     // MARK: - Coordinator
 
@@ -197,6 +223,19 @@ struct CameraARView: UIViewRepresentable {
         context: Context
     ) {
 
+        if context.coordinator.lastLocalizationResetID
+            != localizationResetID {
+
+            context.coordinator
+                .aprilTagLocalization
+                .reset()
+
+            context.coordinator
+                .lastLocalizationResetID =
+                localizationResetID
+        }
+
+
         guard
             context.coordinator.isEduardLocalized,
             let eduard = context.coordinator.eduard
@@ -330,6 +369,9 @@ struct CameraARView: UIViewRepresentable {
         weak var arView: ARView?
         var worldAnchor: AnchorEntity?
         var eduard: Entity?
+
+        var lastLocalizationResetID:
+            Int = 0
         
         // --------------------------------------------------
         // AR objects placed on AprilTags

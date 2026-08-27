@@ -31,7 +31,6 @@ struct GameView: View {
     // MARK: - AprilTag Map
 
     @StateObject private var mapBuilder = AprilTagMapBuilder()
-    @StateObject private var course = Course()
 
     var body: some View {
 
@@ -53,16 +52,37 @@ struct GameView: View {
                     mapBuilder
             )
             .ignoresSafeArea()
-            
-            AprilTagMapView(
-                mapBuilder: mapBuilder,
-                course: course,
-                showsClearCourseButton: false,
-                backgroundColor: .white.opacity(0.1),
-                borderColor: .white.opacity(0.36),
-                borderLineWidth: 2
-            )
-            .offset(x: -20)
+
+
+            // MARK: - Saved Game Map
+
+            VStack {
+
+                HStack {
+
+                    Spacer()
+
+
+                    GameMapPreview(
+                        map:
+                            map
+                    )
+                    .frame(
+                        width:
+                            180,
+
+                        height:
+                            180
+                    )
+                    .padding(
+                        .trailing,
+                        20
+                    )
+                }
+
+
+                Spacer()
+            }
 
 
 //            // MARK: - Debug Joystick Values
