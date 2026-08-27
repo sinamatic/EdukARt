@@ -30,11 +30,6 @@ final class EduardSimulation {
         Entity?
 
 
-    var isVisible: Bool {
-        entity != nil
-    }
-
-
     // MARK: - Wheels
 
     private var frontLeftWheel:
@@ -68,7 +63,7 @@ final class EduardSimulation {
     // MARK: - Settings
 
     private let movementUpdateInterval:
-        Float = 0.05
+        Float = 0.025 // change speed of AR Model
 
 
     // MARK: - Show
@@ -175,6 +170,17 @@ final class EduardSimulation {
     }
 
 
+    // MARK: - Visibility
+
+    func setVisible(
+        _ visible: Bool
+    ) {
+
+        entity?.isEnabled =
+            visible
+    }
+
+
     // MARK: - Set Pose
 
     func setPose(
@@ -199,7 +205,7 @@ final class EduardSimulation {
         // Update lightweight simulation state
         // ----------------------------------------------
 
-        pose.rotation +=
+        pose.rotation -=
             Float(
                 command.rotation
             )
@@ -215,7 +221,7 @@ final class EduardSimulation {
             * movementUpdateInterval
 
         let sideways =
-            Float(
+            -Float(
                 command.sideways
             )
             * movementUpdateInterval
@@ -237,12 +243,12 @@ final class EduardSimulation {
                 * cosRotation
             +
             forward
-                * sinRotation
+                * -sinRotation
 
 
         pose.position.z +=
             forward
-                * cosRotation
+                * -cosRotation
             -
             sideways
                 * sinRotation

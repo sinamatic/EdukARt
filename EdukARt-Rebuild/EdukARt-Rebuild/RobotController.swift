@@ -87,6 +87,13 @@ final class RobotController:
         false
 
 
+    // MARK: - AR Robot Visibility
+
+    @Published private(set)
+    var isSimulationVisible =
+        true
+
+
     // MARK: - Physical Robot State
 
     @Published private(set)
@@ -173,6 +180,23 @@ final class RobotController:
         }
 
         return .disconnected
+    }
+
+
+    // MARK: - Effective Control Mode
+
+    private var effectiveControlMode:
+        RobotControlMode {
+
+        // If the physical robot cannot receive commands,
+        // automatically fall back to the AR simulation.
+        if isConnected == false
+            || isEnabled == false {
+
+            return .simulation
+        }
+
+        return controlMode
     }
 
 
@@ -482,7 +506,7 @@ final class RobotController:
             Eduard.LightMode
     ) {
 
-        switch controlMode {
+        switch effectiveControlMode {
 
         case .real:
 
@@ -519,6 +543,16 @@ final class RobotController:
 
         eduardSimulation.setPose(
             .zero
+        )
+    }
+
+
+    func toggleSimulationVisibility() {
+
+        isSimulationVisible.toggle()
+
+        eduardSimulation.setVisible(
+            isSimulationVisible
         )
     }
 
@@ -577,21 +611,13 @@ final class RobotController:
             currentDriveCommand()
 
 
-        switch controlMode {
-
+        switch effectiveControlMode {
 
         // --------------------------------------------------
         // Physical Eduard only
         // --------------------------------------------------
 
         case .real:
-
-            guard isEnabled
-
-            else {
-                return
-            }
-
 
             eduard.drive(
                 command
@@ -604,10 +630,9 @@ final class RobotController:
 
         case .simulation:
 
-            eduardSimulation
-                .drive(
-                    command
-                )
+            eduardSimulation.drive(
+                command
+            )
 
 
         // --------------------------------------------------
@@ -616,29 +641,17 @@ final class RobotController:
 
         case .synchronized:
 
-            guard isEnabled
-
-            else {
-                return
-            }
-
-
             eduard.drive(
                 command
             )
 
+            // The simulated position is supplied by
+            // AprilTag #0 while synchronized.
+            // Only animate the wheels here.
 
-            // Do NOT move the simulated pose here.
-            //
-            // Its position comes from AprilTag #0.
-            //
-            // If the AR model is hidden,
-            // animate() immediately returns.
-
-            eduardSimulation
-                .animate(
-                    command
-                )
+            eduardSimulation.animate(
+                command
+            )
         }
     }
 
@@ -666,7 +679,7 @@ final class RobotController:
         if driveMode == .mechanum {
 
             rotation =
-                -mechanumRotationInput
+                mechanumRotationInput
                 * maxAngularSpeed
 
         } else if driveMode == .offroad {

@@ -98,6 +98,15 @@ final class AprilTagLocalization {
         simd_float4x4?
 
 
+    // MARK: - Map Reference World Transform
+
+    var mapReferenceWorldTransform:
+        simd_float4x4? {
+
+        referenceTagWorldTransform
+    }
+
+
     // --------------------------------------------------
     // Reference state
     // --------------------------------------------------

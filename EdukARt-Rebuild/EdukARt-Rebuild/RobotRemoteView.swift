@@ -213,51 +213,40 @@ private extension RobotRemoteView {
             
             if driveExpanded {
                 JoystickView(
-                    joystickMonitor: joystickMonitor,
-                    turnJoystickMonitor: turnJoystickMonitor,
-                    width: 180,
-                    shape: .circle
-                )
-                .frame(maxWidth: .infinity)
-                .onChange(
-                    of:
-                        joystickMonitor.xyPoint
-                ) { _, input in
+                            joystickMonitor:
+                                joystickMonitor,
 
-                    controller.updateJoystickInput(
-                        x:
-                            Float(input.x / 180),
+                            turnJoystickMonitor:
+                                turnJoystickMonitor,
 
-                        y:
-                            Float(input.y / 180)
-                    )
-                }
-                .onChange(
-                    of:
-                        turnJoystickMonitor.xyPoint
-                ) { _, input in
+                            width:
+                                180,
 
-                    let rotationInput =
-                        Float(input.x / 120)
+                            shape:
+                                .circle
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .onChange(
+                            of:
+                                joystickMonitor.xyPoint
+                        ) { _, input in
 
-                    controller.updateMechanumRotationInput(
-                        x:
-                            rotationInput
-                    )
-                }
-                
-                .onDisappear {
+                            controller.updateJoystickInput(
+                                x:
+                                    Float(
+                                        input.x / 180
+                                    ),
 
-                    controller.stopJoystick()
-
-                    controller.stopMechanumRotation()
-                }
-
-                Text(
-                    "Forward: \(joystickMonitor.xyPoint.y, specifier: "%.2f")   Sideways: \(joystickMonitor.xyPoint.x, specifier: "%.2f")   Turn: \(turnJoystickMonitor.xyPoint.x, specifier: "%.2f")"
-                )
-                .font(.caption)
-                .frame(maxWidth: .infinity)
+                                y:
+                                    Float(
+                                        input.y / 180
+                                    )
+                            )
+                        }
+                        
             }
             
             

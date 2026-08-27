@@ -8,6 +8,7 @@
 
 import SwiftUI
 import SwiftUIJoystick
+import UIKit
 
 struct GameView: View {
 
@@ -21,6 +22,9 @@ struct GameView: View {
             GameMap
 
     @State private var isMapLocalized =
+        false
+
+    @State private var isARMenuOpen =
         false
     
     
@@ -41,57 +45,29 @@ struct GameView: View {
     var body: some View {
 
         gameContent
-            .onChange(
-                of:
-                    joystickMonitor.xyPoint,
-                handleDriveJoystickChange
-            )
-            .onChange(
-                of:
-                    turnJoystickMonitor.xyPoint,
-                handleTurnJoystickChange
+            .background(
+                SwipeBackDisabler()
             )
     }
 
 
     private var gameContent: some View {
 
-        ZStack {
+        ZStack(
+            alignment:
+                .topLeading
+        ) {
 
             arView
             savedMapView
+                .allowsHitTesting(false)
             localizationHeading
+                .allowsHitTesting(false)
             arRobotControl
             joystickControl
         }
     }
 
-
-    private func handleDriveJoystickChange(
-        _ oldValue: CGPoint,
-        _ point: CGPoint
-    ) {
-
-        controller.updateJoystickInput(
-            x:
-                Float(point.x / 180),
-
-            y:
-                Float(point.y / 180)
-        )
-    }
-
-
-    private func handleTurnJoystickChange(
-        _ oldValue: CGPoint,
-        _ point: CGPoint
-    ) {
-
-        controller.updateMechanumRotationInput(
-            x:
-                Float(point.x / 120)
-        )
-    }
 
 
     // MARK: - AR View
@@ -196,6 +172,7 @@ struct GameView: View {
             value:
                 isMapLocalized
         )
+        .allowsHitTesting(false)
     }
 
 
@@ -255,14 +232,24 @@ struct GameView: View {
     private var arRobotControl: some View {
 
         HStack(
+            alignment:
+                .top,
+            
             spacing:
-                7
+                8
         ) {
 
             Button {
 
-                controller
-                    .placeSimulationAtReference()
+                withAnimation(
+                    .easeInOut(
+                        duration:
+                            0.2
+                    )
+                ) {
+
+                    isARMenuOpen.toggle()
+                }
 
             } label: {
 
@@ -283,78 +270,227 @@ struct GameView: View {
                         34
                 )
                 .accessibilityLabel(
-                    "Place AR Robot at Reference"
+                    "AR Menu"
                 )
             }
             .buttonStyle(
                 RobotStatusIconButtonStyle(
                     isEnabled:
-                        controller.realRobotPose != nil
+                        isARMenuOpen
                 )
             )
 
 
-            Toggle(
-                "Live Sync",
-                isOn:
-                    $controller.isLiveSyncEnabled
-            )
-            .font(
-                .caption.bold()
-            )
-            .foregroundStyle(
-                .white
-            )
-            .toggleStyle(
-                .switch
-            )
+            if isARMenuOpen {
+
+                VStack(
+                    alignment:
+                        .leading,
+
+                    spacing:
+                        8
+                ) {
+
+                    Button {
+
+                        controller
+                            .placeSimulationAtReference()
+
+                    } label: {
+
+                        arMenuRow(
+                            icon:
+                                "scope",
+
+                            title:
+                                "PlaceOnTag",
+
+                            subtitle:
+                                "Reference origin"
+                        )
+                    }
+
+
+                    Button {
+
+                        controller
+                            .synchronizeSimulationToEduard()
+
+                    } label: {
+
+                        arMenuRow(
+                            icon:
+                                "arrow.triangle.2.circlepath",
+
+                            title:
+                                "Sync",
+
+                            subtitle:
+                                "Copy robot pose"
+                        )
+                    }
+
+
+                    Button {
+
+                        controller.isLiveSyncEnabled.toggle()
+
+                    } label: {
+
+                        arMenuRow(
+                            icon:
+                                "dot.radiowaves.left.and.right",
+
+                            title:
+                                "Live Sync",
+
+                            subtitle:
+                                controller.isLiveSyncEnabled
+                                ? "Aktiv"
+                                : "Inaktiv",
+
+                            statusIcon:
+                                controller.isLiveSyncEnabled
+                                ? "checkmark.circle.fill"
+                                : "xmark.circle.fill",
+
+                            statusColor:
+                                controller.isLiveSyncEnabled
+                                ? .green
+                                : .red
+                        )
+                    }
+
+
+                    Button {
+
+                        controller
+                            .toggleSimulationVisibility()
+
+                    } label: {
+
+                        arMenuRow(
+                            icon:
+                                controller.isSimulationVisible
+                                ? "eye.slash"
+                                : "arkit",
+
+                            title:
+                                controller.isSimulationVisible
+                                ? "Hide AR"
+                                : "Show AR",
+
+                            subtitle:
+                                "Model visibility"
+                        )
+                    }
+                }
+                .font(
+                    .caption.bold()
+                )
+                .foregroundStyle(
+                    .white
+                )
+                .padding(
+                    8
+                )
+                .background(
+                    .black.opacity(
+                        0.68
+                    )
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            8,
+
+                        style:
+                            .continuous
+                    )
+                )
+            }
         }
-        .padding(
-            .leading,
-            7
+        .buttonStyle(
+            .plain
         )
         .padding(
-            .trailing,
+            .top,
             8
         )
         .padding(
-            .vertical,
-            5
+            .leading,
+            16
         )
-        .background(
-            .black.opacity(
-                0.58
-            )
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius:
-                    8,
+    }
 
-                style:
-                    .continuous
-            )
-        )
-        .frame(
-            width:
-                170
-        )
-        .frame(
-            maxWidth:
-                .infinity,
 
-            maxHeight:
-                .infinity,
+    private func arMenuRow(
+        icon: String,
+        title: String,
+        subtitle: String,
+        statusIcon: String? = nil,
+        statusColor: Color = .white
+    ) -> some View {
+
+        VStack(
+            alignment:
+                .leading,
+
+            spacing:
+                2
+        ) {
+
+            HStack(
+                spacing:
+                    7
+            ) {
+
+                Image(
+                    systemName:
+                        icon
+                )
+                .frame(
+                    width:
+                        18
+                )
+
+                Text(
+                    title
+                )
+
+                if let statusIcon {
+
+                    Image(
+                        systemName:
+                            statusIcon
+                    )
+                    .foregroundStyle(
+                        statusColor
+                    )
+                }
+            }
+
+            Text(
+                subtitle
+            )
+            .font(
+                .caption2
+            )
+            .foregroundStyle(
+                .white.opacity(
+                    0.72
+                )
+            )
+        }
+        .frame(
+            minWidth:
+                118,
 
             alignment:
-                .top
+                .leading
         )
-        .padding(
-            20
-        )
-        .offset(
-            y:
-                -70
+        .contentShape(
+            Rectangle()
         )
     }
 
@@ -370,18 +506,154 @@ struct GameView: View {
 
                 Spacer()
 
-                JoystickView(
-                    joystickMonitor:
-                        joystickMonitor,
+                joystickView
 
-                    turnJoystickMonitor:
-                        turnJoystickMonitor,
 
-                    width: 180,
-
-                    shape: .circle
+                Text(
+                    joystickDebugText
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .white
+                )
+                .frame(
+                    maxWidth:
+                        .infinity
                 )
             }
         }
+    }
+
+
+    private var joystickView: some View {
+
+        JoystickView(
+            joystickMonitor:
+                joystickMonitor,
+
+            turnJoystickMonitor:
+                turnJoystickMonitor,
+
+            width:
+                180,
+
+            shape:
+                .circle
+        )
+        .frame(
+            maxWidth:
+                .infinity
+        )
+        .onChange(
+            of:
+                joystickMonitor.xyPoint,
+            perform:
+                handleJoystickInput
+        )
+        .onChange(
+            of:
+                turnJoystickMonitor.xyPoint,
+            perform:
+                handleTurnJoystickInput
+        )
+        .onDisappear(
+            perform:
+                stopJoystickInput
+        )
+    }
+
+
+    private func handleJoystickInput(
+        _ input: CGPoint
+    ) {
+
+        controller.updateJoystickInput(
+            x:
+                Float(
+                    input.x / 180
+                ),
+
+            y:
+                Float(
+                    input.y / 180
+                )
+        )
+    }
+
+
+    private func handleTurnJoystickInput(
+        _ input: CGPoint
+    ) {
+
+        controller.updateMechanumRotationInput(
+            x:
+                Float(
+                    input.x / 120
+                )
+        )
+    }
+
+
+    private func stopJoystickInput() {
+
+        controller.stopJoystick()
+
+        controller.stopMechanumRotation()
+    }
+
+
+    private var joystickDebugText:
+        String {
+
+        String(
+            format:
+                "Forward: %.2f   Sideways: %.2f   Turn: %.2f",
+            joystickMonitor.xyPoint.y,
+            joystickMonitor.xyPoint.x,
+            turnJoystickMonitor.xyPoint.x
+        )
+    }
+
+}
+
+private struct SwipeBackDisabler:
+    UIViewControllerRepresentable {
+
+    func makeUIViewController(
+        context: Context
+    ) -> UIViewController {
+
+        UIViewController()
+    }
+
+
+    func updateUIViewController(
+        _ uiViewController: UIViewController,
+        context: Context
+    ) {
+
+        DispatchQueue.main.async {
+
+            uiViewController
+                .navigationController?
+                .interactivePopGestureRecognizer?
+                .isEnabled =
+                false
+        }
+    }
+
+
+    static func dismantleUIViewController(
+        _ uiViewController: UIViewController,
+        coordinator: ()
+    ) {
+
+        uiViewController
+            .navigationController?
+            .interactivePopGestureRecognizer?
+            .isEnabled =
+            true
     }
 }

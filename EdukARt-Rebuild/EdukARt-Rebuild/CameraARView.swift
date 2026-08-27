@@ -232,31 +232,19 @@ struct CameraARView: UIViewRepresentable {
             let simulationRoot =
                 Entity()
 
-            context.coordinator.simulationRoot =
-                simulationRoot
-
 
             let eduard =
                 model.clone(
                     recursive: true
                 )
 
-            eduard.orientation =
-                simd_quatf(
-                    angle:
-                        .pi,
-
-                    axis:
-                        SIMD3<Float>(
-                            1,
-                            0,
-                            0
-                        )
-                )
 
             simulationRoot.addChild(
                 eduard
             )
+
+            context.coordinator.simulationRoot =
+                simulationRoot
 
             context.coordinator.eduard =
                 eduard
@@ -264,6 +252,10 @@ struct CameraARView: UIViewRepresentable {
             controller.eduardSimulation.show(
                 entity:
                     simulationRoot
+            )
+
+            controller.eduardSimulation.setVisible(
+                controller.isSimulationVisible
             )
 
             print(
@@ -296,6 +288,7 @@ struct CameraARView: UIViewRepresentable {
                 .aprilTagLocalization
                 .reset()
 
+
             if context.coordinator.requiredReferenceTagID > 0 {
 
                 context.coordinator
@@ -307,16 +300,11 @@ struct CameraARView: UIViewRepresentable {
                     )
             }
 
+
             context.coordinator
                 .lastLocalizationResetID =
                 localizationResetID
         }
-
-
-        // Apply the latest logical simulation pose
-        // to the RealityKit entity.
-        context.coordinator
-            .updateSimulationEntity()
     }
 
 
@@ -613,10 +601,15 @@ struct CameraARView: UIViewRepresentable {
 
                         DispatchQueue.main.async {
 
-                            self.localizeMapAnchor(
-                                with:
-                                    mapPose.worldTransform
-                            )
+                            if let mapReferenceWorldTransform =
+                                self.aprilTagLocalization
+                                    .mapReferenceWorldTransform {
+
+                                self.localizeMapAnchor(
+                                    with:
+                                        mapReferenceWorldTransform
+                                )
+                            }
 
                             self
                                 .onReferenceTagLocalized()
@@ -789,6 +782,11 @@ struct CameraARView: UIViewRepresentable {
             )
 
 
+            // Attach the virtual robot to the
+            // localized map coordinate system.
+            attachSimulationToMap()
+
+
             print(
                 "# MAP ANCHOR LOCALIZED"
             )
@@ -797,7 +795,7 @@ struct CameraARView: UIViewRepresentable {
 
         // MARK: - Update Simulation Entity
 
-        func updateSimulationEntity() {
+        func attachSimulationToMap() {
 
             guard
                 let mapAnchor,
@@ -807,7 +805,6 @@ struct CameraARView: UIViewRepresentable {
             }
 
 
-            // Attach Eduard to the localized map coordinate system.
             if simulationRoot.parent !== mapAnchor {
 
                 simulationRoot.removeFromParent()
@@ -816,30 +813,6 @@ struct CameraARView: UIViewRepresentable {
                     simulationRoot
                 )
             }
-
-
-            let pose =
-                controller
-                    .eduardSimulation
-                    .pose
-
-
-            simulationRoot.position =
-                pose.position
-
-
-            simulationRoot.orientation =
-                simd_quatf(
-                    angle:
-                        pose.rotation,
-
-                    axis:
-                        SIMD3<Float>(
-                            0,
-                            1,
-                            0
-                        )
-                )
         }
         
 
