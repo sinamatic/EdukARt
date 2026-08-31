@@ -12,8 +12,10 @@
 //  Created by Sina Steinmüller on 21.08.26.
 
 
+import Foundation
 import RealityKit
 import simd
+import UIKit
 
 
 final class EduardSimulation {
@@ -44,6 +46,9 @@ final class EduardSimulation {
     private var backRightWheel:
         Entity?
 
+    private var wheelAnimationDebugCounter =
+        0
+
 
     // MARK: - Lights
 
@@ -65,6 +70,9 @@ final class EduardSimulation {
     private let movementUpdateInterval:
         Float = 0.01 // change speed of AR Model
 
+    private let wheelRotationSpeed:
+        Float = 0.12
+
 
     // MARK: - Show
 
@@ -81,25 +89,25 @@ final class EduardSimulation {
         frontLeftWheel =
             entity.findEntity(
                 named:
-                    "wheel-front-left"
+                    "wheel_front_left"
             )
 
         frontRightWheel =
             entity.findEntity(
                 named:
-                    "wheel-front-right"
+                    "wheel_front_right"
             )
 
         backLeftWheel =
             entity.findEntity(
                 named:
-                    "wheel-back-left"
+                    "wheel_back_left"
             )
 
         backRightWheel =
             entity.findEntity(
                 named:
-                    "wheel-back-right"
+                    "wheel_back_right"
             )
 
 
@@ -108,28 +116,30 @@ final class EduardSimulation {
         frontLeftLight =
             entity.findEntity(
                 named:
-                    "chassis-led-front-left"
+                    "chassis_led_front_left"
             )
 
         frontRightLight =
             entity.findEntity(
                 named:
-                    "chassis-led-front-right"
+                    "chassis_led_front_right"
             )
 
         backLeftLight =
             entity.findEntity(
                 named:
-                    "chassis-led-back-left"
+                    "chassis_led_back_left"
             )
 
         backRightLight =
             entity.findEntity(
                 named:
-                    "chassis-led-back.right"
+                    "chassis_led_back_right"
             )
 
 
+        printEntityLookupStatus()
+        applyDefaultLightMaterials()
         applyPose()
     }
 
@@ -325,6 +335,113 @@ final class EduardSimulation {
     }
 
 
+    private func applyDefaultLightMaterials() {
+
+        applyLightMaterial(
+            to:
+                frontLeftLight,
+
+            color:
+                .white
+        )
+
+        applyLightMaterial(
+            to:
+                frontRightLight,
+
+            color:
+                .white
+        )
+
+        applyLightMaterial(
+            to:
+                backLeftLight,
+
+            color:
+                .red
+        )
+
+        applyLightMaterial(
+            to:
+                backRightLight,
+
+            color:
+                .red
+        )
+    }
+
+
+    private func applyLightMaterial(
+        to entity: Entity?,
+        color: UIColor
+    ) {
+
+        guard let entity
+        else {
+            return
+        }
+
+
+        let material =
+            SimpleMaterial(
+                color:
+                    color,
+
+                isMetallic:
+                    false
+            )
+
+
+        applyMaterial(
+            material,
+            to:
+                entity
+        )
+    }
+
+
+    private func applyMaterial(
+        _ material: RealityKit.Material,
+        to entity: Entity
+    ) {
+
+        if var modelComponent =
+            entity.components[ModelComponent.self] {
+
+            modelComponent.materials =
+                [
+                    material
+                ]
+
+            entity.components.set(
+                modelComponent
+            )
+        }
+
+
+        for child in entity.children {
+
+            applyMaterial(
+                material,
+                to:
+                    child
+            )
+        }
+    }
+
+
+    private func printEntityLookupStatus() {
+
+        print(
+            "# EDUARD MODEL ENTITIES | wheels FL \(frontLeftWheel != nil) | FR \(frontRightWheel != nil) | BL \(backLeftWheel != nil) | BR \(backRightWheel != nil)"
+        )
+
+        print(
+            "# EDUARD MODEL ENTITIES | lights FL \(frontLeftLight != nil) | FR \(frontRightLight != nil) | BL \(backLeftLight != nil) | BR \(backRightLight != nil)"
+        )
+    }
+
+
     // MARK: - Apply Pose
 
     private func applyPose() {
@@ -377,6 +494,23 @@ final class EduardSimulation {
             )
 
 
+        wheelAnimationDebugCounter +=
+            1
+
+        if wheelAnimationDebugCounter % 20 == 0 {
+
+            print(
+                String(
+                    format:
+                        "# WHEEL COMMAND | forward %+6.3f | sideways %+6.3f | rotation %+6.3f",
+                    forward,
+                    sideways,
+                    rotation
+                )
+            )
+        }
+
+
         // Simple Mecanum wheel mixing.
 
         let frontLeft =
@@ -400,28 +534,51 @@ final class EduardSimulation {
             - rotation
 
 
+        if wheelAnimationDebugCounter % 20 == 0 {
+
+            print(
+                String(
+                    format:
+                        "# WHEEL SPEEDS | FL %+6.3f | FR %+6.3f | BL %+6.3f | BR %+6.3f",
+                    frontLeft,
+                    frontRight,
+                    backLeft,
+                    backRight
+                )
+            )
+        }
+
+
         rotateWheel(
             frontLeftWheel,
             speed:
-                frontLeft
+                frontLeft,
+            direction:
+                1
         )
 
         rotateWheel(
             frontRightWheel,
             speed:
-                frontRight
+                frontRight,
+            direction:
+                -1
         )
 
         rotateWheel(
             backLeftWheel,
             speed:
-                backLeft
+                backLeft,
+            direction:
+                1
         )
 
         rotateWheel(
             backRightWheel,
             speed:
-                backRight
+                backRight,
+            direction:
+                -1
         )
     }
 
@@ -430,11 +587,20 @@ final class EduardSimulation {
 
     private func rotateWheel(
         _ wheel: Entity?,
-        speed: Float
+        speed: Float,
+        direction: Float
     ) {
 
         guard let wheel
         else {
+
+            if wheelAnimationDebugCounter % 20 == 0 {
+
+                print(
+                    "# WHEEL ENTITY MISSING"
+                )
+            }
+
             return
         }
 
@@ -443,7 +609,8 @@ final class EduardSimulation {
             simd_quatf(
                 angle:
                     speed
-                    * movementUpdateInterval,
+                    * direction
+                    * wheelRotationSpeed,
 
                 axis:
                     SIMD3<Float>(
