@@ -53,6 +53,8 @@ struct CameraARView: UIViewRepresentable {
     @ObservedObject var mapBuilder: AprilTagMapBuilder
     @ObservedObject var controller:
         RobotController
+    let gameMap:
+        GameMap?
     let localizationResetID:
         Int
     let requiredReferenceTagID:
@@ -68,6 +70,7 @@ struct CameraARView: UIViewRepresentable {
         turnJoystickMonitor: JoystickMonitor,
         mapBuilder: AprilTagMapBuilder,
         controller: RobotController,
+        gameMap: GameMap? = nil,
         localizationResetID: Int = 0,
         requiredReferenceTagID: Int = 0,
         onReferenceTagLocalized: @escaping () -> Void = {},
@@ -88,6 +91,9 @@ struct CameraARView: UIViewRepresentable {
 
         self.controller =
             controller
+
+        self.gameMap =
+            gameMap
 
         self.localizationResetID =
             localizationResetID
@@ -112,6 +118,9 @@ struct CameraARView: UIViewRepresentable {
 
             controller:
                 controller,
+
+            gameMap:
+                gameMap,
 
             requiredReferenceTagID:
                 requiredReferenceTagID,
@@ -304,6 +313,10 @@ struct CameraARView: UIViewRepresentable {
             context.coordinator
                 .lastLocalizationResetID =
                 localizationResetID
+
+            context.coordinator
+                .hasRenderedTrack =
+                false
         }
     }
 
@@ -320,8 +333,13 @@ struct CameraARView: UIViewRepresentable {
 
         weak var arView: ARView?
         var mapAnchor: AnchorEntity?
+        var mapRoot: Entity?
         var simulationRoot: Entity?
         var eduard: Entity?
+        private let trackRenderer =
+            ARTrackRenderer()
+        var hasRenderedTrack =
+            false
 
         var lastLocalizationResetID:
             Int = 0
@@ -344,6 +362,8 @@ struct CameraARView: UIViewRepresentable {
         let mapBuilder: AprilTagMapBuilder
         let controller:
             RobotController
+        let gameMap:
+            GameMap?
         let requiredReferenceTagID:
             Int
         let onReferenceTagLocalized:
@@ -354,6 +374,7 @@ struct CameraARView: UIViewRepresentable {
         init(
             mapBuilder: AprilTagMapBuilder,
             controller: RobotController,
+            gameMap: GameMap?,
             requiredReferenceTagID: Int,
             onReferenceTagLocalized: @escaping () -> Void,
             onRobotPoseUpdated: @escaping (RobotPose) -> Void
@@ -364,6 +385,9 @@ struct CameraARView: UIViewRepresentable {
 
             self.controller =
                 controller
+
+            self.gameMap =
+                gameMap
 
             self.requiredReferenceTagID =
                 requiredReferenceTagID
@@ -605,9 +629,16 @@ struct CameraARView: UIViewRepresentable {
                                 self.aprilTagLocalization
                                     .mapReferenceWorldTransform {
 
+                                let mapRootTransform =
+                                    self.makeMapRootTransform(
+                                        from:
+                                            mapReferenceWorldTransform
+                                    )
+
+
                                 self.localizeMapAnchor(
                                     with:
-                                        mapReferenceWorldTransform
+                                        mapRootTransform
                                 )
                             }
 
@@ -667,6 +698,97 @@ struct CameraARView: UIViewRepresentable {
                     error
                 )
             }
+        }
+
+
+        // MARK: - Stable Map Transform
+
+        private func makeMapRootTransform(
+            from transform: simd_float4x4
+        ) -> simd_float4x4 {
+
+            // Position of the detected reference AprilTag.
+            let position =
+                SIMD3<Float>(
+                    transform.columns.3.x,
+                    transform.columns.3.y,
+                    transform.columns.3.z
+                )
+
+
+            // Take the tag's X direction,
+            // but project it onto ARKit's horizontal X/Z plane.
+            var xAxis =
+                SIMD3<Float>(
+                    transform.columns.0.x,
+                    0,
+                    transform.columns.0.z
+                )
+
+
+            guard simd_length(xAxis) > 0.001
+            else {
+                return transform
+            }
+
+
+            xAxis =
+                simd_normalize(
+                    xAxis
+                )
+
+
+            // ARKit Y is the vertical direction.
+            let yAxis =
+                SIMD3<Float>(
+                    0,
+                    1,
+                    0
+                )
+
+
+            // Build the matching horizontal Z axis.
+            let zAxis =
+                simd_normalize(
+                    simd_cross(
+                        xAxis,
+                        yAxis
+                    )
+                )
+
+
+            return simd_float4x4(
+                columns: (
+
+                    SIMD4<Float>(
+                        xAxis.x,
+                        xAxis.y,
+                        xAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        yAxis.x,
+                        yAxis.y,
+                        yAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        zAxis.x,
+                        zAxis.y,
+                        zAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        position.x,
+                        position.y,
+                        position.z,
+                        1
+                    )
+                )
+            )
         }
         
         // MARK: - Place AR Cube
@@ -781,6 +903,18 @@ struct CameraARView: UIViewRepresentable {
                     nil
             )
 
+            let mapRoot =
+                ensureMapRoot(
+                    in:
+                        mapAnchor
+                )
+
+
+            renderTrackIfNeeded(
+                in:
+                    mapRoot
+            )
+
 
             // Attach the virtual robot to the
             // localized map coordinate system.
@@ -790,6 +924,57 @@ struct CameraARView: UIViewRepresentable {
             print(
                 "# MAP ANCHOR LOCALIZED"
             )
+        }
+
+
+        private func ensureMapRoot(
+            in mapAnchor: Entity
+        ) -> Entity {
+
+            if let mapRoot {
+                return mapRoot
+            }
+
+
+            let mapRoot =
+                Entity()
+
+            mapRoot.name =
+                "MapRoot"
+
+            mapAnchor.addChild(
+                mapRoot
+            )
+
+            self.mapRoot =
+                mapRoot
+
+
+            return mapRoot
+        }
+
+
+        private func renderTrackIfNeeded(
+            in mapRoot: Entity
+        ) {
+
+            guard hasRenderedTrack == false,
+                  let gameMap
+            else {
+                return
+            }
+
+
+            trackRenderer.render(
+                trackPoints:
+                    gameMap.trackPoints,
+
+                parent:
+                    mapRoot
+            )
+
+            hasRenderedTrack =
+                true
         }
 
 

@@ -90,6 +90,9 @@ struct GameView: View {
             controller:
                 controller,
 
+            gameMap:
+                map,
+
             requiredReferenceTagID:
                 map.referenceTagID,
 
