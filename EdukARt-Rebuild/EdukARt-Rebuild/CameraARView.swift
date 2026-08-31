@@ -317,6 +317,22 @@ struct CameraARView: UIViewRepresentable {
             context.coordinator
                 .hasRenderedTrack =
                 false
+
+            context.coordinator
+                .hasRenderedMapObjects =
+                false
+
+            context.coordinator
+                .mapObjectAnimationSubscription?
+                .cancel()
+
+            context.coordinator
+                .mapObjectAnimationSubscription =
+                nil
+
+            context.coordinator
+                .animatedMapObjects
+                .removeAll()
         }
     }
 
@@ -340,6 +356,14 @@ struct CameraARView: UIViewRepresentable {
             ARTrackRenderer()
         var hasRenderedTrack =
             false
+        var hasRenderedMapObjects =
+            false
+        var mapObjectAnimationSubscription:
+            Cancellable?
+        var mapObjectAnimationTime:
+            Float = 0
+        var animatedMapObjects:
+            [AnimatedMapObject] = []
 
         var lastLocalizationResetID:
             Int = 0
@@ -410,6 +434,22 @@ struct CameraARView: UIViewRepresentable {
                             requiredReferenceTagID
                     )
             }
+        }
+
+
+        struct AnimatedMapObject {
+
+            let entity:
+                Entity
+
+            let basePosition:
+                SIMD3<Float>
+
+            let baseOrientation:
+                simd_quatf
+
+            let phase:
+                Float
         }
 
         // --------------------------------------------------
@@ -915,6 +955,11 @@ struct CameraARView: UIViewRepresentable {
                     mapRoot
             )
 
+            renderMapObjectsIfNeeded(
+                in:
+                    mapRoot
+            )
+
 
             // Attach the virtual robot to the
             // localized map coordinate system.
@@ -978,6 +1023,238 @@ struct CameraARView: UIViewRepresentable {
 
             hasRenderedTrack =
                 true
+        }
+
+
+        private func renderMapObjectsIfNeeded(
+            in mapRoot: Entity
+        ) {
+
+            guard hasRenderedMapObjects == false,
+                  let gameMap
+            else {
+                return
+            }
+
+
+            hasRenderedMapObjects =
+                true
+
+            mapRoot
+                .findEntity(
+                    named: "ARMapObjects"
+                )?
+                .removeFromParent()
+
+
+            let mapObjects =
+                gameMap.mapObjects
+
+            guard mapObjects.isEmpty == false
+            else {
+                return
+            }
+
+
+            Task { @MainActor in
+
+                let objectsRoot =
+                    Entity()
+
+                objectsRoot.name =
+                    "ARMapObjects"
+
+
+                for object in mapObjects {
+
+                    guard let modelName =
+                        object.type.modelName
+                    else {
+                        continue
+                    }
+
+
+                    do {
+
+                        let entity =
+                            try await Entity(
+                                named:
+                                    modelName
+                            )
+
+                        let objectRoot =
+                            Entity()
+
+                        objectRoot.name =
+                            "ARMapObject-\(object.id)"
+
+                        let basePosition =
+                            SIMD3<Float>(
+                                object.x,
+                                0.02,
+                                object.z
+                            )
+
+                        objectRoot.position =
+                            basePosition
+
+
+                        let uprightRotation =
+                            simd_quatf(
+                                angle:
+                                    0,
+
+                                axis:
+                                    SIMD3<Float>(
+                                        0,
+                                        0,
+                                        1
+                                    )
+                            )
+
+                        let mapRotation =
+                            simd_quatf(
+                                angle:
+                                    object.rotation,
+
+                                axis:
+                                    SIMD3<Float>(
+                                        0,
+                                        1,
+                                        0
+                                    )
+                            )
+
+                        let baseOrientation =
+                            mapRotation
+                            * uprightRotation
+
+                        objectRoot.orientation =
+                            baseOrientation
+
+                        entity.scale *=
+                            SIMD3<Float>(
+                                repeating:
+                                    0.3
+                            )
+
+                        objectRoot.addChild(
+                            entity
+                        )
+
+                        objectsRoot.addChild(
+                            objectRoot
+                        )
+
+                        animatedMapObjects.append(
+                            AnimatedMapObject(
+                                entity:
+                                    objectRoot,
+
+                                basePosition:
+                                    basePosition,
+
+                                baseOrientation:
+                                    baseOrientation,
+
+                                phase:
+                                    Float(
+                                        animatedMapObjects.count
+                                    )
+                                    * 0.7
+                            )
+                        )
+
+                    } catch {
+
+                        print(
+                            "# MAP OBJECT MODEL LOAD FAILED | \(modelName) |",
+                            error
+                        )
+                    }
+                }
+
+
+                guard objectsRoot.children.isEmpty == false
+                else {
+                    return
+                }
+
+
+                mapRoot.addChild(
+                    objectsRoot
+                )
+
+                startMapObjectAnimationIfNeeded()
+            }
+        }
+
+
+        private func startMapObjectAnimationIfNeeded() {
+
+            guard mapObjectAnimationSubscription == nil,
+                  let arView
+            else {
+                return
+            }
+
+
+            mapObjectAnimationSubscription =
+                arView.scene.subscribe(
+                    to:
+                        SceneEvents.Update.self
+                ) { [weak self] event in
+
+                    guard let self
+                    else {
+                        return
+                    }
+
+
+                    self.mapObjectAnimationTime +=
+                        Float(
+                            event.deltaTime
+                        )
+
+
+                    for object in self.animatedMapObjects {
+
+                        let time =
+                            self.mapObjectAnimationTime
+                            + object.phase
+
+                        let verticalOffset =
+                            sin(time * 3.2)
+                            * 0.018
+
+                        let rotationOffset =
+                            sin(time * 4.0)
+                            * 0.10
+
+
+                        object.entity.position =
+                            object.basePosition
+                            + SIMD3<Float>(
+                                0,
+                                verticalOffset,
+                                0
+                            )
+
+                        object.entity.orientation =
+                            simd_quatf(
+                                angle:
+                                    rotationOffset,
+
+                                axis:
+                                    SIMD3<Float>(
+                                        0,
+                                        1,
+                                        0
+                                    )
+                            )
+                            * object.baseOrientation
+                    }
+                }
         }
 
 

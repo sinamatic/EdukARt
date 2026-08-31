@@ -283,6 +283,18 @@ enum MapObjectType:
             false
         }
     }
+
+    var modelName: String? {
+
+        switch self {
+
+        case .shit:
+            "Shit"
+
+        default:
+            nil
+        }
+    }
 }
 
 

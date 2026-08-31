@@ -16,8 +16,7 @@ struct CoursesView: View {
     @StateObject private var mapBuilder = AprilTagMapBuilder()
 
     @State private var editingMap: GameMap?
-    @State private var editedMapName = ""
-    @State private var showsEditDialog = false
+    @State private var isShowingEditView = false
 
     var body: some View {
         MapMenuBackground {
@@ -56,42 +55,44 @@ struct CoursesView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Edit Course", isPresented: $showsEditDialog) {
-            TextField("Name", text: $editedMapName)
+        .navigationDestination(
+            isPresented:
+                $isShowingEditView
+        ) {
 
-            Button("Cancel", role: .cancel) {}
+            if let editingMap {
 
-            Button("Save") {
-                saveEditedMap()
+                CreateMapView(
+                    eduardModelStore:
+                        eduardModelStore,
+
+                    controller:
+                        controller,
+
+                    mapBuilder:
+                        mapBuilder,
+
+                    gameMapStore:
+                        gameMapStore,
+
+                    editingMap:
+                        editingMap
+                )
+
+            } else {
+
+                EmptyView()
             }
-            .disabled(
-                editedMapName
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .isEmpty
-            )
-        } message: {
-            Text("Rename this course.")
         }
     }
 
     private func beginEditing(_ map: GameMap) {
-        editingMap = map
-        editedMapName = map.name
-        showsEditDialog = true
-    }
 
-    private func saveEditedMap() {
-        let name = editedMapName
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        editingMap =
+            map
 
-        guard var map = editingMap, name.isEmpty == false else {
-            return
-        }
-
-        map.name = name
-        gameMapStore.save(map)
-        editingMap = nil
-        editedMapName = ""
+        isShowingEditView =
+            true
     }
 }
 

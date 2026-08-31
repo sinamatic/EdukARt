@@ -551,6 +551,23 @@ final class Course: ObservableObject {
     }
 
 
+    func load(
+        storedTrackPoints: [StoredTrackPoint]
+    ) {
+
+        rawPoints.removeAll()
+
+        trackPoints =
+            storedTrackPoints.map { point in
+
+                SIMD2<Float>(
+                    point.x,
+                    point.z
+                )
+            }
+    }
+
+
     // ======================================================
     // MARK: - Reset
     // ======================================================

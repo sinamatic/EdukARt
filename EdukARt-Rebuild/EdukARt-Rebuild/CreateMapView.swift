@@ -14,6 +14,32 @@ struct CreateMapView: View {
     @ObservedObject var controller: RobotController
     @ObservedObject var mapBuilder: AprilTagMapBuilder
     @ObservedObject var gameMapStore: GameMapStore
+    let editingMap:
+        GameMap?
+
+    init(
+        eduardModelStore: EduardModelStore,
+        controller: RobotController,
+        mapBuilder: AprilTagMapBuilder,
+        gameMapStore: GameMapStore,
+        editingMap: GameMap? = nil
+    ) {
+
+        self.eduardModelStore =
+            eduardModelStore
+
+        self.controller =
+            controller
+
+        self.mapBuilder =
+            mapBuilder
+
+        self.gameMapStore =
+            gameMapStore
+
+        self.editingMap =
+            editingMap
+    }
 
     @Environment(\.dismiss) private var dismiss
 
@@ -37,6 +63,7 @@ struct CreateMapView: View {
     @State private var creationStep = CreationStep.createMap
     @State private var mapName = ""
     @State private var showNameDialog = false
+    @State private var hasConfiguredInitialState = false
 
     private let mapSizeFactor: CGFloat = 2.0 / 3.0
     private let items:
@@ -60,6 +87,10 @@ struct CreateMapView: View {
 
     private var showsCamera: Bool {
         creationStep == .createMap && showNameDialog == false
+    }
+
+    private var isEditingExistingMap: Bool {
+        editingMap != nil
     }
 
     private var canContinue: Bool {
@@ -235,13 +266,7 @@ struct CreateMapView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            mapBuilder.reset()
-            course.reset()
-            frozenReferenceTagID =
-                    nil
-            mapName = ""
-            creationStep = .createMap
-            placedMapObjects.removeAll()
+            configureInitialStateIfNeeded()
         }
         .alert("Course Name", isPresented: $showNameDialog) {
             TextField("Name", text: $mapName)
@@ -272,6 +297,62 @@ struct CreateMapView: View {
                     .lineLimit(4)
                     .frame(height: 92, alignment: .top)
             }
+        }
+    }
+
+
+    private func configureInitialStateIfNeeded() {
+
+        guard hasConfiguredInitialState == false
+        else {
+            return
+        }
+
+
+        hasConfiguredInitialState =
+            true
+
+
+        if let editingMap {
+
+            mapBuilder.reset()
+
+            course.load(
+                storedTrackPoints:
+                    editingMap.trackPoints
+            )
+
+            frozenAprilTags =
+                editingMap.aprilTags
+
+            frozenReferenceTagID =
+                editingMap.referenceTagID
+
+            placedMapObjects =
+                editingMap.mapObjects
+
+            mapName =
+                editingMap.name
+
+            creationStep =
+                .drawRoad
+
+        } else {
+
+            mapBuilder.reset()
+
+            course.reset()
+
+            frozenReferenceTagID =
+                nil
+
+            mapName =
+                ""
+
+            creationStep =
+                .createMap
+
+            placedMapObjects.removeAll()
         }
     }
 
@@ -336,14 +417,18 @@ struct CreateMapView: View {
     ) -> some View {
         ZStack {
             if let previousStep = creationStep.previousStep {
-                stepArrow(
-                    systemName: "chevron.left.circle.fill",
-                    targetStep: previousStep
-                )
-                .position(
-                    x: max(mapLeftX - 64, 36),
-                    y: mapCenterY
-                )
+                if isEditingExistingMap == false
+                    || creationStep != .drawRoad {
+
+                    stepArrow(
+                        systemName: "chevron.left.circle.fill",
+                        targetStep: previousStep
+                    )
+                    .position(
+                        x: max(mapLeftX - 64, 36),
+                        y: mapCenterY
+                    )
+                }
             }
 
             if let nextStep = creationStep.nextStep, canContinue {
@@ -488,7 +573,14 @@ struct CreateMapView: View {
                 }
 
                 if creationStep == .itemsObstacles {
-                    showNameDialog = true
+                    if isEditingExistingMap {
+
+                        saveMap()
+
+                    } else {
+
+                        showNameDialog = true
+                    }
                 } else if let nextStep =
                     creationStep.nextStep {
 
@@ -642,8 +734,17 @@ struct CreateMapView: View {
 
         let gameMap =
             GameMap(
+                id:
+                    editingMap?.id
+                    ?? UUID(),
+
                 name:
-                    name,
+                    editingMap?.name
+                    ?? name,
+
+                createdAt:
+                    editingMap?.createdAt
+                    ?? Date(),
 
                 referenceTagID:
                     referenceTagID,
