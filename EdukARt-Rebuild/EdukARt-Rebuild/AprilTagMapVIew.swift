@@ -510,7 +510,7 @@ struct AprilTagMapView: View {
         .rotationEffect(
             .radians(
                 Double(
-                    point.rotation
+                    -point.rotation
                 )
             )
         )

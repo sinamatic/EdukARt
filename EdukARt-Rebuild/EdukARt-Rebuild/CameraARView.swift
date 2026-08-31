@@ -969,6 +969,9 @@ struct CameraARView: UIViewRepresentable {
                 trackPoints:
                     gameMap.trackPoints,
 
+                aprilTags:
+                    gameMap.aprilTags,
+
                 parent:
                     mapRoot
             )

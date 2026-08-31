@@ -4,15 +4,27 @@
 //
 //  Renders the stored 2D race track in RealityKit.
 //
-//  The track consists of:
-//  - a semi-transparent 60 cm wide road surface,
-//  - a white dashed center line,
-//  - red/white alternating boundary lines
-//    30 cm to the left and right of the center line.
+//  The renderer first creates one clean and uniformly
+//  sampled center path from the stored track points.
 //
-//  All elements are generated as flat custom meshes.
-//  Consecutive sections share vertices at corners,
-//  preventing overlapping geometry and Z-fighting.
+//  Rendering pipeline:
+//
+//  Stored track points
+//      ↓
+//  Remove points that are too close
+//      ↓
+//  Smooth path using Chaikin corner cutting
+//      ↓
+//  Resample at a constant physical distance
+//      ↓
+//  Render:
+//      - semi-transparent road surface
+//      - dashed white center line
+//      - continuous white road boundaries
+//
+//  The road and its markings use mitered ribbon geometry.
+//  This avoids distorted or overlapping inner/outer
+//  boundaries in curves.
 //
 
 import RealityKit
@@ -22,50 +34,106 @@ import UIKit
 
 final class ARTrackRenderer {
 
+    // ======================================================
     // MARK: - Road Settings
+    // ======================================================
 
     /// Complete road width.
-    private let roadWidth: Float = 0.60
+    private let roadWidth:
+        Float = 0.60
 
-    /// Distance from center line to each road boundary.
-    private let roadHalfWidth: Float = 0.30
+    /// Distance from center to road boundary.
+    private var roadHalfWidth:
+        Float {
+
+        roadWidth / 2
+    }
 
     /// Transparency of the black road surface.
-    private let roadOpacity: Float = 0.10
+    private let roadOpacity:
+        Float = 0.10
+
+    /// Width of the continuous white road edge.
+    private let roadEdgeWidth:
+        Float = 0.035
 
 
+    // ======================================================
     // MARK: - Center Line Settings
+    // ======================================================
 
-    private let centerLineWidth: Float = 0.035
+    private let centerLineWidth:
+        Float = 0.035
 
-    private let centerDashLength: Float = 0.30
+    private let centerDashLength:
+        Float = 0.30
 
-    private let centerGapLength: Float = 0.10
-
-
-    // MARK: - Boundary Settings
-
-    /// Width of the red/white boundary lines.
-    private let boundaryLineWidth: Float = 0.05
-
-    /// Length of one red or white section.
-    private let boundarySegmentLength: Float = 0.30
+    private let centerGapLength:
+        Float = 0.10
 
 
+    // ======================================================
+    // MARK: - Path Processing
+    // ======================================================
+
+    /// Ignore stored points closer than this distance.
+    ///
+    /// This removes tiny finger-input irregularities.
+    private let minimumInputPointDistance:
+        Float = 0.015
+
+    /// Number of smoothing passes.
+    ///
+    /// 2–3 usually gives a visibly smoother road
+    /// without changing the original course too much.
+    private let smoothingIterations:
+        Int = 2
+
+    /// Physical distance between final center-path samples.
+    ///
+    /// The complete renderer uses this normalized path.
+    private let pathSampleDistance:
+        Float = 0.02
+
+
+    // ======================================================
+    // MARK: - Geometry Settings
+    // ======================================================
+
+    /// Prevents extremely long miter joins
+    /// if an unusually sharp corner remains.
+    private let maximumMiterFactor:
+        Float = 3.0
+
+
+    // ======================================================
     // MARK: - Height Settings
+    // ======================================================
 
-    /// Base height above the mapped floor.
-    private let floorOffset: Float = 0.006
+    /// Base height above mapped floor.
+    private let floorOffset:
+        Float = 0.006
 
-    /// Lines sit slightly above the road surface
-    /// to prevent Z-fighting.
-    private let lineOffset: Float = 0.001
+    /// Markings sit slightly above the road.
+    private let lineOffset:
+        Float = 0.001
 
 
+    // ======================================================
+    // MARK: - Start Settings
+    // ======================================================
+
+    private let startLineDistance:
+        Float = 0.30
+
+
+    // ======================================================
     // MARK: - Render Track
+    // ======================================================
 
     func render(
         trackPoints: [StoredTrackPoint],
+        aprilTags: [StoredAprilTag] = [],
         parent: Entity
     ) {
 
@@ -74,11 +142,15 @@ final class ARTrackRenderer {
         }
 
 
-        // Remove previously rendered track.
-        parent.findEntity(
-            named: "ARTrack"
-        )?
-        .removeFromParent()
+        // --------------------------------------------------
+        // Remove previously rendered track
+        // --------------------------------------------------
+
+        parent
+            .findEntity(
+                named: "ARTrack"
+            )?
+            .removeFromParent()
 
 
         let trackRoot =
@@ -92,9 +164,11 @@ final class ARTrackRenderer {
         )
 
 
-        // Convert stored 2D map points
-        // into local 3D map coordinates.
-        let path: [SIMD3<Float>] =
+        // --------------------------------------------------
+        // Convert persistent 2D track into 3D coordinates
+        // --------------------------------------------------
+
+        let rawPath =
             trackPoints.map {
 
                 SIMD3<Float>(
@@ -103,6 +177,21 @@ final class ARTrackRenderer {
                     $0.z
                 )
             }
+
+
+        // --------------------------------------------------
+        // Create one normalized center path
+        // --------------------------------------------------
+
+        let path =
+            preparePath(
+                rawPath
+            )
+
+
+        guard path.count >= 2 else {
+            return
+        }
 
 
         let cumulativeDistances =
@@ -119,18 +208,25 @@ final class ARTrackRenderer {
         }
 
 
-        // 1. Road surface
+        // --------------------------------------------------
+        // 1. Road
+        // --------------------------------------------------
 
         renderRoad(
-            path: path,
-            parent: trackRoot
+            path:
+                path,
+            parent:
+                trackRoot
         )
 
 
-        // 2. White dashed center line
+        // --------------------------------------------------
+        // 2. Dashed center line
+        // --------------------------------------------------
 
         renderCenterLine(
-            path: path,
+            path:
+                path,
             cumulativeDistances:
                 cumulativeDistances,
             totalLength:
@@ -140,16 +236,320 @@ final class ARTrackRenderer {
         )
 
 
-        // 3. Left and right red/white boundaries
+        // --------------------------------------------------
+        // 3. Road boundaries
+        // --------------------------------------------------
 
-        renderBoundaries(
-            path: path,
-            parent: trackRoot
+        renderRoadEdges(
+            path:
+                path,
+            parent:
+                trackRoot
+        )
+
+
+        // --------------------------------------------------
+        // 4. Start
+        // --------------------------------------------------
+
+        renderStartLine(
+            path:
+                path,
+            aprilTags:
+                aprilTags,
+            parent:
+                trackRoot
         )
     }
 
 
+    // ======================================================
+    // MARK: - Prepare Path
+    // ======================================================
+
+    /// Creates the single center path that is used
+    /// by every rendered road component.
+    private func preparePath(
+        _ input: [SIMD3<Float>]
+    ) -> [SIMD3<Float>] {
+
+        // 1. Remove extremely close points.
+        var path =
+            removeClosePoints(
+                input,
+                minimumDistance:
+                    minimumInputPointDistance
+            )
+
+
+        guard path.count >= 2 else {
+            return path
+        }
+
+
+        // 2. Smooth the original polyline.
+        for _ in 0..<smoothingIterations {
+
+            path =
+                chaikinSmooth(
+                    path
+                )
+        }
+
+
+        // 3. Sample the final line at constant
+        // physical distances.
+        path =
+            resamplePath(
+                path,
+                spacing:
+                    pathSampleDistance
+            )
+
+
+        return path
+    }
+
+
+    // ======================================================
+    // MARK: - Remove Close Points
+    // ======================================================
+
+    private func removeClosePoints(
+        _ points: [SIMD3<Float>],
+        minimumDistance: Float
+    ) -> [SIMD3<Float>] {
+
+        guard let first =
+            points.first
+        else {
+            return []
+        }
+
+
+        var result:
+            [SIMD3<Float>] = [
+                first
+            ]
+
+
+        for point in points.dropFirst() {
+
+            guard let previous =
+                result.last
+            else {
+                continue
+            }
+
+
+            if horizontalDistance(
+                previous,
+                point
+            ) >= minimumDistance {
+
+                result.append(
+                    point
+                )
+            }
+        }
+
+
+        // Always keep original end point.
+        if let last =
+            points.last,
+           let currentLast =
+            result.last,
+           horizontalDistance(
+                currentLast,
+                last
+           ) > 0.001 {
+
+            result.append(
+                last
+            )
+        }
+
+
+        return result
+    }
+
+
+    // ======================================================
+    // MARK: - Chaikin Smoothing
+    // ======================================================
+
+    /// Smooths a polyline without spline overshoot.
+    ///
+    /// Every corner is replaced by two points:
+    ///
+    /// P0 ---- Q ---- R ---- P1
+    ///
+    /// Q = 75% P0 + 25% P1
+    /// R = 25% P0 + 75% P1
+    ///
+    /// Start and end remain unchanged.
+    private func chaikinSmooth(
+        _ points: [SIMD3<Float>]
+    ) -> [SIMD3<Float>] {
+
+        guard points.count >= 3 else {
+            return points
+        }
+
+
+        var result:
+            [SIMD3<Float>] = []
+
+
+        // Keep start point.
+        result.append(
+            points[0]
+        )
+
+
+        for index in
+            0..<(points.count - 1) {
+
+            let p0 =
+                points[index]
+
+            let p1 =
+                points[index + 1]
+
+
+            let q =
+                p0 * 0.75
+                + p1 * 0.25
+
+            let r =
+                p0 * 0.25
+                + p1 * 0.75
+
+
+            // Avoid duplicating points very close
+            // to the preserved start/end.
+            if index > 0 {
+
+                result.append(
+                    q
+                )
+            }
+
+
+            if index <
+                points.count - 2 {
+
+                result.append(
+                    r
+                )
+            }
+        }
+
+
+        // Keep end point.
+        result.append(
+            points[
+                points.count - 1
+            ]
+        )
+
+
+        return result
+    }
+
+
+    // ======================================================
+    // MARK: - Resample Path
+    // ======================================================
+
+    /// Samples the path at approximately equal
+    /// physical distances.
+    private func resamplePath(
+        _ path: [SIMD3<Float>],
+        spacing: Float
+    ) -> [SIMD3<Float>] {
+
+        guard path.count >= 2,
+              spacing > 0
+        else {
+            return path
+        }
+
+
+        let distances =
+            calculateCumulativeDistances(
+                for: path
+            )
+
+
+        guard let totalLength =
+            distances.last,
+              totalLength > 0
+        else {
+            return path
+        }
+
+
+        var result:
+            [SIMD3<Float>] = []
+
+
+        var distance:
+            Float = 0
+
+
+        while distance < totalLength {
+
+            result.append(
+                point(
+                    atDistance:
+                        distance,
+                    path:
+                        path,
+                    cumulativeDistances:
+                        distances
+                )
+            )
+
+
+            distance +=
+                spacing
+        }
+
+
+        // Always preserve the final point.
+        if let last =
+            path.last {
+
+            if let currentLast =
+                result.last {
+
+                if horizontalDistance(
+                    currentLast,
+                    last
+                ) > 0.001 {
+
+                    result.append(
+                        last
+                    )
+                }
+
+            } else {
+
+                result.append(
+                    last
+                )
+            }
+        }
+
+
+        return result
+    }
+
+
+    // ======================================================
     // MARK: - Road
+    // ======================================================
 
     private func renderRoad(
         path: [SIMD3<Float>],
@@ -158,8 +558,10 @@ final class ARTrackRenderer {
 
         guard let mesh =
             createRibbonMesh(
-                points: path,
-                width: roadWidth
+                points:
+                    path,
+                width:
+                    roadWidth
             )
         else {
             return
@@ -168,16 +570,19 @@ final class ARTrackRenderer {
 
         let material =
             UnlitMaterial(
-                color: .black
+                color:
+                    .black
             )
 
 
         let entity =
             ModelEntity(
-                mesh: mesh,
-                materials: [
-                    material
-                ]
+                mesh:
+                    mesh,
+                materials:
+                    [
+                        material
+                    ]
             )
 
 
@@ -185,8 +590,6 @@ final class ARTrackRenderer {
             "ARRoadSurface"
 
 
-        // Make the black road
-        // only slightly visible.
         entity.components.set(
             OpacityComponent(
                 opacity:
@@ -201,7 +604,9 @@ final class ARTrackRenderer {
     }
 
 
+    // ======================================================
     // MARK: - Center Line
+    // ======================================================
 
     private func renderCenterLine(
         path: [SIMD3<Float>],
@@ -210,12 +615,13 @@ final class ARTrackRenderer {
         parent: Entity
     ) {
 
-        let linePath =
+        let elevatedPath =
             path.map {
 
                 SIMD3<Float>(
                     $0.x,
-                    $0.y + lineOffset,
+                    $0.y
+                        + lineOffset,
                     $0.z
                 )
             }
@@ -224,7 +630,7 @@ final class ARTrackRenderer {
         guard let mesh =
             createDashedMesh(
                 path:
-                    linePath,
+                    elevatedPath,
                 cumulativeDistances:
                     cumulativeDistances,
                 totalLength:
@@ -241,18 +647,17 @@ final class ARTrackRenderer {
         }
 
 
-        let material =
-            UnlitMaterial(
-                color: .white
-            )
-
-
         let entity =
             ModelEntity(
-                mesh: mesh,
-                materials: [
-                    material
-                ]
+                mesh:
+                    mesh,
+                materials:
+                    [
+                        UnlitMaterial(
+                            color:
+                                .white
+                        )
+                    ]
             )
 
 
@@ -266,265 +671,337 @@ final class ARTrackRenderer {
     }
 
 
-    // MARK: - Boundaries
+    // ======================================================
+    // MARK: - Road Edges
+    // ======================================================
 
-    private func renderBoundaries(
+    private func renderRoadEdges(
         path: [SIMD3<Float>],
         parent: Entity
     ) {
 
-        // Generate paths exactly 30 cm
-        // left and right of the center line.
         let leftPath =
-            offsetPath(
-                path,
-                lateralOffset:
+            createOffsetPath(
+                from:
+                    path,
+                distance:
                     roadHalfWidth,
                 verticalOffset:
-                    lineOffset
+                    lineOffset * 2
             )
 
 
         let rightPath =
-            offsetPath(
-                path,
-                lateralOffset:
+            createOffsetPath(
+                from:
+                    path,
+                distance:
                     -roadHalfWidth,
                 verticalOffset:
-                    lineOffset
+                    lineOffset * 2
             )
 
 
-        renderBoundary(
+        renderRoadEdge(
             path:
                 leftPath,
             name:
-                "ARLeftBoundary",
+                "ARLeftRoadEdge",
             parent:
                 parent
         )
 
 
-        renderBoundary(
+        renderRoadEdge(
             path:
                 rightPath,
             name:
-                "ARRightBoundary",
+                "ARRightRoadEdge",
             parent:
                 parent
         )
     }
 
 
-    // MARK: - Boundary
-
-    private func renderBoundary(
+    private func renderRoadEdge(
         path: [SIMD3<Float>],
         name: String,
         parent: Entity
     ) {
 
-        let cumulativeDistances =
-            calculateCumulativeDistances(
-                for: path
+        guard let mesh =
+            createRibbonMesh(
+                points:
+                    path,
+                width:
+                    roadEdgeWidth
             )
-
-
-        guard let totalLength =
-            cumulativeDistances.last,
-              totalLength > 0.001
         else {
             return
         }
 
 
-        // RED sections:
-        //
-        // 0.00 - 0.30
-        // 0.60 - 0.90
-        // 1.20 - 1.50
-        // ...
-
-        if let redMesh =
-            createAlternatingMesh(
-                path:
-                    path,
-                cumulativeDistances:
-                    cumulativeDistances,
-                totalLength:
-                    totalLength,
-                startOffset:
-                    0,
-                width:
-                    boundaryLineWidth
-            )
-        {
-
-            let redMaterial =
-                UnlitMaterial(
-                    color: .red
-                )
-
-
-            let redEntity =
-                ModelEntity(
-                    mesh:
-                        redMesh,
-                    materials: [
-                        redMaterial
+        let entity =
+            ModelEntity(
+                mesh:
+                    mesh,
+                materials:
+                    [
+                        UnlitMaterial(
+                            color:
+                                .white
+                        )
                     ]
-                )
-
-
-            redEntity.name =
-                "\(name)Red"
-
-
-            parent.addChild(
-                redEntity
-            )
-        }
-
-
-        // WHITE sections:
-        //
-        // 0.30 - 0.60
-        // 0.90 - 1.20
-        // 1.50 - 1.80
-        // ...
-
-        if let whiteMesh =
-            createAlternatingMesh(
-                path:
-                    path,
-                cumulativeDistances:
-                    cumulativeDistances,
-                totalLength:
-                    totalLength,
-                startOffset:
-                    boundarySegmentLength,
-                width:
-                    boundaryLineWidth
-            )
-        {
-
-            let whiteMaterial =
-                UnlitMaterial(
-                    color: .white
-                )
-
-
-            let whiteEntity =
-                ModelEntity(
-                    mesh:
-                        whiteMesh,
-                    materials: [
-                        whiteMaterial
-                    ]
-                )
-
-
-            whiteEntity.name =
-                "\(name)White"
-
-
-            parent.addChild(
-                whiteEntity
-            )
-        }
-    }
-
-
-    // MARK: - Create Alternating Mesh
-
-    /// Creates every second 30 cm boundary section.
-    ///
-    /// Called once for red sections
-    /// and once for white sections.
-    private func createAlternatingMesh(
-        path: [SIMD3<Float>],
-        cumulativeDistances: [Float],
-        totalLength: Float,
-        startOffset: Float,
-        width: Float
-    ) -> MeshResource? {
-
-        var vertices:
-            [SIMD3<Float>] = []
-
-        var normals:
-            [SIMD3<Float>] = []
-
-        var indices:
-            [UInt32] = []
-
-
-        let completePatternLength =
-            boundarySegmentLength
-            * 2
-
-
-        var segmentStart =
-            startOffset
-
-
-        while segmentStart
-                < totalLength {
-
-            let segmentEnd =
-                min(
-                    segmentStart
-                    + boundarySegmentLength,
-                    totalLength
-                )
-
-
-            let segmentPoints =
-                points(
-                    fromDistance:
-                        segmentStart,
-                    toDistance:
-                        segmentEnd,
-                    path:
-                        path,
-                    cumulativeDistances:
-                        cumulativeDistances
-                )
-
-
-            addRibbon(
-                points:
-                    segmentPoints,
-                width:
-                    width,
-                vertices:
-                    &vertices,
-                normals:
-                    &normals,
-                indices:
-                    &indices
             )
 
 
-            segmentStart +=
-                completePatternLength
-        }
+        entity.name =
+            name
 
 
-        return createMeshResource(
-            vertices:
-                vertices,
-            normals:
-                normals,
-            indices:
-                indices,
-            name:
-                "ARBoundaryMesh"
+        parent.addChild(
+            entity
         )
     }
 
 
-    // MARK: - Create Dashed Mesh
+    // ======================================================
+    // MARK: - Offset Path
+    // ======================================================
+
+    /// Creates a parallel path using miter joins.
+    ///
+    /// This is the important difference from simply
+    /// adding `sideVector * distance` to every point.
+    private func createOffsetPath(
+        from path: [SIMD3<Float>],
+        distance: Float,
+        verticalOffset: Float
+    ) -> [SIMD3<Float>] {
+
+        guard path.count >= 2 else {
+            return path
+        }
+
+
+        var result:
+            [SIMD3<Float>] = []
+
+
+        for index in path.indices {
+
+            let offset =
+                miterOffset(
+                    at:
+                        index,
+                    points:
+                        path,
+                    distance:
+                        distance
+                )
+
+
+            var point =
+                path[index]
+                + offset
+
+
+            point.y +=
+                verticalOffset
+
+
+            result.append(
+                point
+            )
+        }
+
+
+        return result
+    }
+
+
+    // ======================================================
+    // MARK: - Miter Offset
+    // ======================================================
+
+    private func miterOffset(
+        at index: Int,
+        points: [SIMD3<Float>],
+        distance: Float
+    ) -> SIMD3<Float> {
+
+        guard points.count >= 2 else {
+            return .zero
+        }
+
+
+        // --------------------------------------------------
+        // Start
+        // --------------------------------------------------
+
+        if index == 0 {
+
+            return sideVector(
+                from:
+                    points[0],
+                to:
+                    points[1]
+            )
+            * distance
+        }
+
+
+        // --------------------------------------------------
+        // End
+        // --------------------------------------------------
+
+        if index ==
+            points.count - 1 {
+
+            return sideVector(
+                from:
+                    points[index - 1],
+                to:
+                    points[index]
+            )
+            * distance
+        }
+
+
+        // --------------------------------------------------
+        // Interior vertex
+        // --------------------------------------------------
+
+        let previousSide =
+            sideVector(
+                from:
+                    points[index - 1],
+                to:
+                    points[index]
+            )
+
+
+        let nextSide =
+            sideVector(
+                from:
+                    points[index],
+                to:
+                    points[index + 1]
+            )
+
+
+        let combined =
+            previousSide
+            + nextSide
+
+
+        guard simd_length(
+            combined
+        ) > 0.0001
+        else {
+
+            return nextSide
+                * distance
+        }
+
+
+        let miter =
+            simd_normalize(
+                combined
+            )
+
+
+        let denominator =
+            simd_dot(
+                miter,
+                nextSide
+            )
+
+
+        guard abs(
+            denominator
+        ) > 0.05
+        else {
+
+            return nextSide
+                * distance
+        }
+
+
+        var miterLength =
+            distance
+            / denominator
+
+
+        // Prevent spikes at very sharp corners.
+        let maximumLength =
+            abs(distance)
+            * maximumMiterFactor
+
+
+        miterLength =
+            min(
+                max(
+                    miterLength,
+                    -maximumLength
+                ),
+                maximumLength
+            )
+
+
+        return miter
+            * miterLength
+    }
+
+
+    // ======================================================
+    // MARK: - Side Vector
+    // ======================================================
+
+    private func sideVector(
+        from start: SIMD3<Float>,
+        to end: SIMD3<Float>
+    ) -> SIMD3<Float> {
+
+        var direction =
+            end - start
+
+
+        // Geometry is always planar.
+        direction.y =
+            0
+
+
+        guard simd_length(
+            direction
+        ) > 0.0001
+        else {
+
+            return SIMD3<Float>(
+                1,
+                0,
+                0
+            )
+        }
+
+
+        direction =
+            simd_normalize(
+                direction
+            )
+
+
+        return SIMD3<Float>(
+            -direction.z,
+            0,
+            direction.x
+        )
+    }
+
+
+    // ======================================================
+    // MARK: - Dashed Mesh
+    // ======================================================
 
     private func createDashedMesh(
         path: [SIMD3<Float>],
@@ -554,18 +1031,17 @@ final class ARTrackRenderer {
             Float = 0
 
 
-        while dashStart
-                < totalLength {
+        while dashStart < totalLength {
 
             let dashEnd =
                 min(
                     dashStart
-                    + dashLength,
+                        + dashLength,
                     totalLength
                 )
 
 
-            let dashPoints =
+            let dashPath =
                 points(
                     fromDistance:
                         dashStart,
@@ -580,7 +1056,7 @@ final class ARTrackRenderer {
 
             addRibbon(
                 points:
-                    dashPoints,
+                    dashPath,
                 width:
                     width,
                 vertices:
@@ -610,7 +1086,9 @@ final class ARTrackRenderer {
     }
 
 
-    // MARK: - Solid Ribbon Mesh
+    // ======================================================
+    // MARK: - Ribbon Mesh
+    // ======================================================
 
     private func createRibbonMesh(
         points: [SIMD3<Float>],
@@ -649,12 +1127,140 @@ final class ARTrackRenderer {
             indices:
                 indices,
             name:
-                "ARRoadMesh"
+                "ARRibbonMesh"
         )
     }
 
 
-    // MARK: - Create Mesh Resource
+    // ======================================================
+    // MARK: - Add Ribbon
+    // ======================================================
+
+    /// Creates a ribbon around a path.
+    ///
+    /// Every path point receives a mitered left/right
+    /// vertex pair instead of a simple perpendicular pair.
+    private func addRibbon(
+        points: [SIMD3<Float>],
+        width: Float,
+        vertices: inout [SIMD3<Float>],
+        normals: inout [SIMD3<Float>],
+        indices: inout [UInt32]
+    ) {
+
+        guard points.count >= 2 else {
+            return
+        }
+
+
+        let halfWidth =
+            width / 2
+
+
+        let firstVertexIndex =
+            UInt32(
+                vertices.count
+            )
+
+
+        // --------------------------------------------------
+        // Vertices
+        // --------------------------------------------------
+
+        for index in points.indices {
+
+            let offset =
+                miterOffset(
+                    at:
+                        index,
+                    points:
+                        points,
+                    distance:
+                        halfWidth
+                )
+
+
+            let left =
+                points[index]
+                + offset
+
+            let right =
+                points[index]
+                - offset
+
+
+            vertices.append(
+                left
+            )
+
+            vertices.append(
+                right
+            )
+
+
+            normals.append(
+                SIMD3<Float>(
+                    0,
+                    1,
+                    0
+                )
+            )
+
+            normals.append(
+                SIMD3<Float>(
+                    0,
+                    1,
+                    0
+                )
+            )
+        }
+
+
+        // --------------------------------------------------
+        // Triangles
+        // --------------------------------------------------
+
+        for index in
+            0..<(points.count - 1) {
+
+            let currentLeft =
+                firstVertexIndex
+                + UInt32(
+                    index * 2
+                )
+
+            let currentRight =
+                currentLeft
+                + 1
+
+            let nextLeft =
+                currentLeft
+                + 2
+
+            let nextRight =
+                currentLeft
+                + 3
+
+
+            indices.append(
+                contentsOf: [
+
+                    currentLeft,
+                    nextLeft,
+                    currentRight,
+
+                    currentRight,
+                    nextLeft,
+                    nextRight
+                ]
+            )
+        }
+    }
+
+
+    // ======================================================
+    // MARK: - Mesh Resource
+    // ======================================================
 
     private func createMeshResource(
         vertices: [SIMD3<Float>],
@@ -663,8 +1269,8 @@ final class ARTrackRenderer {
         name: String
     ) -> MeshResource? {
 
-        guard !vertices.isEmpty,
-              !indices.isEmpty
+        guard vertices.isEmpty == false,
+              indices.isEmpty == false
         else {
             return nil
         }
@@ -698,287 +1304,27 @@ final class ARTrackRenderer {
         do {
 
             return try MeshResource.generate(
-                from: [
-                    descriptor
-                ]
+                from:
+                    [
+                        descriptor
+                    ]
             )
 
         } catch {
 
             print(
-                "ARTrackRenderer: "
-                + "Could not create mesh:",
+                "ARTrackRenderer: Could not create mesh:",
                 error
             )
-
 
             return nil
         }
     }
 
 
-    // MARK: - Add Ribbon
-
-    private func addRibbon(
-        points: [SIMD3<Float>],
-        width: Float,
-        vertices: inout [SIMD3<Float>],
-        normals: inout [SIMD3<Float>],
-        indices: inout [UInt32]
-    ) {
-
-        guard points.count >= 2 else {
-            return
-        }
-
-
-        let halfWidth =
-            width / 2
-
-
-        let firstVertexIndex =
-            UInt32(
-                vertices.count
-            )
-
-
-        // Create one left and one right
-        // vertex for every path point.
-        for index in
-            points.indices {
-
-            let side =
-                sideVector(
-                    at:
-                        index,
-                    points:
-                        points
-                )
-
-
-            let offset =
-                side
-                * halfWidth
-
-
-            let leftPoint =
-                points[index]
-                + offset
-
-            let rightPoint =
-                points[index]
-                - offset
-
-
-            vertices.append(
-                leftPoint
-            )
-
-            vertices.append(
-                rightPoint
-            )
-
-
-            normals.append(
-                SIMD3<Float>(
-                    0,
-                    1,
-                    0
-                )
-            )
-
-            normals.append(
-                SIMD3<Float>(
-                    0,
-                    1,
-                    0
-                )
-            )
-        }
-
-
-        // Connect each pair using
-        // two triangles.
-        for index in
-            0..<(points.count - 1) {
-
-            let currentLeft =
-                firstVertexIndex
-                + UInt32(
-                    index * 2
-                )
-
-            let currentRight =
-                currentLeft + 1
-
-            let nextLeft =
-                currentLeft + 2
-
-            let nextRight =
-                currentLeft + 3
-
-
-            indices.append(
-                contentsOf: [
-
-                    currentLeft,
-                    nextLeft,
-                    currentRight,
-
-                    currentRight,
-                    nextLeft,
-                    nextRight
-                ]
-            )
-        }
-    }
-
-
-    // MARK: - Offset Path
-
-    /// Creates a parallel path to the original track.
-    ///
-    /// Positive values move to one side,
-    /// negative values to the other side.
-    private func offsetPath(
-        _ path: [SIMD3<Float>],
-        lateralOffset: Float,
-        verticalOffset: Float
-    ) -> [SIMD3<Float>] {
-
-        guard path.count >= 2 else {
-            return path
-        }
-
-
-        return path.indices.map {
-
-            let side =
-                sideVector(
-                    at:
-                        $0,
-                    points:
-                        path
-                )
-
-
-            var point =
-                path[$0]
-                + side
-                * lateralOffset
-
-
-            point.y +=
-                verticalOffset
-
-
-            return point
-        }
-    }
-
-
-    // MARK: - Side Vector
-
-    private func sideVector(
-        at index: Int,
-        points: [SIMD3<Float>]
-    ) -> SIMD3<Float> {
-
-        let tangent:
-            SIMD3<Float>
-
-
-        if index == 0 {
-
-            tangent =
-                normalizedDirection(
-                    from:
-                        points[0],
-                    to:
-                        points[1]
-                )
-
-        } else if index
-                    == points.count - 1 {
-
-            tangent =
-                normalizedDirection(
-                    from:
-                        points[index - 1],
-                    to:
-                        points[index]
-                )
-
-        } else {
-
-            let incoming =
-                normalizedDirection(
-                    from:
-                        points[index - 1],
-                    to:
-                        points[index]
-                )
-
-
-            let outgoing =
-                normalizedDirection(
-                    from:
-                        points[index],
-                    to:
-                        points[index + 1]
-                )
-
-
-            let combined =
-                incoming
-                + outgoing
-
-
-            if simd_length(
-                combined
-            ) > 0.001 {
-
-                tangent =
-                    simd_normalize(
-                        combined
-                    )
-
-            } else {
-
-                tangent =
-                    outgoing
-            }
-        }
-
-
-        let side =
-            SIMD3<Float>(
-                -tangent.z,
-                0,
-                tangent.x
-            )
-
-
-        guard simd_length(
-            side
-        ) > 0.001
-        else {
-
-            return SIMD3<Float>(
-                1,
-                0,
-                0
-            )
-        }
-
-
-        return simd_normalize(
-            side
-        )
-    }
-
-
-    // MARK: - Segment Points
+    // ======================================================
+    // MARK: - Segment Between Distances
+    // ======================================================
 
     private func points(
         fromDistance startDistance: Float,
@@ -987,8 +1333,8 @@ final class ARTrackRenderer {
         cumulativeDistances: [Float]
     ) -> [SIMD3<Float>] {
 
-        guard endDistance
-                > startDistance
+        guard endDistance >
+                startDistance
         else {
             return []
         }
@@ -1019,10 +1365,11 @@ final class ARTrackRenderer {
                 ]
 
 
-            if distance
-                > startDistance
-                && distance
-                < endDistance {
+            if distance >
+                startDistance
+                &&
+                distance <
+                endDistance {
 
                 result.append(
                     path[index]
@@ -1031,7 +1378,7 @@ final class ARTrackRenderer {
         }
 
 
-        let endPoint =
+        let end =
             point(
                 atDistance:
                     endDistance,
@@ -1045,20 +1392,20 @@ final class ARTrackRenderer {
         if let last =
             result.last {
 
-            if simd_distance(
+            if horizontalDistance(
                 last,
-                endPoint
+                end
             ) > 0.0001 {
 
                 result.append(
-                    endPoint
+                    end
                 )
             }
 
         } else {
 
             result.append(
-                endPoint
+                end
             )
         }
 
@@ -1067,7 +1414,9 @@ final class ARTrackRenderer {
     }
 
 
+    // ======================================================
     // MARK: - Point At Distance
+    // ======================================================
 
     private func point(
         atDistance distance: Float,
@@ -1080,9 +1429,9 @@ final class ARTrackRenderer {
         }
 
 
-        if let totalDistance =
+        if let total =
             cumulativeDistances.last,
-           distance >= totalDistance {
+           distance >= total {
 
             return path[
                 path.count - 1
@@ -1093,29 +1442,30 @@ final class ARTrackRenderer {
         for index in
             0..<(path.count - 1) {
 
-            let segmentStart =
+            let startDistance =
                 cumulativeDistances[
                     index
                 ]
 
-            let segmentEnd =
+            let endDistance =
                 cumulativeDistances[
                     index + 1
                 ]
 
 
-            if distance
-                >= segmentStart
-                && distance
-                <= segmentEnd {
+            if distance >=
+                startDistance
+                &&
+                distance <=
+                endDistance {
 
                 let segmentLength =
-                    segmentEnd
-                    - segmentStart
+                    endDistance
+                    - startDistance
 
 
-                guard segmentLength
-                        > 0.0001
+                guard segmentLength >
+                        0.0001
                 else {
 
                     return path[
@@ -1127,7 +1477,7 @@ final class ARTrackRenderer {
                 let progress =
                     (
                         distance
-                        - segmentStart
+                        - startDistance
                     )
                     / segmentLength
 
@@ -1150,19 +1500,24 @@ final class ARTrackRenderer {
     }
 
 
+    // ======================================================
     // MARK: - Cumulative Distances
+    // ======================================================
 
     private func calculateCumulativeDistances(
         for path: [SIMD3<Float>]
     ) -> [Float] {
 
-        guard !path.isEmpty else {
+        guard path.isEmpty == false else {
             return []
         }
 
 
-        var distances:
-            [Float] = [0]
+        var result:
+            [Float] = [
+                0
+            ]
+
 
         var total:
             Float = 0
@@ -1172,31 +1527,64 @@ final class ARTrackRenderer {
             1..<path.count {
 
             total +=
-                simd_distance(
+                horizontalDistance(
                     path[index - 1],
                     path[index]
                 )
 
 
-            distances.append(
+            result.append(
                 total
             )
         }
 
 
-        return distances
+        return result
     }
 
 
+    // ======================================================
+    // MARK: - Horizontal Distance
+    // ======================================================
+
+    private func horizontalDistance(
+        _ first: SIMD3<Float>,
+        _ second: SIMD3<Float>
+    ) -> Float {
+
+        let dx =
+            second.x
+            - first.x
+
+        let dz =
+            second.z
+            - first.z
+
+
+        return sqrt(
+            dx * dx
+            +
+            dz * dz
+        )
+    }
+
+
+    // ======================================================
     // MARK: - Direction
+    // ======================================================
 
     private func normalizedDirection(
         from start: SIMD3<Float>,
         to end: SIMD3<Float>
     ) -> SIMD3<Float> {
 
-        let vector =
-            end - start
+        var vector =
+            end
+            - start
+
+
+        vector.y =
+            0
 
 
         guard simd_length(
@@ -1214,6 +1602,158 @@ final class ARTrackRenderer {
 
         return simd_normalize(
             vector
+        )
+    }
+
+
+    // ======================================================
+    // MARK: - Start Line
+    // ======================================================
+
+    private func renderStartLine(
+        path: [SIMD3<Float>],
+        aprilTags: [StoredAprilTag],
+        parent: Entity
+    ) {
+
+        guard path.count >= 2 else {
+            return
+        }
+
+
+        let direction =
+            normalizedDirection(
+                from:
+                    path[0],
+                to:
+                    path[1]
+            )
+
+
+        let referencePoint:
+            SIMD3<Float>
+
+
+        if let firstTag =
+            aprilTags.first {
+
+            referencePoint =
+                SIMD3<Float>(
+                    firstTag.x,
+                    floorOffset
+                        + lineOffset * 2,
+                    firstTag.z
+                )
+
+        } else {
+
+            referencePoint =
+                path[0]
+        }
+
+
+        let origin =
+            referencePoint
+            - direction
+            * startLineDistance
+
+
+        addStartText(
+            origin:
+                origin
+                + direction
+                * 0.18,
+            direction:
+                direction,
+            parent:
+                parent
+        )
+    }
+
+
+    // ======================================================
+    // MARK: - Start Text
+    // ======================================================
+
+    private func addStartText(
+        origin: SIMD3<Float>,
+        direction: SIMD3<Float>,
+        parent: Entity
+    ) {
+
+        let mesh =
+            MeshResource.generateText(
+                "Start",
+                extrusionDepth:
+                    0.001,
+                font:
+                    .boldSystemFont(
+                        ofSize:
+                            0.10
+                    ),
+                containerFrame:
+                    .zero,
+                alignment:
+                    .center,
+                lineBreakMode:
+                    .byWordWrapping
+            )
+
+
+        let entity =
+            ModelEntity(
+                mesh:
+                    mesh,
+                materials:
+                    [
+                        UnlitMaterial(
+                            color:
+                                .white
+                        )
+                    ]
+            )
+
+
+        entity.name =
+            "ARStartText"
+
+        entity.position =
+            origin
+
+
+        let trackOrientation =
+            simd_quatf(
+                from:
+                    SIMD3<Float>(
+                        1,
+                        0,
+                        0
+                    ),
+                to:
+                    direction
+            )
+
+
+        let turn =
+            simd_quatf(
+                angle:
+                    -.pi / 2,
+                axis:
+                    SIMD3<Float>(
+                        0,
+                        1,
+                        0
+                    )
+            )
+
+
+        entity.orientation =
+            turn
+            * trackOrientation
+
+
+        parent.addChild(
+            entity
         )
     }
 }
