@@ -26,6 +26,9 @@ struct GameView: View {
 
     @State private var isARMenuOpen =
         false
+
+    @State private var simulationRobotPose =
+        RobotPose.zero
     
     
     // MARK: - Joystick
@@ -130,7 +133,12 @@ struct GameView: View {
                 map,
 
             robotPose:
-                controller.realRobotPose
+                controller.realRobotPose,
+
+            simulationPose:
+                controller.isSimulationVisible
+                ? simulationRobotPose
+                : nil
         )
         .frame(
             width:
@@ -176,6 +184,25 @@ struct GameView: View {
                 isMapLocalized
         )
         .allowsHitTesting(false)
+        .task {
+            await updateSimulationPoseLoop()
+        }
+    }
+
+
+    @MainActor
+    private func updateSimulationPoseLoop() async {
+
+        while Task.isCancelled == false {
+
+            simulationRobotPose =
+                controller.eduardSimulation.pose
+
+            try? await Task.sleep(
+                nanoseconds:
+                    50_000_000
+            )
+        }
     }
 
 

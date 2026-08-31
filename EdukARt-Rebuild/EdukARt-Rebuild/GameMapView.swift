@@ -38,6 +38,9 @@ struct GameMapView: View {
     var robotPose:
         RobotPose? = nil
 
+    var simulationPose:
+        RobotPose? = nil
+
     var backgroundColor:
         Color = .black.opacity(0.35)
 
@@ -156,7 +159,11 @@ struct GameMapView: View {
                 if let robotPose {
 
                     robotPoseView(
-                        robotPose
+                        robotPose,
+                        color:
+                            .blue,
+                        label:
+                            "0"
                     )
                     .position(
                         mapToScreen(
@@ -165,6 +172,30 @@ struct GameMapView: View {
 
                             z:
                                 robotPose.position.z,
+
+                            layout:
+                                layout
+                        )
+                    )
+                }
+
+
+                if let simulationPose {
+
+                    robotPoseView(
+                        simulationPose,
+                        color:
+                            .cyan,
+                        label:
+                            "3D"
+                    )
+                    .position(
+                        mapToScreen(
+                            x:
+                                simulationPose.position.x,
+
+                            z:
+                                simulationPose.position.z,
 
                             layout:
                                 layout
@@ -650,12 +681,14 @@ struct GameMapView: View {
 
 
     private func robotPoseView(
-        _ pose: RobotPose
+        _ pose: RobotPose,
+        color: Color,
+        label: String
     ) -> some View {
 
         Rectangle()
             .fill(
-                Color.blue
+                color
             )
             .frame(
                 width:
@@ -667,7 +700,7 @@ struct GameMapView: View {
             .overlay {
 
                 Text(
-                    "0"
+                    label
                 )
                 .font(
                     .caption2.bold()
@@ -1006,6 +1039,9 @@ struct StoredGameMapView: View {
     var robotPose:
         RobotPose? = nil
 
+    var simulationPose:
+        RobotPose? = nil
+
     var backgroundColor:
         Color = .black.opacity(0.5)
 
@@ -1044,6 +1080,9 @@ struct StoredGameMapView: View {
 
             robotPose:
                 robotPose,
+
+            simulationPose:
+                simulationPose,
 
             backgroundColor:
                 backgroundColor,
