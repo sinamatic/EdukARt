@@ -125,7 +125,7 @@ struct GameView: View {
 
     private var savedMapView: some View {
 
-        GameMapPreview(
+        StoredGameMapView(
             map:
                 map,
 

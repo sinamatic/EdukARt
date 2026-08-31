@@ -35,8 +35,11 @@ struct GameMapView: View {
     var allowsObjectPlacement:
         Bool = false
 
+    var robotPose:
+        RobotPose? = nil
+
     var backgroundColor:
-        Color = .black
+        Color = .black.opacity(0.35)
 
     var borderColor:
         Color = .white.opacity(0.7)
@@ -51,6 +54,9 @@ struct GameMapView: View {
 
     private let mapPadding:
         CGFloat = 28
+
+    private let mapWorldPadding:
+        Float = 0.25
 
     private let minimumExtent:
         Float = 1.0
@@ -139,6 +145,26 @@ struct GameMapView: View {
 
                             z:
                                 tag.z,
+
+                            layout:
+                                layout
+                        )
+                    )
+                }
+
+
+                if let robotPose {
+
+                    robotPoseView(
+                        robotPose
+                    )
+                    .position(
+                        mapToScreen(
+                            x:
+                                robotPose.position.x,
+
+                            z:
+                                robotPose.position.z,
 
                             layout:
                                 layout
@@ -616,10 +642,47 @@ struct GameMapView: View {
         .rotationEffect(
             .radians(
                 Double(
-                    tag.rotation
+                    -tag.rotation
                 )
             )
         )
+    }
+
+
+    private func robotPoseView(
+        _ pose: RobotPose
+    ) -> some View {
+
+        Rectangle()
+            .fill(
+                Color.blue
+            )
+            .frame(
+                width:
+                    20,
+
+                height:
+                    20
+            )
+            .overlay {
+
+                Text(
+                    "0"
+                )
+                .font(
+                    .caption2.bold()
+                )
+                .foregroundStyle(
+                    .white
+                )
+            }
+            .rotationEffect(
+                .radians(
+                    Double(
+                        pose.rotation
+                    )
+                )
+            )
     }
 
 
@@ -708,10 +771,20 @@ struct GameMapView: View {
         let minX =
             realMinX
             - extraX
+            - mapWorldPadding
 
         let minZ =
             realMinZ
             - extraZ
+            - mapWorldPadding
+
+        let paddedWidth =
+            width
+            + mapWorldPadding * 2
+
+        let paddedHeight =
+            height
+            + mapWorldPadding * 2
 
 
         // --------------------------------------------------
@@ -721,7 +794,10 @@ struct GameMapView: View {
         let usableWidth =
             max(
                 size.width
-                - mapPadding * 2,
+                - effectiveMapPadding(
+                    for:
+                        size
+                ) * 2,
 
                 1
             )
@@ -729,7 +805,10 @@ struct GameMapView: View {
         let usableHeight =
             max(
                 size.height
-                - mapPadding * 2,
+                - effectiveMapPadding(
+                    for:
+                        size
+                ) * 2,
 
                 1
             )
@@ -739,19 +818,19 @@ struct GameMapView: View {
         let scale =
             min(
                 usableWidth
-                    / CGFloat(width),
+                    / CGFloat(paddedWidth),
 
                 usableHeight
-                    / CGFloat(height)
+                    / CGFloat(paddedHeight)
             )
 
 
         let contentWidth =
-            CGFloat(width)
+            CGFloat(paddedWidth)
             * scale
 
         let contentHeight =
-            CGFloat(height)
+            CGFloat(paddedHeight)
             * scale
 
 
@@ -763,10 +842,10 @@ struct GameMapView: View {
                 minZ,
 
             width:
-                width,
+                paddedWidth,
 
             height:
-                height,
+                paddedHeight,
 
             scale:
                 scale,
@@ -784,6 +863,24 @@ struct GameMapView: View {
                     - contentHeight
                 )
                 / 2
+        )
+    }
+
+
+    private func effectiveMapPadding(
+        for size: CGSize
+    ) -> CGFloat {
+
+        min(
+            mapPadding,
+            max(
+                8,
+                min(
+                    size.width,
+                    size.height
+                )
+                * 0.16
+            )
         )
     }
 
@@ -896,4 +993,110 @@ private struct MapLayout {
 
     let offsetY:
         CGFloat
+}
+
+
+// MARK: - Stored Game Map View
+
+struct StoredGameMapView: View {
+
+    let map:
+        GameMap
+
+    var robotPose:
+        RobotPose? = nil
+
+    var backgroundColor:
+        Color = .black.opacity(0.5)
+
+    var borderColor:
+        Color = .white.opacity(0.7)
+
+    var borderLineWidth:
+        CGFloat = 1
+
+    @StateObject private var course =
+        Course()
+
+    @State private var mapObjects:
+        [PlacedMapObject] = []
+
+    var body: some View {
+
+        GameMapView(
+            aprilTags:
+                map.aprilTags,
+
+            referenceTagID:
+                map.referenceTagID,
+
+            course:
+                course,
+
+            allowsCourseDrawing:
+                false,
+
+            mapObjects:
+                $mapObjects,
+
+            allowsObjectPlacement:
+                false,
+
+            robotPose:
+                robotPose,
+
+            backgroundColor:
+                backgroundColor,
+
+            borderColor:
+                borderColor,
+
+            borderLineWidth:
+                borderLineWidth
+        )
+        .onAppear {
+            loadMap()
+        }
+        .onChange(
+            of:
+                mapFingerprint
+        ) { _, _ in
+            loadMap()
+        }
+    }
+
+    private var mapFingerprint:
+        String {
+
+        let trackFingerprint =
+            map.trackPoints.map {
+                "\($0.x):\($0.z)"
+            }
+            .joined(
+                separator:
+                    "|"
+            )
+
+        let objectFingerprint =
+            map.mapObjects.map {
+                "\($0.id):\($0.type.rawValue):\($0.x):\($0.z):\($0.rotation)"
+            }
+            .joined(
+                separator:
+                    "|"
+            )
+
+        return "\(map.id)-\(trackFingerprint)-\(objectFingerprint)"
+    }
+
+    private func loadMap() {
+
+        course.load(
+            storedTrackPoints:
+                map.trackPoints
+        )
+
+        mapObjects =
+            map.mapObjects
+    }
 }

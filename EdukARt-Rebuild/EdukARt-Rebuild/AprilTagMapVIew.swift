@@ -51,6 +51,9 @@ struct AprilTagMapView: View {
     private let mapPadding:
         CGFloat = 28
 
+    private let mapWorldPadding:
+        Float = 0.25
+
     // Minimum displayed map extent in metres.
     //
     // This prevents an almost straight line of tags
@@ -613,19 +616,23 @@ struct AprilTagMapView: View {
 
             minX:
                 minX
-                - extraX,
+                - extraX
+                - mapWorldPadding,
 
             maxX:
                 maxX
-                + extraX,
+                + extraX
+                + mapWorldPadding,
 
             minZ:
                 minZ
-                - extraZ,
+                - extraZ
+                - mapWorldPadding,
 
             maxZ:
                 maxZ
                 + extraZ
+                + mapWorldPadding
         )
     }
 }
