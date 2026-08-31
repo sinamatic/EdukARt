@@ -660,7 +660,7 @@ struct CreateMapView: View {
 
 
         print(
-            "# MAP SAVED | Reference ID \(referenceTagID)"
+            "# MAP SAVED | Reference ID \(referenceTagID) | Objects \(placedMapObjects.count)"
         )
 
 

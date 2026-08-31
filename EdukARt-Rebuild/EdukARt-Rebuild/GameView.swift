@@ -12,14 +12,14 @@ import UIKit
 
 struct GameView: View {
 
+    let map:
+        GameMap
+
     @ObservedObject var eduardModelStore:
         EduardModelStore
 
     @ObservedObject var controller:
         RobotController
-
-    let map:
-            GameMap
 
     @State private var isMapLocalized =
         false

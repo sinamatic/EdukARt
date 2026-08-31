@@ -53,14 +53,14 @@ struct StartGameView: View {
                     if let selectedMap {
                         NavigationLink {
                             GameView(
+                                map:
+                                    selectedMap,
+
                                 eduardModelStore:
                                     eduardModelStore,
 
                                 controller:
-                                    controller,
-
-                                map:
-                                    selectedMap
+                                    controller
                             )
                         } label: {
                             Text("Start Game")
@@ -286,6 +286,49 @@ struct GameMapPreview: View {
                     scale:
                         scale
                 )
+
+
+                // MARK: - Map Objects
+
+                ForEach(
+                    map.mapObjects
+                ) { object in
+
+                    Text(
+                        object.type.symbol
+                    )
+                    .font(
+                        .system(
+                            size:
+                                18
+                        )
+                    )
+                    .rotationEffect(
+                        .radians(
+                            Double(
+                                object.rotation
+                            )
+                        )
+                    )
+                    .position(
+
+                        x:
+                            9
+                            + CGFloat(
+                                object.x
+                                - bounds.minX
+                            )
+                            * scale,
+
+                        y:
+                            9
+                            + CGFloat(
+                                object.z
+                                - bounds.minZ
+                            )
+                            * scale
+                    )
+                }
 
 
                 // MARK: - AprilTags
@@ -582,6 +625,10 @@ struct GameMapPreview: View {
                 $0.x
             }
             +
+            map.mapObjects.map {
+                $0.x
+            }
+            +
             (
                 robotPose.map {
                     [
@@ -598,6 +645,10 @@ struct GameMapPreview: View {
             }
             +
             map.trackPoints.map {
+                $0.z
+            }
+            +
+            map.mapObjects.map {
                 $0.z
             }
             +

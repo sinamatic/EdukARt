@@ -64,11 +64,14 @@ struct MainMenuView: View {
 
                     NavigationLink {
                         GameView(
+                                map:
+                                    selectedMap,
+
                                 eduardModelStore:
                                     eduardModelStore,
+
                                 controller:
-                                    controller,
-                                map: selectedMap
+                                    controller
                             )
 
                     } label: {
