@@ -231,9 +231,9 @@ struct GameView: View {
 
     private var arRobotControl: some View {
 
-        HStack(
+        VStack(
             alignment:
-                .top,
+                .leading,
             
             spacing:
                 8
@@ -258,16 +258,16 @@ struct GameView: View {
                         "arkit"
                 )
                 .font(
-                    .subheadline.weight(
+                    .title3.weight(
                         .bold
                     )
                 )
                 .frame(
                     width:
-                        34,
+                        44,
 
                     height:
-                        34
+                        44
                 )
                 .accessibilityLabel(
                     "AR Menu"
@@ -279,13 +279,29 @@ struct GameView: View {
                         isARMenuOpen
                 )
             )
+            .overlay {
+                Circle()
+                    .stroke(
+                        .white.opacity(
+                            0.36
+                        ),
+                        lineWidth:
+                            2
+                    )
+                    .allowsHitTesting(
+                        false
+                    )
+            }
 
 
             if isARMenuOpen {
 
-                HStack(
+                VStack(
+                    alignment:
+                        .leading,
+
                     spacing:
-                        8
+                        10
                 ) {
 
                     Button {
@@ -300,7 +316,7 @@ struct GameView: View {
                                 "scope",
 
                             title:
-                                "PlaceOnTag"
+                                "Place"
                         )
                     }
 
@@ -375,7 +391,12 @@ struct GameView: View {
                     .white
                 )
                 .padding(
-                    8
+                    .horizontal,
+                    10
+                )
+                .padding(
+                    .vertical,
+                    9
                 )
                 .background(
                     .black.opacity(
@@ -391,6 +412,15 @@ struct GameView: View {
                             .continuous
                     )
                 )
+                .transition(
+                    .opacity.combined(
+                        with:
+                            .move(
+                                edge:
+                                    .top
+                            )
+                    )
+                )
             }
         }
         .buttonStyle(
@@ -398,11 +428,11 @@ struct GameView: View {
         )
         .padding(
             .top,
-            8
+            28
         )
         .padding(
             .leading,
-            16
+            21
         )
     }
 
@@ -414,9 +444,9 @@ struct GameView: View {
         statusColor: Color = .white
     ) -> some View {
 
-        VStack(
+        HStack(
             spacing:
-                3
+                8
         ) {
 
             ZStack(
@@ -461,16 +491,21 @@ struct GameView: View {
             Text(
                 title
             )
-            .font(
-                .caption2
-            )
             .lineLimit(
                 1
+            )
+
+            Spacer(
+                minLength:
+                    0
             )
         }
         .frame(
             width:
-                58
+                124,
+
+            alignment:
+                .leading
         )
         .contentShape(
             Rectangle()
@@ -601,7 +636,7 @@ struct GameView: View {
 
 }
 
-private struct SwipeBackDisabler:
+struct SwipeBackDisabler:
     UIViewControllerRepresentable {
 
     func makeUIViewController(

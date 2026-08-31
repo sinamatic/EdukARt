@@ -21,6 +21,8 @@ struct CreateMapView: View {
     @StateObject private var turnJoystickMonitor = JoystickMonitor()
     @StateObject private var course = Course()
     
+    @State private var placedMapObjects: [PlacedMapObject] = []
+    
     // AprilTag geometry is frozen when Step 1 is completed.
     // Steps 2 and 3 no longer depend on live measurements.
     @State private var frozenAprilTags:
@@ -37,17 +39,20 @@ struct CreateMapView: View {
     @State private var showNameDialog = false
 
     private let mapSizeFactor: CGFloat = 2.0 / 3.0
-    private let items = [
-        ("👅", "Tongue"),
-        ("🥚", "Eggs"),
-        ("💩", "Shit")
-    ]
-    private let obstacles = [
-        ("🛢", "Oil"),
-        ("💧", "Water"),
-        ("🪨", "Rock"),
-        ("🌳", "Tree")
-    ]
+    private let items:
+        [MapObjectType] = [
+            .tongue,
+            .eggs,
+            .shit
+        ]
+
+    private let obstacles:
+        [MapObjectType] = [
+            .oil,
+            .water,
+            .rock,
+            .tree
+        ]
 
     private var footerHeight: CGFloat {
         creationStep == .itemsObstacles ? 250 : 116
@@ -163,9 +168,15 @@ struct CreateMapView: View {
 
                         course:
                             course,
-
+                        
                         allowsCourseDrawing:
-                            creationStep == .drawRoad,
+                                creationStep == .drawRoad,
+                        
+                        mapObjects:
+                                $placedMapObjects,
+                      
+                        allowsObjectPlacement:
+                                creationStep == .itemsObstacles,
 
                         backgroundColor:
                             .black,
@@ -218,6 +229,9 @@ struct CreateMapView: View {
             }
         }
         .ignoresSafeArea()
+        .background(
+            SwipeBackDisabler()
+        )
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -227,6 +241,7 @@ struct CreateMapView: View {
                     nil
             mapName = ""
             creationStep = .createMap
+            placedMapObjects.removeAll()
         }
         .alert("Course Name", isPresented: $showNameDialog) {
             TextField("Name", text: $mapName)
@@ -453,9 +468,7 @@ struct CreateMapView: View {
 
 
         case .itemsObstacles:
-
-            // Items will be reset here later.
-            break
+            placedMapObjects.removeAll()
         }
     }
 
@@ -504,43 +517,107 @@ struct CreateMapView: View {
 
     private func paletteSection(
         title: String,
-        options: [(String, String)]
+        options: [MapObjectType]
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                8
+        ) {
+
             Text(title)
                 .font(.caption.bold())
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(
+                    .white.opacity(0.75)
+                )
+
 
             HStack(spacing: 10) {
-                ForEach(options, id: \.1) { option in
-                    objectTile(symbol: option.0, name: option.1)
+
+                ForEach(
+                    options,
+                    id:
+                        \.self
+                ) { type in
+
+                    objectTile(
+                        type:
+                            type
+                    )
                 }
             }
         }
     }
 
     private func objectTile(
-        symbol: String,
-        name: String
+        type: MapObjectType
     ) -> some View {
-        VStack(spacing: 6) {
-            Text(symbol)
-                .font(.system(size: 30))
-                .frame(height: 36)
 
-            Text(name)
-                .font(.caption2.bold())
-                .foregroundStyle(.white)
+        return VStack(spacing: 6) {
+
+            Text(type.symbol)
+                .font(
+                    .system(
+                        size:
+                            30
+                    )
+                )
+                .frame(
+                    height:
+                        36
+                )
+
+
+            Text(type.name)
+                .font(
+                    .caption2.bold()
+                )
+                .foregroundStyle(
+                    .white
+                )
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(
+                    0.75
+                )
         }
-        .frame(width: 82, height: 78)
-        .background(Color.black.opacity(0.55))
+        .frame(
+            width:
+                82,
+
+            height:
+                78
+        )
+        .background(
+            Color.black.opacity(
+                0.55
+            )
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.28), lineWidth: 1)
+
+            RoundedRectangle(
+                cornerRadius:
+                    12
+            )
+            .stroke(
+                Color.white.opacity(
+                    0.28
+                ),
+                lineWidth:
+                    1
+            )
         }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    12
+            )
+        )
+
+        .draggable(
+            type.rawValue
+        )
     }
 
     // MARK: - Save Map
@@ -575,7 +652,10 @@ struct CreateMapView: View {
                     frozenAprilTags,
 
                 trackPoints:
-                    course.storedTrackPoints()
+                    course.storedTrackPoints(),
+                
+                mapObjects:
+                           placedMapObjects
             )
 
 
@@ -654,7 +734,7 @@ private enum CreationStep {
         case .drawRoad:
             "Draw the road in one stroke."
         case .itemsObstacles:
-            "Place items and obstacles on the mapped course."
+            "Hold an item, then place it on the mapped course."
         }
     }
 

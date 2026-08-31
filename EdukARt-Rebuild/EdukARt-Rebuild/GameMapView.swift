@@ -28,6 +28,12 @@ struct GameMapView: View {
 
     var allowsCourseDrawing:
         Bool = false
+    
+    @Binding var mapObjects:
+        [PlacedMapObject]
+
+    var allowsObjectPlacement:
+        Bool = false
 
     var backgroundColor:
         Color = .black
@@ -37,6 +43,8 @@ struct GameMapView: View {
 
     var borderLineWidth:
         CGFloat = 1
+    
+    
 
 
     // MARK: - Settings
@@ -86,6 +94,31 @@ struct GameMapView: View {
                     layout:
                         layout
                 )
+                
+                // ------------------------------------------
+                // Items / Obstacles
+                // ------------------------------------------
+
+                ForEach(
+                    mapObjects
+                ) { object in
+
+                    mapObjectView(
+                        object
+                    )
+                    .position(
+                        mapToScreen(
+                            x:
+                                object.x,
+
+                            z:
+                                object.z,
+
+                            layout:
+                                layout
+                        )
+                    )
+                }
 
 
                 // ------------------------------------------
@@ -124,6 +157,57 @@ struct GameMapView: View {
                 )
                 : nil
             )
+            .dropDestination(
+                for:
+                    String.self
+            ) { droppedValues, location in
+
+                guard allowsObjectPlacement,
+                      let rawValue =
+                        droppedValues.first,
+                      let type =
+                        MapObjectType(
+                            rawValue:
+                                rawValue
+                        )
+                else {
+                    return false
+                }
+
+
+                let mapPoint =
+                    screenToMap(
+                        location,
+                        layout:
+                            layout
+                    )
+
+
+                let object =
+                    PlacedMapObject(
+                        type:
+                            type,
+
+                        x:
+                            mapPoint.x,
+
+                        z:
+                            mapPoint.y
+                    )
+
+
+                mapObjects.append(
+                    object
+                )
+
+
+                print(
+                    "# MAP OBJECT ADDED | \(type.name) | x \(mapPoint.x) | z \(mapPoint.y)"
+                )
+
+
+                return true
+            }
         }
         .clipShape(
             RoundedRectangle(
@@ -375,6 +459,70 @@ struct GameMapView: View {
                 0
         )
     }
+    
+    // ======================================================
+    // MARK: - Map Object
+    // ======================================================
+
+    private func mapObjectView(
+        _ object: PlacedMapObject
+    ) -> some View {
+
+        Text(
+            object.type.symbol
+        )
+        .font(
+            .system(
+                size:
+                    22
+            )
+        )
+        .frame(
+            width:
+                30,
+
+            height:
+                30
+        )
+        .background(
+            object.type.isObstacle
+            ? Color.red.opacity(0.72)
+            : Color.green.opacity(0.72)
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    6,
+
+                style:
+                    .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius:
+                    6,
+
+                style:
+                    .continuous
+            )
+            .stroke(
+                .white.opacity(
+                    0.42
+                ),
+                lineWidth:
+                    1
+            )
+        }
+        .rotationEffect(
+            .radians(
+                Double(
+                    object.rotation
+                )
+            )
+        )
+    }
+
 
     // ======================================================
     // MARK: - Drawing Gesture

@@ -32,6 +32,9 @@ struct GameMap:
 
     var aprilTags:
         [StoredAprilTag]
+    
+    var mapObjects:
+        [PlacedMapObject]
 
     // Final normalized track centerline.
     //
@@ -48,7 +51,8 @@ struct GameMap:
         createdAt: Date = Date(),
         referenceTagID: Int,
         aprilTags: [StoredAprilTag],
-        trackPoints: [StoredTrackPoint] = []
+        trackPoints: [StoredTrackPoint] = [],
+        mapObjects: [PlacedMapObject] = []
     ) {
 
         self.id =
@@ -68,6 +72,9 @@ struct GameMap:
 
         self.trackPoints =
             trackPoints
+        
+        self.mapObjects =
+                mapObjects
     }
 
 
@@ -83,6 +90,7 @@ struct GameMap:
         case referenceTagID
         case aprilTags
         case trackPoints
+        case mapObjects
     }
 
 
@@ -142,6 +150,14 @@ struct GameMap:
                     .trackPoints
             )
             ?? []
+        
+        mapObjects =
+            try container.decodeIfPresent(
+                [PlacedMapObject].self,
+                forKey:
+                    .mapObjects
+            )
+            ?? []
     }
 }
 
@@ -176,4 +192,143 @@ struct StoredTrackPoint:
 
     let z:
         Float
+}
+
+// MARK: - Map Object Type
+
+enum MapObjectType:
+    String,
+    Codable,
+    CaseIterable {
+
+    // Items
+    case tongue
+    case eggs
+    case shit
+
+    // Obstacles
+    case oil
+    case water
+    case rock
+    case tree
+
+
+    var symbol: String {
+
+        switch self {
+
+        case .tongue:
+            "👅"
+
+        case .eggs:
+            "🥚"
+
+        case .shit:
+            "💩"
+
+        case .oil:
+            "🛢"
+
+        case .water:
+            "💧"
+
+        case .rock:
+            "🪨"
+
+        case .tree:
+            "🌳"
+        }
+    }
+
+
+    var name: String {
+
+        switch self {
+
+        case .tongue:
+            "Tongue"
+
+        case .eggs:
+            "Eggs"
+
+        case .shit:
+            "Shit"
+
+        case .oil:
+            "Oil"
+
+        case .water:
+            "Water"
+
+        case .rock:
+            "Rock"
+
+        case .tree:
+            "Tree"
+        }
+    }
+
+
+    var isObstacle: Bool {
+
+        switch self {
+
+        case .oil,
+             .water,
+             .rock,
+             .tree:
+            true
+
+        default:
+            false
+        }
+    }
+}
+
+
+// MARK: - Placed Map Object
+
+struct PlacedMapObject:
+    Identifiable,
+    Codable {
+
+    let id:
+        UUID
+
+    let type:
+        MapObjectType
+
+    var x:
+        Float
+
+    var z:
+        Float
+
+    var rotation:
+        Float
+
+
+    init(
+        id: UUID = UUID(),
+        type: MapObjectType,
+        x: Float,
+        z: Float,
+        rotation: Float = 0
+    ) {
+
+        self.id =
+            id
+
+        self.type =
+            type
+
+        self.x =
+            x
+
+        self.z =
+            z
+
+        self.rotation =
+            rotation
+    }
 }
