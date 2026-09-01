@@ -194,8 +194,8 @@ struct GameView: View {
             runtimeMapObjects:
                 gameController.activeMapObjects,
 
-            shitTrailPoints:
-                gameController.shitTrailPoints
+            shitDots:
+                gameController.shitDots
         )
         .frame(
             width:

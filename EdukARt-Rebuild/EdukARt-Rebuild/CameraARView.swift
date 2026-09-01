@@ -352,9 +352,9 @@ struct CameraARView: UIViewRepresentable {
             )
 
         context.coordinator
-            .updateShitTrail(
+            .updateShitDots(
                 gameController
-                    .shitTrailPoints
+                    .shitDots
             )
     }
 
@@ -392,11 +392,8 @@ struct CameraARView: UIViewRepresentable {
         var mapObjectEntities:
             [UUID: Entity] = [:]
 
-        var shitTrailEntities:
-            [Entity] = []
-
-        var renderedShitTrailPointCount:
-            Int = 0
+        var shitDotEntities:
+            [UUID: Entity] = [:]
 
         var lastLocalizationResetID:
             Int = 0
@@ -1244,33 +1241,12 @@ struct CameraARView: UIViewRepresentable {
         }
 
 
-        // MARK: - Update Shit Trail
+        // MARK: - Update Shit Dots
 
-        func updateShitTrail(
-            _ points:
-                [SIMD2<Float>]
+        func updateShitDots(
+            _ dots:
+                [ShitDot]
         ) {
-
-            // Game was reset.
-            if points.isEmpty {
-
-                for entity in shitTrailEntities {
-
-                    entity.removeFromParent()
-                }
-
-
-                shitTrailEntities
-                    .removeAll()
-
-
-                renderedShitTrailPointCount =
-                    0
-
-
-                return
-            }
-
 
             guard let mapAnchor
             else {
@@ -1278,194 +1254,91 @@ struct CameraARView: UIViewRepresentable {
             }
 
 
-            guard points.count >= 2
-            else {
-                return
-            }
-
-
-            // Start at the first segment which has not
-            // already been rendered.
-            let firstNewSegment =
-                max(
-                    renderedShitTrailPointCount - 1,
-                    0
+            // Remove dots which no longer exist.
+            let activeIDs =
+                Set(
+                    dots.map {
+                        $0.id
+                    }
                 )
 
 
-            guard firstNewSegment
-                    < points.count - 1
-            else {
-                return
+            for id in shitDotEntities.keys
+                where activeIDs.contains(id) == false {
+
+                shitDotEntities[id]?
+                    .removeFromParent()
+
+                shitDotEntities[id] =
+                    nil
             }
 
 
-            for index in
-                firstNewSegment..<(points.count - 1) {
+            // Add new dots.
+            for dot in dots {
 
-                let start =
-                    points[index]
+                guard shitDotEntities[
+                    dot.id
+                ] == nil
 
-                let end =
-                    points[index + 1]
+                else {
+                    continue
+                }
 
 
-                let segment =
-                    makeShitTrailSegment(
-                        from:
-                            start,
+                let mesh =
+                    MeshResource.generateCylinder(
+                        height:
+                            0.003,
 
-                        to:
-                            end
+                        radius:
+                            dot.radius
+                    )
+
+
+                let material =
+                    SimpleMaterial(
+                        color:
+                            .brown,
+
+                        isMetallic:
+                            false
+                    )
+
+
+                let entity =
+                    ModelEntity(
+                        mesh:
+                            mesh,
+
+                        materials:
+                            [
+                                material
+                            ]
+                    )
+
+
+                entity.position =
+                    SIMD3<Float>(
+                        dot.position.x,
+
+                        // Slightly above the road.
+                        0.008,
+
+                        dot.position.y
                     )
 
 
                 mapAnchor.addChild(
-                    segment
+                    entity
                 )
 
 
-                shitTrailEntities.append(
-                    segment
-                )
+                shitDotEntities[
+                    dot.id
+                ] =
+                    entity
             }
-
-
-            renderedShitTrailPointCount =
-                points.count
-        }
-
-
-        // MARK: - Create Shit Trail Segment
-
-        private func makeShitTrailSegment(
-            from start:
-                SIMD2<Float>,
-
-            to end:
-                SIMD2<Float>
-        ) -> ModelEntity {
-
-            // --------------------------------------------------
-            // Direction
-            // --------------------------------------------------
-
-            let dx =
-                end.x - start.x
-
-            let dz =
-                end.y - start.y
-
-
-            // --------------------------------------------------
-            // Length
-            // --------------------------------------------------
-
-            let length =
-                sqrt(
-                    dx * dx
-                    +
-                    dz * dz
-                )
-
-
-            // --------------------------------------------------
-            // Center
-            // --------------------------------------------------
-
-            let centerX =
-                (
-                    start.x
-                    +
-                    end.x
-                )
-                / 2
-
-            let centerZ =
-                (
-                    start.y
-                    +
-                    end.y
-                )
-                / 2
-
-
-            // --------------------------------------------------
-            // Rotation
-            // --------------------------------------------------
-
-            let angle =
-                atan2(
-                    dx,
-                    dz
-                )
-
-
-            // --------------------------------------------------
-            // Mesh
-            // --------------------------------------------------
-
-            let mesh =
-                MeshResource.generateBox(
-                    size:
-                        SIMD3<Float>(
-                            0.08,
-                            0.003,
-                            max(
-                                length,
-                                0.01
-                            )
-                        )
-                )
-
-
-            // Brown material.
-            let material =
-                SimpleMaterial(
-                    color:
-                        UIColor.brown,
-
-                    isMetallic:
-                        false
-                )
-
-
-            let entity =
-                ModelEntity(
-                    mesh:
-                        mesh,
-
-                    materials:
-                        [
-                            material
-                        ]
-                )
-
-
-            // Slightly above the floor to prevent Z-fighting.
-            entity.position =
-                SIMD3<Float>(
-                    centerX,
-                    0.008,
-                    centerZ
-                )
-
-
-            entity.orientation =
-                simd_quatf(
-                    angle:
-                        angle,
-
-                    axis:
-                        SIMD3<Float>(
-                            0,
-                            1,
-                            0
-                        )
-                )
-
-
-            return entity
         }
 
 
@@ -1479,16 +1352,13 @@ struct CameraARView: UIViewRepresentable {
             mapObjectEntities
                 .removeAll()
 
-            for entity in shitTrailEntities {
+            for entity in shitDotEntities.values {
 
                 entity.removeFromParent()
             }
 
-            shitTrailEntities
+            shitDotEntities
                 .removeAll()
-
-            renderedShitTrailPointCount =
-                0
         }
 
 

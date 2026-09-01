@@ -19,6 +19,22 @@ import simd
 import Combine
 
 
+// MARK: - Shit Dot
+
+struct ShitDot:
+    Identifiable {
+
+    let id =
+        UUID()
+
+    let position:
+        SIMD2<Float>
+
+    let radius:
+        Float
+}
+
+
 @MainActor
 final class GameController:
     ObservableObject {
@@ -63,25 +79,19 @@ final class GameController:
 
 
     // ======================================================
-    // MARK: - Shit Trail
+    // MARK: - Shit Effect
     // ======================================================
 
-    /// Runtime positions forming the brown shit trail.
     @Published private(set)
-    var shitTrailPoints:
-        [SIMD2<Float>] = []
+    var shitDots:
+        [ShitDot] = []
 
 
-    private var lastShitTrailPoint:
-        SIMD2<Float>?
+    private var shitEffectTask:
+        Task<Void, Never>?
 
-    private var shitTrailEndDate:
-        Date?
-
-
-    /// Add a new trail point approximately every 10 cm.
-    private let shitTrailPointDistance:
-        Float = 0.10
+    private var currentRobotPose:
+        RobotPose = .zero
 
 
     // ======================================================
@@ -126,9 +136,8 @@ final class GameController:
             RobotPose
     ) {
 
-        // --------------------------------------------------
-        // Detect collisions
-        // --------------------------------------------------
+        currentRobotPose =
+            pose
 
         let collisions =
             collisionManager.update(
@@ -148,19 +157,6 @@ final class GameController:
 
             handleCollision(
                 collision
-            )
-        }
-
-
-        // --------------------------------------------------
-        // Runtime effects
-        // --------------------------------------------------
-
-        if isLeavingShitTrail {
-
-            updateShitTrail(
-                with:
-                    pose
             )
         }
     }
@@ -360,35 +356,130 @@ final class GameController:
             "Shit hit"
 
 
-        // Remove the object only from the current game session.
-        //
-        // The original GameMap remains unchanged.
+        // Remove Shit from the current game session.
         activeMapObjects.removeAll {
             $0.id == object.id
         }
 
 
-        // Start brown trail.
-        isLeavingShitTrail =
-            true
-
-        shitTrailEndDate =
-            Date()
-                .addingTimeInterval(
-                    5
-                )
-
-        lastShitTrailPoint =
-            nil
-
-
         print(
-            "# GAME | Shit collected"
+            "# GAME | Shit hit"
         )
 
         print(
             "# GAME | Score: \(score)"
         )
+
+
+        startShitEffect()
+    }
+
+
+    // ======================================================
+    // MARK: - Shit Effect
+    // ======================================================
+
+    private func startShitEffect() {
+
+        // Stop an already running effect.
+        shitEffectTask?
+            .cancel()
+
+
+        isLeavingShitTrail =
+            true
+
+
+        shitEffectTask =
+            Task { @MainActor in
+
+                let endDate =
+                    Date()
+                        .addingTimeInterval(
+                            10
+                        )
+
+
+                while Date() < endDate {
+
+                    // ------------------------------------------
+                    // Random delay: 0.5 - 2 seconds
+                    // ------------------------------------------
+
+                    let delay =
+                        Double.random(
+                            in:
+                                0.5...2.0
+                        )
+
+
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                delay
+                            )
+                    )
+
+
+                    guard Task.isCancelled == false
+                    else {
+                        return
+                    }
+
+
+                    guard Date() < endDate
+                    else {
+                        break
+                    }
+
+
+                    // ------------------------------------------
+                    // Current robot position
+                    // ------------------------------------------
+
+                    let pose =
+                        currentRobotPose
+
+
+                    // ------------------------------------------
+                    // Random size: 0.5 - 3 cm radius
+                    // ------------------------------------------
+
+                    let radius =
+                        Float.random(
+                            in:
+                                0.005...0.03
+                        )
+
+
+                    shitDots.append(
+                        ShitDot(
+                            position:
+                                SIMD2<Float>(
+                                    pose.position.x,
+                                    pose.position.z
+                                ),
+
+                            radius:
+                                radius
+                        )
+                    )
+
+
+                    print(
+                        "# GAME | Shit dropped"
+                    )
+                }
+
+
+                isLeavingShitTrail =
+                    false
+
+
+                print(
+                    "# GAME | Shit effect ended"
+                )
+            }
     }
 
 
@@ -522,106 +613,6 @@ final class GameController:
 
 
     // ======================================================
-    // MARK: - Shit Trail
-    // ======================================================
-
-    private func updateShitTrail(
-        with pose:
-            RobotPose
-    ) {
-
-        guard isLeavingShitTrail
-        else {
-            return
-        }
-
-
-        // --------------------------------------------------
-        // End effect after five seconds
-        // --------------------------------------------------
-
-        if let shitTrailEndDate,
-           Date() >= shitTrailEndDate {
-
-            isLeavingShitTrail =
-                false
-
-            self.shitTrailEndDate =
-                nil
-
-            lastShitTrailPoint =
-                nil
-
-
-            print(
-                "# GAME | Shit trail ended"
-            )
-
-            return
-        }
-
-
-        // --------------------------------------------------
-        // Current map position
-        // --------------------------------------------------
-
-        let currentPoint =
-            SIMD2<Float>(
-                pose.position.x,
-                pose.position.z
-            )
-
-
-        // --------------------------------------------------
-        // First point
-        // --------------------------------------------------
-
-        guard let lastPoint =
-            lastShitTrailPoint
-
-        else {
-
-            shitTrailPoints.append(
-                currentPoint
-            )
-
-            lastShitTrailPoint =
-                currentPoint
-
-            return
-        }
-
-
-        // --------------------------------------------------
-        // Add approximately every 10 cm
-        // --------------------------------------------------
-
-        let distance =
-            simd_distance(
-                currentPoint,
-                lastPoint
-            )
-
-
-        guard distance
-                >= shitTrailPointDistance
-
-        else {
-            return
-        }
-
-
-        shitTrailPoints.append(
-            currentPoint
-        )
-
-
-        lastShitTrailPoint =
-            currentPoint
-    }
-
-
-    // ======================================================
     // MARK: - Reset
     // ======================================================
 
@@ -642,17 +633,20 @@ final class GameController:
         activeMapObjects =
             map.mapObjects
 
+        shitEffectTask?
+            .cancel()
+
+        shitEffectTask =
+            nil
+
         isLeavingShitTrail =
             false
 
-        shitTrailPoints
+        shitDots
             .removeAll()
 
-        lastShitTrailPoint =
-            nil
-
-        shitTrailEndDate =
-            nil
+        currentRobotPose =
+            .zero
 
         collisionManager
             .reset()

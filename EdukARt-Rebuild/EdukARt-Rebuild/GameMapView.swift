@@ -32,8 +32,8 @@ struct GameMapView: View {
     @Binding var mapObjects:
         [PlacedMapObject]
 
-    var shitTrailPoints:
-        [SIMD2<Float>] = []
+    var shitDots:
+        [ShitDot] = []
 
     var allowsObjectPlacement:
         Bool = false
@@ -107,7 +107,7 @@ struct GameMapView: View {
                         layout
                 )
 
-                shitTrailLayer(
+                shitDotsLayer(
                     layout:
                         layout
                 )
@@ -527,80 +527,53 @@ struct GameMapView: View {
 
 
     // ======================================================
-    // MARK: - Shit Trail Layer
+    // MARK: - Shit Dots Layer
     // ======================================================
 
     @ViewBuilder
-    private func shitTrailLayer(
+    private func shitDotsLayer(
         layout: MapLayout
     ) -> some View {
 
-        if shitTrailPoints.count >= 2 {
+        ForEach(
+            shitDots
+        ) { dot in
 
-            Path { path in
+            Circle()
+                .fill(
+                    Color.brown
+                )
+                .frame(
+                    width:
+                        max(
+                            CGFloat(
+                                dot.radius * 2
+                            )
+                            * layout.scale,
+                            2
+                        ),
 
-                guard let firstPoint =
-                    shitTrailPoints.first
-
-                else {
-                    return
-                }
-
-
-                let firstScreenPoint =
+                    height:
+                        max(
+                            CGFloat(
+                                dot.radius * 2
+                            )
+                            * layout.scale,
+                            2
+                        )
+                )
+                .position(
                     mapToScreen(
                         x:
-                            firstPoint.x,
+                            dot.position.x,
 
                         z:
-                            firstPoint.y,
+                            dot.position.y,
 
                         layout:
                             layout
                     )
-
-
-                path.move(
-                    to:
-                        firstScreenPoint
                 )
-
-
-                for point in shitTrailPoints.dropFirst() {
-
-                    let screenPoint =
-                        mapToScreen(
-                            x:
-                                point.x,
-
-                            z:
-                                point.y,
-
-                            layout:
-                                layout
-                        )
-
-
-                    path.addLine(
-                        to:
-                            screenPoint
-                    )
-                }
-            }
-            .stroke(
-                Color.brown,
-                style:
-                    StrokeStyle(
-                        lineWidth:
-                            7,
-
-                        lineCap:
-                            .round,
-
-                        lineJoin:
-                            .round
-                    )
-            )
         }
     }
     
@@ -1132,8 +1105,8 @@ struct StoredGameMapView: View {
     var runtimeMapObjects:
         [PlacedMapObject]? = nil
 
-    var shitTrailPoints:
-        [SIMD2<Float>] = []
+    var shitDots:
+        [ShitDot] = []
 
     var backgroundColor:
         Color = .black.opacity(0.5)
@@ -1178,8 +1151,8 @@ struct StoredGameMapView: View {
                     }
                 ),
 
-            shitTrailPoints:
-                shitTrailPoints,
+            shitDots:
+                shitDots,
 
             allowsObjectPlacement:
                 false,
