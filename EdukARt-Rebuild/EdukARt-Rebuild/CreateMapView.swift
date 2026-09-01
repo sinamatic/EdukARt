@@ -46,6 +46,20 @@ struct CreateMapView: View {
     @StateObject private var joystickMonitor = JoystickMonitor()
     @StateObject private var turnJoystickMonitor = JoystickMonitor()
     @StateObject private var course = Course()
+    @StateObject private var gameController =
+        GameController(
+            map:
+                GameMap(
+                    name:
+                        "Mapping",
+
+                    referenceTagID:
+                        0,
+
+                    aprilTags:
+                        []
+                )
+        )
     
     @State private var placedMapObjects: [PlacedMapObject] = []
     
@@ -393,6 +407,7 @@ struct CreateMapView: View {
                 turnJoystickMonitor: turnJoystickMonitor,
                 mapBuilder: mapBuilder,
                 controller: controller,
+                gameController: gameController,
                 localizationResetID: localizationResetID
             )
         } else {

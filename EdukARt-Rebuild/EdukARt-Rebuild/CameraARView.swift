@@ -42,6 +42,7 @@ import ARKit
 import Combine
 import SwiftAprilTag
 import SwiftUIJoystick
+import UIKit
 
 
 struct CameraARView: UIViewRepresentable {
@@ -53,6 +54,8 @@ struct CameraARView: UIViewRepresentable {
     @ObservedObject var mapBuilder: AprilTagMapBuilder
     @ObservedObject var controller:
         RobotController
+    @ObservedObject var gameController:
+        GameController
     let gameMap:
         GameMap?
     let localizationResetID:
@@ -70,6 +73,7 @@ struct CameraARView: UIViewRepresentable {
         turnJoystickMonitor: JoystickMonitor,
         mapBuilder: AprilTagMapBuilder,
         controller: RobotController,
+        gameController: GameController,
         gameMap: GameMap? = nil,
         localizationResetID: Int = 0,
         requiredReferenceTagID: Int = 0,
@@ -91,6 +95,9 @@ struct CameraARView: UIViewRepresentable {
 
         self.controller =
             controller
+
+        self.gameController =
+            gameController
 
         self.gameMap =
             gameMap
@@ -333,7 +340,22 @@ struct CameraARView: UIViewRepresentable {
             context.coordinator
                 .animatedMapObjects
                 .removeAll()
+
+            context.coordinator
+                .clearRuntimeGameARContent()
         }
+
+        context.coordinator
+            .updateRuntimeMapObjects(
+                gameController
+                    .activeMapObjects
+            )
+
+        context.coordinator
+            .updateShitTrail(
+                gameController
+                    .shitTrailPoints
+            )
     }
 
 
@@ -364,6 +386,17 @@ struct CameraARView: UIViewRepresentable {
             Float = 0
         var animatedMapObjects:
             [AnimatedMapObject] = []
+
+        // MARK: - Runtime Game AR Content
+
+        var mapObjectEntities:
+            [UUID: Entity] = [:]
+
+        var shitTrailEntities:
+            [Entity] = []
+
+        var renderedShitTrailPointCount:
+            Int = 0
 
         var lastLocalizationResetID:
             Int = 0
@@ -955,12 +988,6 @@ struct CameraARView: UIViewRepresentable {
                     mapRoot
             )
 
-            renderMapObjectsIfNeeded(
-                in:
-                    mapRoot
-            )
-
-
             // Attach the virtual robot to the
             // localized map coordinate system.
             attachSimulationToMap()
@@ -1026,167 +1053,442 @@ struct CameraARView: UIViewRepresentable {
         }
 
 
-        private func renderMapObjectsIfNeeded(
-            in mapRoot: Entity
+        // MARK: - Update Runtime Map Objects
+
+        func updateRuntimeMapObjects(
+            _ activeObjects:
+                [PlacedMapObject]
         ) {
 
-            guard hasRenderedMapObjects == false,
-                  let gameMap
+            guard let mapAnchor
             else {
                 return
             }
 
 
-            hasRenderedMapObjects =
-                true
+            // --------------------------------------------------
+            // Active IDs
+            // --------------------------------------------------
 
-            mapRoot
-                .findEntity(
-                    named: "ARMapObjects"
-                )?
-                .removeFromParent()
-
-
-            let mapObjects =
-                gameMap.mapObjects
-
-            guard mapObjects.isEmpty == false
-            else {
-                return
-            }
-
-
-            Task { @MainActor in
-
-                let objectsRoot =
-                    Entity()
-
-                objectsRoot.name =
-                    "ARMapObjects"
-
-
-                for object in mapObjects {
-
-                    guard let modelName =
-                        object.type.modelName
-                    else {
-                        continue
+            let activeIDs =
+                Set(
+                    activeObjects.map {
+                        $0.id
                     }
-
-
-                    do {
-
-                        let entity =
-                            try await Entity(
-                                named:
-                                    modelName
-                            )
-
-                        let objectRoot =
-                            Entity()
-
-                        objectRoot.name =
-                            "ARMapObject-\(object.id)"
-
-                        let basePosition =
-                            SIMD3<Float>(
-                                object.x,
-                                0.02,
-                                object.z
-                            )
-
-                        objectRoot.position =
-                            basePosition
-
-
-                        let uprightRotation =
-                            simd_quatf(
-                                angle:
-                                    0,
-
-                                axis:
-                                    SIMD3<Float>(
-                                        0,
-                                        0,
-                                        1
-                                    )
-                            )
-
-                        let mapRotation =
-                            simd_quatf(
-                                angle:
-                                    object.rotation,
-
-                                axis:
-                                    SIMD3<Float>(
-                                        0,
-                                        1,
-                                        0
-                                    )
-                            )
-
-                        let baseOrientation =
-                            mapRotation
-                            * uprightRotation
-
-                        objectRoot.orientation =
-                            baseOrientation
-
-                        entity.scale *=
-                            SIMD3<Float>(
-                                repeating:
-                                    0.3
-                            )
-
-                        objectRoot.addChild(
-                            entity
-                        )
-
-                        objectsRoot.addChild(
-                            objectRoot
-                        )
-
-                        animatedMapObjects.append(
-                            AnimatedMapObject(
-                                entity:
-                                    objectRoot,
-
-                                basePosition:
-                                    basePosition,
-
-                                baseOrientation:
-                                    baseOrientation,
-
-                                phase:
-                                    Float(
-                                        animatedMapObjects.count
-                                    )
-                                    * 0.7
-                            )
-                        )
-
-                    } catch {
-
-                        print(
-                            "# MAP OBJECT MODEL LOAD FAILED | \(modelName) |",
-                            error
-                        )
-                    }
-                }
-
-
-                guard objectsRoot.children.isEmpty == false
-                else {
-                    return
-                }
-
-
-                mapRoot.addChild(
-                    objectsRoot
                 )
 
-                startMapObjectAnimationIfNeeded()
+
+            // --------------------------------------------------
+            // Remove AR entities whose gameplay object disappeared
+            // --------------------------------------------------
+
+            let removedIDs =
+                mapObjectEntities.keys.filter {
+                    activeIDs.contains($0) == false
+                }
+
+
+            for id in removedIDs {
+
+                mapObjectEntities[id]?
+                    .removeFromParent()
+
+                mapObjectEntities[id] =
+                    nil
+
+                animatedMapObjects.removeAll {
+                    $0.entity.name == "ARMapObject-\(id)"
+                }
+
+
+                print(
+                    "# AR OBJECT REMOVED | \(id)"
+                )
             }
+
+
+            // --------------------------------------------------
+            // Add objects which do not yet exist in AR
+            // --------------------------------------------------
+
+            for object in activeObjects {
+
+                guard mapObjectEntities[
+                    object.id
+                ] == nil
+                else {
+                    continue
+                }
+
+
+                guard let modelName =
+                    object.type.modelName
+                else {
+                    continue
+                }
+
+
+                do {
+
+                    let entity =
+                        try Entity.load(
+                            named:
+                                modelName
+                        )
+
+
+                    let objectRoot =
+                        Entity()
+
+                    objectRoot.name =
+                        "ARMapObject-\(object.id)"
+
+
+                    let basePosition =
+                        SIMD3<Float>(
+                            object.x,
+                            0.02,
+                            object.z
+                        )
+
+                    objectRoot.position =
+                        basePosition
+
+
+                    let uprightRotation =
+                        simd_quatf(
+                            angle:
+                                0,
+
+                            axis:
+                                SIMD3<Float>(
+                                    0,
+                                    0,
+                                    1
+                                )
+                        )
+
+                    let mapRotation =
+                        simd_quatf(
+                            angle:
+                                object.rotation,
+
+                            axis:
+                                SIMD3<Float>(
+                                    0,
+                                    1,
+                                    0
+                                )
+                        )
+
+                    let baseOrientation =
+                        mapRotation
+                        * uprightRotation
+
+                    objectRoot.orientation =
+                        baseOrientation
+
+                    entity.scale *=
+                        SIMD3<Float>(
+                            repeating:
+                                0.3
+                        )
+
+                    objectRoot.addChild(
+                        entity
+                    )
+
+                    mapAnchor.addChild(
+                        objectRoot
+                    )
+
+
+                    mapObjectEntities[
+                        object.id
+                    ] =
+                        objectRoot
+
+                    animatedMapObjects.append(
+                        AnimatedMapObject(
+                            entity:
+                                objectRoot,
+
+                            basePosition:
+                                basePosition,
+
+                            baseOrientation:
+                                baseOrientation,
+
+                            phase:
+                                Float(
+                                    animatedMapObjects.count
+                                )
+                                * 0.7
+                        )
+                    )
+
+                    startMapObjectAnimationIfNeeded()
+
+
+                    print(
+                        "# AR OBJECT ADDED | \(object.type.name)"
+                    )
+
+                } catch {
+
+                    print(
+                        "# AR OBJECT LOAD FAILED | \(modelName) | \(error)"
+                    )
+                }
+            }
+        }
+
+
+        // MARK: - Update Shit Trail
+
+        func updateShitTrail(
+            _ points:
+                [SIMD2<Float>]
+        ) {
+
+            // Game was reset.
+            if points.isEmpty {
+
+                for entity in shitTrailEntities {
+
+                    entity.removeFromParent()
+                }
+
+
+                shitTrailEntities
+                    .removeAll()
+
+
+                renderedShitTrailPointCount =
+                    0
+
+
+                return
+            }
+
+
+            guard let mapAnchor
+            else {
+                return
+            }
+
+
+            guard points.count >= 2
+            else {
+                return
+            }
+
+
+            // Start at the first segment which has not
+            // already been rendered.
+            let firstNewSegment =
+                max(
+                    renderedShitTrailPointCount - 1,
+                    0
+                )
+
+
+            guard firstNewSegment
+                    < points.count - 1
+            else {
+                return
+            }
+
+
+            for index in
+                firstNewSegment..<(points.count - 1) {
+
+                let start =
+                    points[index]
+
+                let end =
+                    points[index + 1]
+
+
+                let segment =
+                    makeShitTrailSegment(
+                        from:
+                            start,
+
+                        to:
+                            end
+                    )
+
+
+                mapAnchor.addChild(
+                    segment
+                )
+
+
+                shitTrailEntities.append(
+                    segment
+                )
+            }
+
+
+            renderedShitTrailPointCount =
+                points.count
+        }
+
+
+        // MARK: - Create Shit Trail Segment
+
+        private func makeShitTrailSegment(
+            from start:
+                SIMD2<Float>,
+
+            to end:
+                SIMD2<Float>
+        ) -> ModelEntity {
+
+            // --------------------------------------------------
+            // Direction
+            // --------------------------------------------------
+
+            let dx =
+                end.x - start.x
+
+            let dz =
+                end.y - start.y
+
+
+            // --------------------------------------------------
+            // Length
+            // --------------------------------------------------
+
+            let length =
+                sqrt(
+                    dx * dx
+                    +
+                    dz * dz
+                )
+
+
+            // --------------------------------------------------
+            // Center
+            // --------------------------------------------------
+
+            let centerX =
+                (
+                    start.x
+                    +
+                    end.x
+                )
+                / 2
+
+            let centerZ =
+                (
+                    start.y
+                    +
+                    end.y
+                )
+                / 2
+
+
+            // --------------------------------------------------
+            // Rotation
+            // --------------------------------------------------
+
+            let angle =
+                atan2(
+                    dx,
+                    dz
+                )
+
+
+            // --------------------------------------------------
+            // Mesh
+            // --------------------------------------------------
+
+            let mesh =
+                MeshResource.generateBox(
+                    size:
+                        SIMD3<Float>(
+                            0.08,
+                            0.003,
+                            max(
+                                length,
+                                0.01
+                            )
+                        )
+                )
+
+
+            // Brown material.
+            let material =
+                SimpleMaterial(
+                    color:
+                        UIColor.brown,
+
+                    isMetallic:
+                        false
+                )
+
+
+            let entity =
+                ModelEntity(
+                    mesh:
+                        mesh,
+
+                    materials:
+                        [
+                            material
+                        ]
+                )
+
+
+            // Slightly above the floor to prevent Z-fighting.
+            entity.position =
+                SIMD3<Float>(
+                    centerX,
+                    0.008,
+                    centerZ
+                )
+
+
+            entity.orientation =
+                simd_quatf(
+                    angle:
+                        angle,
+
+                    axis:
+                        SIMD3<Float>(
+                            0,
+                            1,
+                            0
+                        )
+                )
+
+
+            return entity
+        }
+
+
+        func clearRuntimeGameARContent() {
+
+            for entity in mapObjectEntities.values {
+
+                entity.removeFromParent()
+            }
+
+            mapObjectEntities
+                .removeAll()
+
+            for entity in shitTrailEntities {
+
+                entity.removeFromParent()
+            }
+
+            shitTrailEntities
+                .removeAll()
+
+            renderedShitTrailPointCount =
+                0
         }
 
 

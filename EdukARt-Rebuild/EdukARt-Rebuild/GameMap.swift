@@ -41,7 +41,8 @@ struct GameMap:
     // These are NOT the raw finger input points.
     var trackPoints:
         [StoredTrackPoint]
-
+    
+    
 
     // MARK: - Init
 
@@ -194,6 +195,8 @@ struct StoredTrackPoint:
         Float
 }
 
+
+
 // MARK: - Map Object Type
 
 enum MapObjectType:
@@ -267,7 +270,9 @@ enum MapObjectType:
             "Tree"
         }
     }
-
+    
+    
+    // MARK: - Classification
 
     var isObstacle: Bool {
 
@@ -283,6 +288,54 @@ enum MapObjectType:
             false
         }
     }
+    
+    // MARK: - Collision
+    
+    var hasCollision: Bool {
+
+        switch self {
+
+        case .tongue,
+             .eggs,
+             .shit,
+             .oil,
+             .water,
+             .rock,
+             .tree:
+
+            return true
+        } }
+        
+    var collisionRadius: Float {
+
+        switch self {
+
+        case .tongue:
+            return 0.10
+
+        case .eggs:
+            return 0.10
+
+        case .shit:
+            return 0.12
+
+        case .oil:
+            return 0.15
+
+        case .water:
+            return 0.15
+
+        case .rock:
+            return 0.18
+
+        case .tree:
+            return 0.20
+        }
+   
+    
+    }
+    
+    // MARK: - AR Model
 
     var modelName: String? {
 
@@ -295,6 +348,8 @@ enum MapObjectType:
             nil
         }
     }
+    
+   
 }
 
 

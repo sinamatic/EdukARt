@@ -9,6 +9,7 @@
 import SwiftUI
 import SwiftUIJoystick
 import UIKit
+import Combine
 
 struct GameView: View {
 
@@ -21,6 +22,9 @@ struct GameView: View {
     @ObservedObject var controller:
         RobotController
 
+    @StateObject private var gameController:
+        GameController
+
     @State private var isMapLocalized =
         false
 
@@ -29,6 +33,19 @@ struct GameView: View {
 
     @State private var simulationRobotPose =
         RobotPose.zero
+
+    private let collisionTimer =
+        Timer.publish(
+            every:
+                0.05,
+
+            on:
+                .main,
+
+            in:
+                .common
+        )
+        .autoconnect()
     
     
     // MARK: - Joystick
@@ -45,12 +62,43 @@ struct GameView: View {
 
     @StateObject private var mapBuilder = AprilTagMapBuilder()
 
+    init(
+        map: GameMap,
+        eduardModelStore: EduardModelStore,
+        controller: RobotController
+    ) {
+
+        self.map =
+            map
+
+        self.eduardModelStore =
+            eduardModelStore
+
+        self.controller =
+            controller
+
+        _gameController =
+            StateObject(
+                wrappedValue:
+                    GameController(
+                        map:
+                            map
+                    )
+            )
+    }
+
     var body: some View {
 
         gameContent
             .background(
                 SwipeBackDisabler()
             )
+            .onReceive(
+                collisionTimer
+            ) { _ in
+
+                updateGameCollision()
+            }
     }
 
 
@@ -92,6 +140,9 @@ struct GameView: View {
 
             controller:
                 controller,
+
+            gameController:
+                gameController,
 
             gameMap:
                 map,
@@ -138,7 +189,13 @@ struct GameView: View {
             simulationPose:
                 controller.isSimulationVisible
                 ? simulationRobotPose
-                : nil
+                : nil,
+
+            runtimeMapObjects:
+                gameController.activeMapObjects,
+
+            shitTrailPoints:
+                gameController.shitTrailPoints
         )
         .frame(
             width:
@@ -649,6 +706,81 @@ struct GameView: View {
         controller.stopJoystick()
 
         controller.stopMechanumRotation()
+    }
+
+
+    // MARK: - Game Collision
+
+    private func updateGameCollision() {
+
+        switch controller.controlMode {
+
+
+        // --------------------------------------------------
+        // Physical Eduard
+        // --------------------------------------------------
+
+        case .real:
+
+            guard let pose =
+                controller.realRobotPose
+
+            else {
+                return
+            }
+
+
+            gameController
+                .updateRobotPose(
+                    pose
+                )
+
+
+        // --------------------------------------------------
+        // AR Eduard
+        // --------------------------------------------------
+
+        case .simulation:
+
+            gameController
+                .updateRobotPose(
+                    controller
+                        .eduardSimulation
+                        .pose
+                )
+
+
+        // --------------------------------------------------
+        // Synchronized
+        // --------------------------------------------------
+
+        case .synchronized:
+
+            // The measured physical pose is authoritative
+            // whenever it is available.
+
+            if let pose =
+                controller.realRobotPose {
+
+                gameController
+                    .updateRobotPose(
+                        pose
+                    )
+            }
+
+            else {
+
+                // Useful fallback for testing without
+                // the physical Eduard.
+
+                gameController
+                    .updateRobotPose(
+                        controller
+                            .eduardSimulation
+                            .pose
+                    )
+            }
+        }
     }
 
 

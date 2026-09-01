@@ -32,6 +32,9 @@ struct GameMapView: View {
     @Binding var mapObjects:
         [PlacedMapObject]
 
+    var shitTrailPoints:
+        [SIMD2<Float>] = []
+
     var allowsObjectPlacement:
         Bool = false
 
@@ -100,6 +103,11 @@ struct GameMapView: View {
                 // ------------------------------------------
 
                 trackLayer(
+                    layout:
+                        layout
+                )
+
+                shitTrailLayer(
                     layout:
                         layout
                 )
@@ -515,6 +523,85 @@ struct GameMapView: View {
             blue:
                 0
         )
+    }
+
+
+    // ======================================================
+    // MARK: - Shit Trail Layer
+    // ======================================================
+
+    @ViewBuilder
+    private func shitTrailLayer(
+        layout: MapLayout
+    ) -> some View {
+
+        if shitTrailPoints.count >= 2 {
+
+            Path { path in
+
+                guard let firstPoint =
+                    shitTrailPoints.first
+
+                else {
+                    return
+                }
+
+
+                let firstScreenPoint =
+                    mapToScreen(
+                        x:
+                            firstPoint.x,
+
+                        z:
+                            firstPoint.y,
+
+                        layout:
+                            layout
+                    )
+
+
+                path.move(
+                    to:
+                        firstScreenPoint
+                )
+
+
+                for point in shitTrailPoints.dropFirst() {
+
+                    let screenPoint =
+                        mapToScreen(
+                            x:
+                                point.x,
+
+                            z:
+                                point.y,
+
+                            layout:
+                                layout
+                        )
+
+
+                    path.addLine(
+                        to:
+                            screenPoint
+                    )
+                }
+            }
+            .stroke(
+                Color.brown,
+                style:
+                    StrokeStyle(
+                        lineWidth:
+                            7,
+
+                        lineCap:
+                            .round,
+
+                        lineJoin:
+                            .round
+                    )
+            )
+        }
     }
     
     // ======================================================
@@ -1042,6 +1129,12 @@ struct StoredGameMapView: View {
     var simulationPose:
         RobotPose? = nil
 
+    var runtimeMapObjects:
+        [PlacedMapObject]? = nil
+
+    var shitTrailPoints:
+        [SIMD2<Float>] = []
+
     var backgroundColor:
         Color = .black.opacity(0.5)
 
@@ -1073,7 +1166,20 @@ struct StoredGameMapView: View {
                 false,
 
             mapObjects:
-                $mapObjects,
+                Binding(
+                    get: {
+                        runtimeMapObjects
+                        ?? mapObjects
+                    },
+
+                    set: { newValue in
+                        mapObjects =
+                            newValue
+                    }
+                ),
+
+            shitTrailPoints:
+                shitTrailPoints,
 
             allowsObjectPlacement:
                 false,

@@ -515,12 +515,12 @@ final class EduardSimulation {
 
         let frontLeft =
             forward
-            + sideways
+            - sideways
             + rotation
 
         let frontRight =
             forward
-            - sideways
+            + sideways
             - rotation
 
         let backLeft =
@@ -554,7 +554,7 @@ final class EduardSimulation {
             speed:
                 frontLeft,
             direction:
-                1
+                -1
         )
 
         rotateWheel(
@@ -578,7 +578,7 @@ final class EduardSimulation {
             speed:
                 backRight,
             direction:
-                -1
+                1
         )
     }
 

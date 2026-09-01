@@ -541,7 +541,7 @@ final class Eduard {
 
                         "z":
                             .double(
-                                command.rotation
+                                -command.rotation
                             )
                     ])
             ]

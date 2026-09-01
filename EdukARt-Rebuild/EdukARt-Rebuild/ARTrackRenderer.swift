@@ -57,6 +57,9 @@ final class ARTrackRenderer {
     private let roadEdgeWidth:
         Float = 0.035
 
+    private let roadEdgeOpacity:
+        Float = 0.80
+
 
     // ======================================================
     // MARK: - Center Line Settings
@@ -224,16 +227,17 @@ final class ARTrackRenderer {
         // 2. Dashed center line
         // --------------------------------------------------
 
-        renderCenterLine(
-            path:
-                path,
-            cumulativeDistances:
-                cumulativeDistances,
-            totalLength:
-                totalLength,
-            parent:
-                trackRoot
-        )
+        // Center line is intentionally hidden in gameplay for now.
+        // renderCenterLine(
+        //     path:
+        //         path,
+        //     cumulativeDistances:
+        //         cumulativeDistances,
+        //     totalLength:
+        //         totalLength,
+        //     parent:
+        //         trackRoot
+        // )
 
 
         // --------------------------------------------------
@@ -757,6 +761,13 @@ final class ARTrackRenderer {
 
         entity.name =
             name
+
+        entity.components.set(
+            OpacityComponent(
+                opacity:
+                    roadEdgeOpacity
+            )
+        )
 
 
         parent.addChild(
