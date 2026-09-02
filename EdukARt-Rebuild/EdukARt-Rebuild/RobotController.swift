@@ -101,6 +101,10 @@ final class RobotController:
         false
 
     @Published private(set)
+    var isWifiReachable =
+        false
+
+    @Published private(set)
     var isEnabled =
         false
 
@@ -162,6 +166,9 @@ final class RobotController:
     private var connectionTimer:
         Timer?
 
+    private var shitLightEffectTask:
+        Task<Void, Never>?
+
     private var isCheckingConnection =
         false
 
@@ -175,7 +182,7 @@ final class RobotController:
             return .enabled
         }
 
-        if isConnected {
+        if isWifiReachable {
             return .connected
         }
 
@@ -228,6 +235,9 @@ final class RobotController:
 
         connectionTimer?
             .invalidate()
+
+        shitLightEffectTask?
+            .cancel()
     }
 
 
@@ -240,6 +250,9 @@ final class RobotController:
         eduard.reconnect()
 
         isConnected =
+            true
+
+        isWifiReachable =
             true
 
         statusMessage =
@@ -284,6 +297,9 @@ final class RobotController:
         isConnected =
             false
 
+        isWifiReachable =
+            false
+
         isEnabled =
             false
 
@@ -292,24 +308,21 @@ final class RobotController:
     }
 
     private func updateConnectionState(_ connected: Bool) {
-        let wasConnected =
-            isConnected
+        let wasReachable =
+            isWifiReachable
 
-        isConnected =
+        isWifiReachable =
             connected
 
-        if connected == false {
-            isEnabled =
-                false
+        print(
+            "# WIFI PING \(connected) | IS ENABLED \(isEnabled)"
+        )
 
-            stopCommandLoop()
-        }
-
-        if connected != wasConnected || connected == false {
+        if connected != wasReachable || connected == false {
             statusMessage =
                 connected
-                ? "Eduard connected."
-                : "No active connection to Eduard."
+                ? "Eduard WiFi reachable."
+                : "Eduard WiFi not reachable."
         }
     }
 
@@ -346,6 +359,9 @@ final class RobotController:
 
 
         isConnected =
+            true
+
+        isWifiReachable =
             true
 
         isEnabled =
@@ -535,6 +551,90 @@ final class RobotController:
                     mode
                 )
         }
+    }
+
+
+    func startShitEffect(
+        duration: TimeInterval
+    ) {
+
+        shitLightEffectTask?
+            .cancel()
+
+
+        eduardSimulation.startShitEffect(
+            duration:
+                duration
+        )
+
+
+        guard isConnected
+                || isWifiReachable
+        else {
+            return
+        }
+
+
+        let previousLightMode =
+            eduard.activeLightMode
+
+        let previousAllLightsColor =
+            eduard.activeAllLightsColor
+
+
+        eduard.setAllLightsColor(
+            red:
+                165,
+
+            green:
+                42,
+
+            blue:
+                42
+        )
+
+        eduard.setLightMode(
+            .solid
+        )
+
+        print(
+            "# SHIT LIGHTS | physical Eduard brown"
+        )
+
+
+        shitLightEffectTask =
+            Task { [weak self] in
+
+                try? await Task.sleep(
+                    for:
+                        .seconds(
+                            duration
+                        )
+                )
+
+
+                guard Task.isCancelled == false,
+                      let self
+                else {
+                    return
+                }
+
+
+                self.eduard.setAllLightsColor(
+                    red:
+                        previousAllLightsColor.red,
+
+                    green:
+                        previousAllLightsColor.green,
+
+                    blue:
+                        previousAllLightsColor.blue
+                )
+
+                self.eduard.setLightMode(
+                    previousLightMode
+                )
+            }
     }
 
     // MARK: - Place Simulation at Map Reference

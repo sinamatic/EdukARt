@@ -64,6 +64,9 @@ final class EduardSimulation {
     private var backRightLight:
         Entity?
 
+    private var shitLightEffectTask:
+        Task<Void, Never>?
+
 
     // MARK: - Settings
 
@@ -72,6 +75,13 @@ final class EduardSimulation {
 
     private let wheelRotationSpeed:
         Float = 0.12
+    
+    // MARK: - AR Model Alignment
+
+
+    /// Visual offset from the AprilTag position.
+    private let modelForwardOffset: Float =
+    0.50
 
 
     // MARK: - Show
@@ -82,6 +92,7 @@ final class EduardSimulation {
 
         self.entity =
             entity
+        
 
 
         // Find wheel entities once.
@@ -177,6 +188,9 @@ final class EduardSimulation {
 
         backRightLight =
             nil
+
+        shitLightEffectTask?
+            .cancel()
     }
 
 
@@ -335,6 +349,39 @@ final class EduardSimulation {
     }
 
 
+    func startShitEffect(
+        duration: TimeInterval
+    ) {
+
+        shitLightEffectTask?
+            .cancel()
+
+        applyAllLightMaterials(
+            color:
+                .brown
+        )
+
+        shitLightEffectTask =
+            Task { @MainActor [weak self] in
+
+                try? await Task.sleep(
+                    for:
+                        .seconds(
+                            duration
+                        )
+                )
+
+                guard Task.isCancelled == false,
+                      let self
+                else {
+                    return
+                }
+
+                self.applyDefaultLightMaterials()
+            }
+    }
+
+
     private func applyDefaultLightMaterials() {
 
         applyLightMaterial(
@@ -368,6 +415,28 @@ final class EduardSimulation {
             color:
                 .red
         )
+    }
+
+
+    private func applyAllLightMaterials(
+        color: UIColor
+    ) {
+
+        [
+            frontLeftLight,
+            frontRightLight,
+            backLeftLight,
+            backRightLight
+        ].forEach {
+
+            applyLightMaterial(
+                to:
+                    $0,
+
+                color:
+                    color
+            )
+        }
     }
 
 
@@ -445,29 +514,40 @@ final class EduardSimulation {
     // MARK: - Apply Pose
 
     private func applyPose() {
-
-        guard let entity
-        else {
+        guard let entity else {
             return
         }
 
+        let logicalRotation =
+            simd_quatf(
+                angle: pose.rotation,
+                axis: SIMD3<Float>(0, 1, 0)
+            )
 
-        entity.position =
-            pose.position
-
-
-        entity.orientation =
+        let visualRotation =
             simd_quatf(
                 angle:
                     pose.rotation,
-
                 axis:
-                    SIMD3<Float>(
-                        0,
-                        1,
-                        0
-                    )
+                    SIMD3<Float>(0, 0, 0)
             )
+
+        let forward =
+            logicalRotation.act(
+                SIMD3<Float>(
+                    0,
+                    0,
+                    -1
+                )
+            )
+
+        entity.position =
+            pose.position
+            + forward
+            * modelForwardOffset
+
+        entity.orientation =
+            visualRotation
     }
 
 

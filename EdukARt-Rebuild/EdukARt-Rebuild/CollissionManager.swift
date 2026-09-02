@@ -14,9 +14,9 @@ import Foundation
 
 final class CollisionManager {
 
-    // Eduard is approximately 30 x 30 cm.
+    // Eduard is approximately 38 x 41 cm.
     private let robotRadius:
-        Float = 0.15
+        Float = 0.205
 
 
     // Objects currently touched by the robot.
@@ -24,12 +24,13 @@ final class CollisionManager {
     // This prevents one collision from being triggered
     // continuously every frame.
     private var activeCollisionIDs:
-        Set<UUID> = []
+        [CollisionActor: Set<UUID>] = [:]
 
 
     // MARK: - Update
 
     func update(
+        actor: CollisionActor,
         robotPose: RobotPose,
         objects: [PlacedMapObject]
     ) -> [MapObjectCollision] {
@@ -43,6 +44,10 @@ final class CollisionManager {
 
         var currentCollisionIDs:
             Set<UUID> = []
+
+        let actorCollisionIDs =
+            activeCollisionIDs[actor]
+            ?? []
 
         var collisions:
             [MapObjectCollision] = []
@@ -76,7 +81,9 @@ final class CollisionManager {
                     )
 
                 print(
-                    "# COLLISION DEBUG | Robot:",
+                    "# COLLISION DEBUG | Actor:",
+                    actor.rawValue,
+                    "| Robot:",
                     robotX,
                     robotZ,
                     "| Shit:",
@@ -115,7 +122,7 @@ final class CollisionManager {
 
             // New collision.
 
-            if activeCollisionIDs
+            if actorCollisionIDs
                 .contains(
                     object.id
                 ) == false {
@@ -124,6 +131,9 @@ final class CollisionManager {
                     MapObjectCollision(
                         object:
                             object,
+
+                        actor:
+                            actor,
 
                         phase:
                             .began
@@ -136,7 +146,7 @@ final class CollisionManager {
         // Detect objects that are no longer touched.
 
         let endedCollisionIDs =
-            activeCollisionIDs
+            actorCollisionIDs
                 .subtracting(
                     currentCollisionIDs
                 )
@@ -161,6 +171,9 @@ final class CollisionManager {
                     object:
                         object,
 
+                    actor:
+                        actor,
+
                     phase:
                         .ended
                 )
@@ -168,7 +181,7 @@ final class CollisionManager {
         }
 
 
-        activeCollisionIDs =
+        activeCollisionIDs[actor] =
             currentCollisionIDs
 
 
@@ -186,12 +199,25 @@ final class CollisionManager {
 }
 
 
+// MARK: - Collision Actor
+
+enum CollisionActor:
+    String {
+
+    case real
+    case simulation
+}
+
+
 // MARK: - Collision
 
 struct MapObjectCollision {
 
     let object:
         PlacedMapObject
+
+    let actor:
+        CollisionActor
 
     let phase:
         CollisionPhase

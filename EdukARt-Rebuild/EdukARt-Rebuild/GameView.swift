@@ -34,6 +34,9 @@ struct GameView: View {
     @State private var simulationRobotPose =
         RobotPose.zero
 
+    @State private var collisionDebugCounter =
+        0
+
     private let collisionTimer =
         Timer.publish(
             every:
@@ -98,6 +101,10 @@ struct GameView: View {
             ) { _ in
 
                 updateGameCollision()
+            }
+            .onAppear {
+
+                configureGameController()
             }
     }
 
@@ -711,76 +718,117 @@ struct GameView: View {
 
     // MARK: - Game Collision
 
+    private func configureGameController() {
+
+        gameController.setShitEffectHandler { duration in
+
+            controller.startShitEffect(
+                duration:
+                    duration
+            )
+        }
+    }
+
+
     private func updateGameCollision() {
 
-        switch controller.controlMode {
+        if let realPose =
+            controller.realRobotPose {
 
+            updateGameCollision(
+                actor:
+                    .real,
 
-        // --------------------------------------------------
-        // Physical Eduard
-        // --------------------------------------------------
-
-        case .real:
-
-            guard let pose =
-                controller.realRobotPose
-
-            else {
-                return
-            }
-
-
-            gameController
-                .updateRobotPose(
-                    pose
-                )
-
-
-        // --------------------------------------------------
-        // AR Eduard
-        // --------------------------------------------------
-
-        case .simulation:
-
-            gameController
-                .updateRobotPose(
-                    controller
-                        .eduardSimulation
-                        .pose
-                )
-
-
-        // --------------------------------------------------
-        // Synchronized
-        // --------------------------------------------------
-
-        case .synchronized:
-
-            // The measured physical pose is authoritative
-            // whenever it is available.
-
-            if let pose =
-                controller.realRobotPose {
-
-                gameController
-                    .updateRobotPose(
-                        pose
-                    )
-            }
-
-            else {
-
-                // Useful fallback for testing without
-                // the physical Eduard.
-
-                gameController
-                    .updateRobotPose(
-                        controller
-                            .eduardSimulation
-                            .pose
-                    )
-            }
+                with:
+                    realPose
+            )
         }
+
+        updateGameCollision(
+            actor:
+                .simulation,
+
+            with:
+                controller
+                    .eduardSimulation
+                    .pose
+        )
+    }
+
+
+    private func updateGameCollision(
+        actor:
+            CollisionActor,
+
+        with gameplayPose:
+            RobotPose
+    ) {
+
+        printCollisionDebug(
+            actor:
+                actor,
+
+            gameplayPose:
+                gameplayPose
+        )
+
+        gameController.updateRobotPose(
+            gameplayPose,
+
+            actor:
+                actor
+        )
+    }
+
+
+    private func printCollisionDebug(
+        actor:
+            CollisionActor,
+
+        gameplayPose:
+            RobotPose
+    ) {
+
+        collisionDebugCounter += 1
+
+        guard collisionDebugCounter % 20 == 0
+        else {
+            return
+        }
+
+
+        let realYawText =
+            controller.realRobotPose.map {
+                String(
+                    format:
+                        "%.1f",
+                    degrees(
+                        $0.rotation
+                    )
+                )
+            }
+            ?? "nil"
+
+        print(
+            String(
+                format:
+                    "# GAMEPLAY DEBUG | actor %@ | REAL yaw %@ | SIM logical yaw %.1f | MODEL visual yaw %.1f",
+                actor.rawValue,
+                realYawText,
+                degrees(
+                    controller.eduardSimulation.pose.rotation
+                )
+            )
+        )
+    }
+
+
+    private func degrees(
+        _ radians:
+            Float
+    ) -> Float {
+
+        radians * 180 / .pi
     }
 
 

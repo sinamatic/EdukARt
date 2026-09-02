@@ -348,6 +348,16 @@ final class Eduard {
             blue: 0
         )
 
+    var activeAllLightsColor:
+        (red: Int, green: Int, blue: Int) {
+
+        (
+            allLightsColor.red,
+            allLightsColor.green,
+            allLightsColor.blue
+        )
+    }
+
     private var signalColor =
         RGBColor(
             red: 255,

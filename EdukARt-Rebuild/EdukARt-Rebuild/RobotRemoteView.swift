@@ -99,7 +99,7 @@ private extension RobotRemoteView {
                                 .font(.caption.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
-                                .background(controller.isConnected ? .green.opacity(0.8) : .red.opacity(0.8))
+                                .background(controller.isWifiReachable ? .green.opacity(0.8) : .red.opacity(0.8))
                                 .foregroundStyle(.white)
                                 .clipShape(
                                     RoundedRectangle(cornerRadius: 8)

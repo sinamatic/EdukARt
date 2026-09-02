@@ -90,8 +90,20 @@ final class GameController:
     private var shitEffectTask:
         Task<Void, Never>?
 
-    private var currentRobotPose:
-        RobotPose = .zero
+    private var onShitEffectStarted:
+        ((TimeInterval) -> Void)?
+
+    private var latestRobotPoses:
+        [CollisionActor: RobotPose] = [:]
+
+    private var shitEffectActor:
+        CollisionActor = .simulation
+
+    private let shitEffectDuration:
+        TimeInterval = 10
+
+    private let shitDotSpawnDistance:
+        Float = 0.14
 
 
     // ======================================================
@@ -118,6 +130,15 @@ final class GameController:
     }
 
 
+    func setShitEffectHandler(
+        _ handler: @escaping (TimeInterval) -> Void
+    ) {
+
+        onShitEffectStarted =
+            handler
+    }
+
+
     // ======================================================
     // MARK: - Robot Pose Update
     // ======================================================
@@ -133,14 +154,20 @@ final class GameController:
     /// which robot representation is currently active.
     func updateRobotPose(
         _ pose:
-            RobotPose
+            RobotPose,
+
+        actor:
+            CollisionActor
     ) {
 
-        currentRobotPose =
+        latestRobotPoses[actor] =
             pose
 
         let collisions =
             collisionManager.update(
+                actor:
+                    actor,
+
                 robotPose:
                     pose,
 
@@ -181,13 +208,16 @@ final class GameController:
         case .began:
 
             print(
-                "# COLLISION BEGAN | \(collision.object.type.name)"
+                "# COLLISION BEGAN | \(collision.object.type.name) | actor = \(collision.actor.rawValue)"
             )
 
 
             handleCollisionBegan(
                 with:
-                    collision.object
+                    collision.object,
+
+                actor:
+                    collision.actor
             )
 
 
@@ -216,7 +246,10 @@ final class GameController:
 
     private func handleCollisionBegan(
         with object:
-            PlacedMapObject
+            PlacedMapObject,
+
+        actor:
+            CollisionActor
     ) {
 
         switch object.type {
@@ -240,7 +273,10 @@ final class GameController:
         case .shit:
 
             hitShit(
-                object
+                object,
+
+                actor:
+                    actor
             )
 
 
@@ -347,7 +383,10 @@ final class GameController:
 
     private func hitShit(
         _ object:
-            PlacedMapObject
+            PlacedMapObject,
+
+        actor:
+            CollisionActor
     ) {
 
         score -= 5
@@ -363,7 +402,7 @@ final class GameController:
 
 
         print(
-            "# GAME | Shit hit"
+            "# GAME | Shit hit | SHIT actor = \(actor.rawValue)"
         )
 
         print(
@@ -371,7 +410,10 @@ final class GameController:
         )
 
 
-        startShitEffect()
+        startShitEffect(
+            actor:
+                actor
+        )
     }
 
 
@@ -379,7 +421,10 @@ final class GameController:
     // MARK: - Shit Effect
     // ======================================================
 
-    private func startShitEffect() {
+    private func startShitEffect(
+        actor:
+            CollisionActor
+    ) {
 
         // Stop an already running effect.
         shitEffectTask?
@@ -389,6 +434,13 @@ final class GameController:
         isLeavingShitTrail =
             true
 
+        shitEffectActor =
+            actor
+
+        onShitEffectStarted?(
+            shitEffectDuration
+        )
+
 
         shitEffectTask =
             Task { @MainActor in
@@ -396,20 +448,20 @@ final class GameController:
                 let endDate =
                     Date()
                         .addingTimeInterval(
-                            10
+                            shitEffectDuration
                         )
 
 
                 while Date() < endDate {
 
                     // ------------------------------------------
-                    // Random delay: 0.5 - 2 seconds
+                    // Random delay: 0.04 - 0.12 seconds
                     // ------------------------------------------
 
                     let delay =
                         Double.random(
                             in:
-                                0.5...2.0
+                                0.04...0.12
                         )
 
 
@@ -437,28 +489,34 @@ final class GameController:
                     // Current robot position
                     // ------------------------------------------
 
-                    let pose =
-                        currentRobotPose
+                    guard let pose =
+                        latestRobotPoses[shitEffectActor]
+                    else {
+                        continue
+                    }
+
+                    let dropPosition =
+                        shitDotPosition(
+                            behind:
+                                pose
+                        )
 
 
                     // ------------------------------------------
-                    // Random size: 0.5 - 3 cm radius
+                    // Random size: 1.5 - 5 cm radius
                     // ------------------------------------------
 
                     let radius =
                         Float.random(
                             in:
-                                0.005...0.03
+                                0.015...0.05
                         )
 
 
                     shitDots.append(
                         ShitDot(
                             position:
-                                SIMD2<Float>(
-                                    pose.position.x,
-                                    pose.position.z
-                                ),
+                                dropPosition,
 
                             radius:
                                 radius
@@ -480,6 +538,31 @@ final class GameController:
                     "# GAME | Shit effect ended"
                 )
             }
+    }
+
+
+    private func shitDotPosition(
+        behind pose:
+            RobotPose
+    ) -> SIMD2<Float> {
+
+        // EduardSimulation defines forward as
+        // (-sin(rotation), -cos(rotation)).
+        // A negative forward offset therefore places the dot
+        // behind the robot in map X/Z coordinates.
+        return SIMD2<Float>(
+            pose.position.x
+                + sin(
+                    pose.rotation
+                )
+                * shitDotSpawnDistance,
+
+            pose.position.z
+                + cos(
+                    pose.rotation
+                )
+                * shitDotSpawnDistance
+        )
     }
 
 
@@ -645,8 +728,8 @@ final class GameController:
         shitDots
             .removeAll()
 
-        currentRobotPose =
-            .zero
+        latestRobotPoses
+            .removeAll()
 
         collisionManager
             .reset()

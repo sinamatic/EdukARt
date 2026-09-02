@@ -120,8 +120,7 @@ struct CreateMapView: View {
 
         case .drawRoad:
 
-            return
-                course.trackPoints.count >= 2
+            return true
 
 
         case .itemsObstacles:

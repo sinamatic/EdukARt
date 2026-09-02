@@ -38,15 +38,15 @@ struct RobotControlOverlay: View {
         .padding(20)
         .offset(y: -20)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Robot Status: \(controller.connectionState.title)")
+        .accessibilityLabel("Robot Status: WiFi \(controller.isWifiReachable), Enabled \(controller.isEnabled)")
         .onAppear { controller.checkConnection() }
     }
 
     private var trafficLight: some View {
         VStack(spacing: 4) {
-            statusDot(.red, controller.connectionState == .disconnected)
-            statusDot(.yellow, controller.connectionState == .connected)
-            statusDot(.green, controller.connectionState == .enabled)
+            statusDot(.red, controller.isWifiReachable == false)
+            statusDot(.yellow, controller.isWifiReachable && controller.isEnabled == false)
+            statusDot(.green, controller.isEnabled)
         }
     }
 

@@ -255,8 +255,15 @@ struct CameraARView: UIViewRepresentable {
                 )
 
 
-            simulationRoot.addChild(
+            let visualCorrectionRoot =
+                Entity()
+
+            visualCorrectionRoot.addChild(
                 eduard
+            )
+
+            simulationRoot.addChild(
+                visualCorrectionRoot
             )
 
             context.coordinator.simulationRoot =
@@ -424,6 +431,12 @@ struct CameraARView: UIViewRepresentable {
             () -> Void
         let onRobotPoseUpdated:
             (RobotPose) -> Void
+
+        private let tagToRobotYawOffset:
+            Float = 0
+
+        private let tagToRobotCenterDistance:
+            Float = 0.19
         
         init(
             mapBuilder: AprilTagMapBuilder,
@@ -464,6 +477,43 @@ struct CameraARView: UIViewRepresentable {
                             requiredReferenceTagID
                     )
             }
+        }
+
+
+        private func correctedRobotPose(
+            from tagPose:
+                RobotPose
+        ) -> RobotPose {
+
+            let robotRotation =
+                tagPose.rotation
+                + tagToRobotYawOffset
+
+            let correctedPosition =
+                SIMD3<Float>(
+                    tagPose.position.x
+                        + sin(
+                            robotRotation
+                        )
+                        * tagToRobotCenterDistance,
+
+                    tagPose.position.y,
+
+                    tagPose.position.z
+                        + cos(
+                            robotRotation
+                        )
+                        * tagToRobotCenterDistance
+                )
+
+
+            return RobotPose(
+                position:
+                    correctedPosition,
+
+                rotation:
+                    robotRotation
+            )
         }
 
 
@@ -670,10 +720,16 @@ struct CameraARView: UIViewRepresentable {
                                 intrinsics
                         ) {
 
+                        let centeredRobotPose =
+                            correctedRobotPose(
+                                from:
+                                    robotPose
+                            )
+
                         DispatchQueue.main.async {
 
                             self.onRobotPoseUpdated(
-                                robotPose
+                                centeredRobotPose
                             )
                         }
                     }
