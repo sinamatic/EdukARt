@@ -195,7 +195,9 @@ struct GameMapView: View {
                         color:
                             .cyan,
                         label:
-                            "3D"
+                            "3D",
+                        isRotationReversed:
+                            true
                     )
                     .position(
                         mapToScreen(
@@ -743,7 +745,9 @@ struct GameMapView: View {
     private func robotPoseView(
         _ pose: RobotPose,
         color: Color,
-        label: String
+        label: String,
+        isRotationReversed:
+            Bool = false
     ) -> some View {
 
         Rectangle()
@@ -772,7 +776,9 @@ struct GameMapView: View {
             .rotationEffect(
                 .radians(
                     Double(
-                        pose.rotation
+                        isRotationReversed
+                        ? -pose.rotation
+                        : pose.rotation
                     )
                 )
             )

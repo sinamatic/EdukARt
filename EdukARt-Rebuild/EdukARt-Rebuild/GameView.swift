@@ -186,35 +186,70 @@ struct GameView: View {
 
     private var savedMapView: some View {
 
-        StoredGameMapView(
-            map:
-                map,
+        VStack(
+            alignment:
+                .trailing,
 
-            robotPose:
-                controller.realRobotPose,
+            spacing:
+                6
+        ) {
 
-            simulationPose:
-                controller.isSimulationVisible
-                ? simulationRobotPose
-                : nil,
+            StoredGameMapView(
+                map:
+                    map,
 
-            runtimeMapObjects:
-                gameController.activeMapObjects,
+                robotPose:
+                    controller.realRobotPose,
 
-            shitDots:
-                gameController.shitDots
-        )
-        .frame(
-            width:
-                isMapLocalized
-                ? 180
-                : 360,
+                simulationPose:
+                    controller.isSimulationVisible
+                    ? simulationRobotPose
+                    : nil,
 
-            height:
-                isMapLocalized
-                ? 180
-                : 360
-        )
+                runtimeMapObjects:
+                    gameController.activeMapObjects,
+
+                shitDots:
+                    gameController.shitDots
+            )
+            .frame(
+                width:
+                    isMapLocalized
+                    ? 180
+                    : 360,
+
+                height:
+                    isMapLocalized
+                    ? 180
+                    : 360
+            )
+
+            Text(
+                "🪙 \(gameController.collectedCoins)"
+            )
+            .font(
+                .caption.bold()
+            )
+            .foregroundStyle(
+                .white
+            )
+            .padding(
+                .horizontal,
+                10
+            )
+            .padding(
+                .vertical,
+                5
+            )
+            .background(
+                .black.opacity(
+                    0.55
+                )
+            )
+            .clipShape(
+                Capsule()
+            )
+        }
         .frame(
             maxWidth:
                 .infinity,

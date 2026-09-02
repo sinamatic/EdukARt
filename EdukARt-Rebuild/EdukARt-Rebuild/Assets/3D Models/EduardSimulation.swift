@@ -70,6 +70,9 @@ final class EduardSimulation {
     private var oilLightEffectTask:
         Task<Void, Never>?
 
+    private var oilSpinTask:
+        Task<Void, Never>?
+
 
     // MARK: - Settings
 
@@ -196,6 +199,9 @@ final class EduardSimulation {
             .cancel()
 
         oilLightEffectTask?
+            .cancel()
+
+        oilSpinTask?
             .cancel()
     }
 
@@ -350,8 +356,68 @@ final class EduardSimulation {
         }
 
 
-        // Add RealityKit material changes here
-        // using the four stored light entities.
+        shitLightEffectTask?
+            .cancel()
+
+        oilLightEffectTask?
+            .cancel()
+
+        switch mode {
+
+        case .slowBlinking:
+            startBlinkingLights(
+                color:
+                    .red,
+
+                duration:
+                    nil
+            )
+
+        case .flashLeft:
+            applyDefaultLightMaterials()
+            applyLightMaterial(
+                to:
+                    frontLeftLight,
+
+                color:
+                    .orange
+            )
+            applyLightMaterial(
+                to:
+                    backLeftLight,
+
+                color:
+                    .orange
+            )
+
+        case .flashRight:
+            applyDefaultLightMaterials()
+            applyLightMaterial(
+                to:
+                    frontRightLight,
+
+                color:
+                    .orange
+            )
+            applyLightMaterial(
+                to:
+                    backRightLight,
+
+                color:
+                    .orange
+            )
+
+        case .dimmed,
+             .enabled,
+             .loading,
+             .beam,
+             .rotation,
+             .running,
+             .solid,
+             .rainbow,
+             .rainbowSolid:
+            applyDefaultLightMaterials()
+        }
     }
 
 
@@ -364,7 +430,19 @@ final class EduardSimulation {
 
         applyAllLightMaterials(
             color:
-                .brown
+                UIColor(
+                    red:
+                        117 / 255,
+
+                    green:
+                        76 / 255,
+
+                    blue:
+                        41 / 255,
+
+                    alpha:
+                        1
+                )
         )
 
         shitLightEffectTask =
@@ -392,6 +470,77 @@ final class EduardSimulation {
         duration: TimeInterval
     ) {
 
+        startBlinkingLights(
+            color:
+                .red,
+
+            duration:
+                duration
+        )
+    }
+
+
+    // MARK: - Oil Effect
+
+    func startOilSpinEffect(
+        duration: TimeInterval = 5.0
+    ) {
+
+        oilSpinTask?
+            .cancel()
+
+        oilSpinTask =
+            Task { @MainActor [weak self] in
+
+                guard let self
+                else {
+                    return
+                }
+
+                let updateInterval:
+                    Float = 0.02
+
+                // About one full 360 degree spin.
+                let rotationSpeed:
+                    Float = 4.0
+
+                let endTime =
+                    Date()
+                    .addingTimeInterval(
+                        duration
+                    )
+
+                while Date() < endTime {
+
+                    guard Task.isCancelled == false
+                    else {
+                        return
+                    }
+
+                    self.pose.rotation +=
+                        rotationSpeed
+                        * updateInterval
+
+                    self.applyPose()
+
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                Double(
+                                    updateInterval
+                                )
+                            )
+                    )
+                }
+            }
+    }
+
+
+    private func startBlinkingLights(
+        color: UIColor,
+        duration: TimeInterval?
+    ) {
+
         oilLightEffectTask?
             .cancel()
 
@@ -399,15 +548,17 @@ final class EduardSimulation {
             Task { @MainActor [weak self] in
 
                 let endDate =
-                    Date()
-                        .addingTimeInterval(
-                            duration
-                        )
+                    duration.map {
+                        Date()
+                            .addingTimeInterval(
+                                $0
+                            )
+                    }
 
                 var lightsOn =
                     true
 
-                while Date() < endDate {
+                while endDate.map({ Date() < $0 }) ?? true {
 
                     guard Task.isCancelled == false,
                           let self
@@ -418,7 +569,7 @@ final class EduardSimulation {
                     self.applyAllLightMaterials(
                         color:
                             lightsOn
-                            ? .red
+                            ? color
                             : .black
                     )
 

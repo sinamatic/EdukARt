@@ -15,7 +15,7 @@ import Foundation
 final class CollisionManager {
 
     // Eduard is approximately 38 x 41 cm.
-    private let robotRadius:
+    let robotRadius:
         Float = 0.205
 
 

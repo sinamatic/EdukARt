@@ -45,6 +45,407 @@ import SwiftUIJoystick
 import UIKit
 
 
+final class ARCoinRenderer {
+
+    private var coinEntities:
+        [UUID: Entity] = [:]
+
+    private var basePositions:
+        [UUID: SIMD3<Float>] = [:]
+
+    private var phases:
+        [UUID: Float] = [:]
+
+    private var animationSubscription:
+        Cancellable?
+
+    private var elapsedTime:
+        Float = 0
+
+    private var hasPrintedHierarchyDebug =
+        false
+
+
+    func update(
+        coins:
+            [GameCoin],
+
+        parent:
+            Entity?,
+
+        mapAnchor:
+            Entity?,
+
+        arView:
+            ARView?
+    ) {
+
+        guard let parent
+        else {
+            return
+        }
+
+        let activeIDs =
+            Set(
+                coins.map {
+                    $0.id
+                }
+            )
+
+        for id in Array(
+            coinEntities.keys
+        )
+        where activeIDs.contains(id) == false {
+
+            coinEntities[id]?
+                .removeFromParent()
+
+            coinEntities[id] =
+                nil
+
+            basePositions[id] =
+                nil
+
+            phases[id] =
+                nil
+        }
+
+        for coin in coins {
+
+            guard coinEntities[
+                coin.id
+            ] == nil
+            else {
+                continue
+            }
+
+            do {
+
+                let model =
+                    try Entity.load(
+                        named:
+                            "Coin"
+                    )
+
+                let root =
+                    Entity()
+
+                root.name =
+                    "ARCoin-\(coin.id)"
+
+                root.position =
+                    SIMD3<Float>(
+                        coin.position.x,
+                        0.10,
+                        coin.position.y
+                    )
+
+                normalizeCoinSize(
+                    model
+                )
+
+                correctCoinPivot(
+                    model
+                )
+
+                root.addChild(
+                    model
+                )
+
+                parent.addChild(
+                    root
+                )
+
+                coinEntities[
+                    coin.id
+                ] =
+                    root
+
+                basePositions[
+                    coin.id
+                ] =
+                    root.position
+
+                phases[
+                    coin.id
+                ] =
+                    Float.random(
+                        in:
+                            0...(.pi * 2)
+                    )
+
+            } catch {
+
+                let mesh =
+                    MeshResource.generateCylinder(
+                        height:
+                            0.008,
+
+                        radius:
+                            0.035
+                    )
+
+                let material =
+                    SimpleMaterial(
+                        color:
+                            .yellow,
+
+                        isMetallic:
+                            true
+                    )
+
+                let entity =
+                    ModelEntity(
+                        mesh:
+                            mesh,
+
+                        materials:
+                            [
+                                material
+                            ]
+                    )
+
+                entity.name =
+                    "ARCoin-\(coin.id)"
+
+                entity.position =
+                    SIMD3<Float>(
+                        coin.position.x,
+                        0.10,
+                        coin.position.y
+                    )
+
+                parent.addChild(
+                    entity
+                )
+
+                coinEntities[
+                    coin.id
+                ] =
+                    entity
+
+                basePositions[
+                    coin.id
+                ] =
+                    entity.position
+
+                phases[
+                    coin.id
+                ] =
+                    Float.random(
+                        in:
+                            0...(.pi * 2)
+                    )
+            }
+        }
+
+        updateAnimation(
+            arView:
+                arView
+        )
+
+        printHierarchyDebugIfNeeded(
+            mapAnchor:
+                mapAnchor,
+
+            mapRoot:
+                parent
+        )
+    }
+
+
+    func clear() {
+
+        for entity in coinEntities.values {
+
+            entity.removeFromParent()
+        }
+
+        coinEntities
+            .removeAll()
+
+        basePositions
+            .removeAll()
+
+        phases
+            .removeAll()
+
+        animationSubscription?
+            .cancel()
+
+        animationSubscription =
+            nil
+
+        hasPrintedHierarchyDebug =
+            false
+    }
+
+
+    private func normalizeCoinSize(
+        _ entity:
+            Entity
+    ) {
+
+        let bounds =
+            entity.visualBounds(
+                relativeTo:
+                    nil
+            )
+
+        let width =
+            max(
+                bounds.extents.x,
+                bounds.extents.z
+            )
+
+        guard width > 0
+        else {
+            return
+        }
+
+        entity.scale *=
+            SIMD3<Float>(
+                repeating:
+                    0.07 / width
+            )
+    }
+
+
+    private func correctCoinPivot(
+        _ entity:
+            Entity
+    ) {
+
+        let bounds =
+            entity.visualBounds(
+                relativeTo:
+                    entity
+            )
+
+        entity.position.y -=
+            bounds.center.y
+    }
+
+
+    private func printHierarchyDebugIfNeeded(
+        mapAnchor:
+            Entity?,
+
+        mapRoot:
+            Entity
+    ) {
+
+        guard hasPrintedHierarchyDebug == false,
+              let firstCoin =
+                coinEntities.values.first
+        else {
+            return
+        }
+
+        hasPrintedHierarchyDebug =
+            true
+
+        print(
+            "# COIN HIERARCHY | mapAnchor y:",
+            mapAnchor?.position.y ?? 0,
+            "| mapRoot y:",
+            mapRoot.position.y,
+            "| first coinRoot y:",
+            firstCoin.position.y
+        )
+    }
+
+
+    private func updateAnimation(
+        arView:
+            ARView?
+    ) {
+
+        guard coinEntities.isEmpty == false,
+              animationSubscription == nil,
+              let arView
+        else {
+            return
+        }
+
+        animationSubscription =
+            arView.scene.subscribe(
+                to:
+                    SceneEvents.Update.self
+            ) { [weak self] event in
+
+                guard let self
+                else {
+                    return
+                }
+
+                self.elapsedTime +=
+                    Float(
+                        event.deltaTime
+                    )
+
+                for (
+                    id,
+                    entity
+                ) in self.coinEntities {
+
+                    guard let basePosition =
+                        self.basePositions[
+                            id
+                        ]
+                    else {
+                        continue
+                    }
+
+                    let phase =
+                        self.phases[
+                            id
+                        ]
+                        ?? 0
+
+                    entity.position =
+                        basePosition
+                        +
+                        SIMD3<Float>(
+                            0,
+                            sin(
+                                self.elapsedTime * 2
+                                +
+                                phase
+                            )
+                            * 0.015,
+                            0
+                        )
+
+                    entity.orientation =
+                        simd_quatf(
+                            angle:
+                                self.elapsedTime * 2.5
+                                +
+                                phase,
+
+                            axis:
+                                SIMD3<Float>(
+                                    0,
+                                    1,
+                                    0
+                                )
+                        )
+                }
+
+                if self.coinEntities.isEmpty {
+
+                    self.animationSubscription?
+                        .cancel()
+
+                    self.animationSubscription =
+                        nil
+                }
+            }
+    }
+}
+
+
 struct CameraARView: UIViewRepresentable {
 
     @ObservedObject var eduardModelStore: EduardModelStore
@@ -363,6 +764,12 @@ struct CameraARView: UIViewRepresentable {
                 gameController
                     .shitDots
             )
+
+        context.coordinator
+            .updateCoins(
+                gameController
+                    .coins
+            )
     }
 
 
@@ -401,6 +808,9 @@ struct CameraARView: UIViewRepresentable {
 
         var shitDotEntities:
             [UUID: Entity] = [:]
+
+        let coinRenderer =
+            ARCoinRenderer()
 
         var lastLocalizationResetID:
             Int = 0
@@ -1198,7 +1608,7 @@ struct CameraARView: UIViewRepresentable {
                         SIMD3<Float>(
                             repeating:
                                 object.type == .oil
-                                ? 0.2
+                                ? 0.15
                                 : 0.3
                         )
 
@@ -1356,6 +1766,29 @@ struct CameraARView: UIViewRepresentable {
         }
 
 
+        // MARK: - Update Coins
+
+        func updateCoins(
+            _ coins:
+                [GameCoin]
+        ) {
+
+            coinRenderer.update(
+                coins:
+                    coins,
+
+                parent:
+                    mapRoot,
+
+                mapAnchor:
+                    mapAnchor,
+
+                arView:
+                    arView
+            )
+        }
+
+
         func clearRuntimeGameARContent() {
 
             for entity in mapObjectEntities.values {
@@ -1373,6 +1806,9 @@ struct CameraARView: UIViewRepresentable {
 
             shitDotEntities
                 .removeAll()
+
+            coinRenderer
+                .clear()
         }
 
 

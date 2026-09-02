@@ -35,6 +35,19 @@ struct ShitDot:
 }
 
 
+// MARK: - Game Coin
+
+struct GameCoin:
+    Identifiable {
+
+    let id:
+        UUID
+
+    let position:
+        SIMD2<Float>
+}
+
+
 @MainActor
 final class GameController:
     ObservableObject {
@@ -62,6 +75,14 @@ final class GameController:
     @Published private(set)
     var activeMapObjects:
         [PlacedMapObject]
+
+    @Published private(set)
+    var coins:
+        [GameCoin] = []
+
+    @Published private(set)
+    var collectedCoins:
+        Int = 0
 
 
     /// Indicates whether Eduard currently leaves a shit trail.
@@ -108,6 +129,21 @@ final class GameController:
     private let shitDotSpawnDistance:
         Float = 0.14
 
+    private var oilCooldownEndDates:
+        [UUID: Date] = [:]
+
+    private let oilCooldownDuration:
+        TimeInterval = 20
+
+    private static let coinSpacing:
+        Float = 0.50
+
+    private static let firstCoinDistance:
+        Float = 1.0
+
+    private let coinCollisionRadius:
+        Float = 0.035
+
 
     // ======================================================
     // MARK: - Collision
@@ -130,6 +166,12 @@ final class GameController:
         // The stored map itself is not modified.
         self.activeMapObjects =
             map.mapObjects
+
+        self.coins =
+            Self.generateCoins(
+                from:
+                    map.trackPoints
+            )
     }
 
 
@@ -175,6 +217,17 @@ final class GameController:
         latestRobotPoses[actor] =
             pose
 
+        updateOilCooldowns()
+
+        let collidableObjects =
+            activeMapObjects.filter { object in
+
+                object.type != .oil
+                    || oilCooldownEndDates[
+                        object.id
+                    ] == nil
+            }
+
         let collisions =
             collisionManager.update(
                 actor:
@@ -184,7 +237,7 @@ final class GameController:
                     pose,
 
                 objects:
-                    activeMapObjects
+                    collidableObjects
             )
 
 
@@ -198,6 +251,80 @@ final class GameController:
                 collision
             )
         }
+
+        collectCoins(
+            robotPose:
+                pose,
+
+            actor:
+                actor
+        )
+    }
+
+
+    private func collectCoins(
+        robotPose:
+            RobotPose,
+
+        actor:
+            CollisionActor
+    ) {
+
+        let collisionDistance =
+            collisionManager.robotRadius
+            +
+            coinCollisionRadius
+
+        let collisionDistanceSquared =
+            collisionDistance
+            *
+            collisionDistance
+
+        let collectedIDs =
+            coins.compactMap { coin -> UUID? in
+
+                let dx =
+                    robotPose.position.x
+                    -
+                    coin.position.x
+
+                let dz =
+                    robotPose.position.z
+                    -
+                    coin.position.y
+
+                let distanceSquared =
+                    dx * dx
+                    +
+                    dz * dz
+
+                return distanceSquared <= collisionDistanceSquared
+                    ? coin.id
+                    : nil
+            }
+
+        guard collectedIDs.isEmpty == false
+        else {
+            return
+        }
+
+        let collectedIDSet =
+            Set(
+                collectedIDs
+            )
+
+        coins.removeAll {
+            collectedIDSet.contains(
+                $0.id
+            )
+        }
+
+        collectedCoins +=
+            collectedIDs.count
+
+        print(
+            "# GAME | Coin collected by \(actor.rawValue) | Coins: \(collectedCoins)"
+        )
     }
 
 
@@ -594,11 +721,6 @@ final class GameController:
         statusText =
             "Oil hit"
 
-        activeMapObjects.removeAll {
-            $0.id == object.id
-        }
-
-
         print(
             "# GAME | Oil hit"
         )
@@ -607,10 +729,61 @@ final class GameController:
             "# GAME | Score: \(score)"
         )
 
+        startOilCooldown(
+            for:
+                object
+        )
 
         onOilEffectStarted?(
-            10
+            5
         )
+    }
+
+
+    private func startOilCooldown(
+        for object:
+            PlacedMapObject
+    ) {
+
+        oilCooldownEndDates[
+            object.id
+        ] =
+            Date()
+                .addingTimeInterval(
+                    oilCooldownDuration
+                )
+
+        updateOilCooldowns()
+
+        Task { @MainActor [weak self] in
+
+            guard let self
+            else {
+                return
+            }
+
+            try? await Task.sleep(
+                for:
+                    .seconds(
+                        self.oilCooldownDuration
+                    )
+            )
+
+            self.updateOilCooldowns()
+        }
+    }
+
+
+    private func updateOilCooldowns() {
+
+        let now =
+            Date()
+
+        oilCooldownEndDates =
+            oilCooldownEndDates.filter {
+                $0.value > now
+            }
+
     }
 
 
@@ -726,6 +899,9 @@ final class GameController:
         score =
             0
 
+        collectedCoins =
+            0
+
         collectedEggs =
             0
 
@@ -734,6 +910,12 @@ final class GameController:
 
         activeMapObjects =
             map.mapObjects
+
+        coins =
+            Self.generateCoins(
+                from:
+                    map.trackPoints
+            )
 
         shitEffectTask?
             .cancel()
@@ -747,6 +929,9 @@ final class GameController:
         shitDots
             .removeAll()
 
+        oilCooldownEndDates
+            .removeAll()
+
         latestRobotPoses
             .removeAll()
 
@@ -757,5 +942,95 @@ final class GameController:
         print(
             "# GAME | Reset"
         )
+    }
+
+
+    private static func generateCoins(
+        from trackPoints:
+            [StoredTrackPoint]
+    ) -> [GameCoin] {
+
+        let points =
+            trackPoints.map {
+                SIMD2<Float>(
+                    $0.x,
+                    $0.z
+                )
+            }
+
+        guard points.count >= 2
+        else {
+            return []
+        }
+
+        var result:
+            [GameCoin] = []
+
+        var distanceAlongTrack:
+            Float = 0
+
+        var nextCoinDistance =
+            firstCoinDistance
+
+        for index in 0..<(points.count - 1) {
+
+            let start =
+                points[index]
+
+            let end =
+                points[index + 1]
+
+            let segmentLength =
+                simd_distance(
+                    start,
+                    end
+                )
+
+            guard segmentLength > 0.001
+            else {
+                continue
+            }
+
+            while distanceAlongTrack + segmentLength >= nextCoinDistance {
+
+                let t =
+                    (
+                        nextCoinDistance
+                        -
+                        distanceAlongTrack
+                    )
+                    /
+                    segmentLength
+
+                let position =
+                    start
+                    +
+                    (
+                        end
+                        -
+                        start
+                    )
+                    *
+                    t
+
+                result.append(
+                    GameCoin(
+                        id:
+                            UUID(),
+
+                        position:
+                            position
+                    )
+                )
+
+                nextCoinDistance +=
+                    coinSpacing
+            }
+
+            distanceAlongTrack +=
+                segmentLength
+        }
+
+        return result
     }
 }

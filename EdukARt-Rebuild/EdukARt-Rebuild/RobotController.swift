@@ -672,14 +672,6 @@ final class RobotController:
                 duration
         )
 
-
-        let previousLightMode =
-            eduard.activeLightMode
-
-        let previousAllLightsColor =
-            eduard.activeAllLightsColor
-
-
         isGameplayInputLocked =
             true
 
@@ -691,6 +683,16 @@ final class RobotController:
 
         activeJoystickDirection =
             .idle
+
+        mechanumRotationInput =
+            0
+
+        sendCurrentCommand()
+
+        eduardSimulation.startOilSpinEffect(
+            duration:
+                duration
+        )
 
         mechanumRotationInput =
             1
@@ -743,19 +745,8 @@ final class RobotController:
 
                 self.sendCurrentCommand()
 
-                self.eduard.setAllLightsColor(
-                    red:
-                        previousAllLightsColor.red,
-
-                    green:
-                        previousAllLightsColor.green,
-
-                    blue:
-                        previousAllLightsColor.blue
-                )
-
                 self.eduard.setLightMode(
-                    previousLightMode
+                    .enabled
                 )
             }
     }
