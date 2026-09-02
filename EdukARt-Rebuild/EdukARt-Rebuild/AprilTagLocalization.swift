@@ -82,6 +82,16 @@ final class AprilTagLocalization {
 
 
     // --------------------------------------------------
+    // Robot tag mounting
+    // --------------------------------------------------
+
+    /// Distance from AprilTag #0 center
+    /// to Eduard's physical center.
+    private let robotTagToCenterDistance:
+        Float = 0.19
+
+
+    // --------------------------------------------------
     // Reference measurements
     // --------------------------------------------------
 
@@ -470,32 +480,87 @@ final class AprilTagLocalization {
             * robotWorldTransform
 
 
-        let mapX =
-            relativeTransform
-                .columns.3.x
+        // --------------------------------------------------
+        // Robot tag center
+        // --------------------------------------------------
 
-        let mapZ =
-            relativeTransform
-                .columns.3.z
+        let tagPosition =
+            SIMD3<Float>(
+                relativeTransform.columns.3.x,
+                0,
+                relativeTransform.columns.3.z
+            )
 
-        let robotXAxis =
-            relativeTransform
-                .columns.0
+
+        // --------------------------------------------------
+        // Robot direction
+        // --------------------------------------------------
+        //
+        // AprilTag #0 lies flat on top of Eduard.
+        // Therefore its Z axis is approximately vertical.
+        //
+        // The robot's horizontal direction must come from
+        // one of the two axes inside the tag plane.
+        //
+        // Start with the tag X axis because this is also
+        // the axis the old implementation used for yaw.
+        //
+
+        var robotForward =
+            SIMD3<Float>(
+                -relativeTransform.columns.1.x,
+                0,
+                -relativeTransform.columns.1.z
+            )
+
+        guard simd_length_squared(
+            robotForward
+        ) > 0.0001
+        else {
+            return nil
+        }
+
+        robotForward =
+            simd_normalize(
+                robotForward
+            )
+
+
+        // --------------------------------------------------
+        // Robot center
+        // --------------------------------------------------
+        //
+        // AprilTag #0 is mounted at the front of Eduard.
+        // Therefore the physical robot center is behind
+        // the tag along the robot's forward direction.
+        //
+
+        let robotPosition =
+            tagPosition
+            - robotForward
+            * robotTagToCenterDistance
+
+
+        // --------------------------------------------------
+        // Logical robot rotation
+        // --------------------------------------------------
+        //
+        // EduardSimulation defines rotation 0 as forward -Z.
+        //
+        // Convert the horizontal forward vector into the
+        // same convention.
+        //
 
         let rotation =
             atan2(
-                robotXAxis.z,
-                robotXAxis.x
+                -robotForward.x,
+                -robotForward.z
             )
 
 
         return RobotPose(
             position:
-                SIMD3<Float>(
-                    mapX,
-                    0,
-                    mapZ
-                ),
+                robotPosition,
 
             rotation:
                 rotation

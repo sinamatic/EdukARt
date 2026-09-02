@@ -81,7 +81,7 @@ final class EduardSimulation {
 
     /// Visual offset from the AprilTag position.
     private let modelForwardOffset: Float =
-    0.50
+    0.075
 
 
     // MARK: - Show
@@ -518,22 +518,17 @@ final class EduardSimulation {
             return
         }
 
-        let logicalRotation =
+        // Logical heading of Eduard.
+        let rotation =
             simd_quatf(
                 angle: pose.rotation,
                 axis: SIMD3<Float>(0, 1, 0)
             )
 
-        let visualRotation =
-            simd_quatf(
-                angle:
-                    pose.rotation,
-                axis:
-                    SIMD3<Float>(0, 0, 0)
-            )
-
+        // Robot forward direction.
+        // Your drive() implementation uses local -Z as forward.
         let forward =
-            logicalRotation.act(
+            rotation.act(
                 SIMD3<Float>(
                     0,
                     0,
@@ -541,13 +536,15 @@ final class EduardSimulation {
                 )
             )
 
+        // Place visible model relative to the logical robot pose.
         entity.position =
             pose.position
             + forward
             * modelForwardOffset
 
+        // Rotate around vertical Y axis.
         entity.orientation =
-            visualRotation
+            rotation
     }
 
 
