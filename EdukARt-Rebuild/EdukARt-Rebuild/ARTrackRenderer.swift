@@ -249,8 +249,8 @@ final class ARTrackRenderer {
         // --------------------------------------------------
 
         addStartFinishMarkers(
-            path:
-                path,
+            trackPoints:
+                trackPoints,
             parent:
                 trackRoot
         )
@@ -1612,188 +1612,185 @@ final class ARTrackRenderer {
     // ======================================================
 
     private func addStartFinishMarkers(
-        path: [SIMD3<Float>],
+        trackPoints:
+            [StoredTrackPoint],
         parent: Entity
     ) {
 
-        guard path.count >= 2 else {
+        guard trackPoints.count >= 2 else {
+
+            print(
+                "# TRACK MARKER ERROR | Not enough track points"
+            )
+
             return
         }
 
 
         let start =
-            path[0]
+            SIMD2<Float>(
+                trackPoints[0].x,
+                trackPoints[0].z
+            )
 
-        let startDirection =
-            normalizedDirection(
-                from:
-                    path[0],
-                to:
-                    path[1]
+        let next =
+            SIMD2<Float>(
+                trackPoints[1].x,
+                trackPoints[1].z
             )
 
         let finish =
-            path[
-                path.count - 1
-            ]
-
-        let finishDirection =
-            normalizedDirection(
-                from:
-                    path[
-                        path.count - 2
-                    ],
-                to:
-                    finish
+            SIMD2<Float>(
+                trackPoints[
+                    trackPoints.count - 1
+                ].x,
+                trackPoints[
+                    trackPoints.count - 1
+                ].z
             )
 
-        addTrackMarker(
+        let previous =
+            SIMD2<Float>(
+                trackPoints[
+                    trackPoints.count - 2
+                ].x,
+                trackPoints[
+                    trackPoints.count - 2
+                ].z
+            )
+
+        makeMarker(
             imageName:
                 "Start",
             position:
                 start,
             direction:
-                startDirection,
+                next - start,
             parent:
                 parent
         )
 
-        addTrackMarker(
+        makeMarker(
             imageName:
                 "Finish",
             position:
                 finish,
             direction:
-                finishDirection,
+                finish - previous,
             parent:
                 parent
         )
     }
 
 
-    private func addTrackMarker(
+    private func makeMarker(
         imageName: String,
-        position: SIMD3<Float>,
-        direction: SIMD3<Float>,
+        position: SIMD2<Float>,
+        direction: SIMD2<Float>,
         parent: Entity
     ) {
 
-        guard let texture =
-            try? TextureResource.load(
-                named:
-                    imageName
-            )
-        else {
+        do {
+
+            let texture =
+                try TextureResource.load(
+                    named:
+                        imageName
+                )
 
             print(
-                "# TRACK MARKER ERROR | Missing \(imageName)"
+                "# TRACK MARKER TEXTURE LOADED | \(imageName)"
             )
 
-            return
+            var material =
+                UnlitMaterial()
+
+            material.color =
+                .init(
+                    tint:
+                        .white,
+                    texture:
+                        .init(
+                            texture
+                        )
+                )
+
+            let mesh =
+                MeshResource.generatePlane(
+                    width:
+                        0.60,
+                    depth:
+                        0.30
+                )
+
+            let marker =
+                ModelEntity(
+                    mesh:
+                        mesh,
+                    materials:
+                        [
+                            material
+                        ]
+                )
+
+            marker.name =
+                "TrackMarker-\(imageName)"
+
+            marker.position =
+                SIMD3<Float>(
+                    position.x,
+                    0.02,
+                    position.y
+                )
+
+            guard simd_length_squared(
+                direction
+            ) > 0.0001
+            else {
+
+                print(
+                    "# TRACK MARKER ERROR | Invalid direction \(imageName)"
+                )
+
+                return
+            }
+
+            let normalizedDirection =
+                simd_normalize(
+                    direction
+                )
+
+            let yaw =
+                atan2(
+                    normalizedDirection.x,
+                    normalizedDirection.y
+                )
+
+            marker.orientation =
+                simd_quatf(
+                    angle:
+                        -yaw,
+                    axis:
+                        SIMD3<Float>(
+                            0,
+                            1,
+                            0
+                        )
+                )
+
+            parent.addChild(
+                marker
+            )
+
+            print(
+                "# TRACK MARKER ADDED | \(imageName) | X \(position.x) | Z \(position.y)"
+            )
+
+        } catch {
+
+            print(
+                "# TRACK MARKER TEXTURE ERROR | \(imageName) | \(error)"
+            )
         }
-
-        var material =
-            UnlitMaterial()
-
-        material.color =
-            .init(
-                tint:
-                    .white,
-                texture:
-                    .init(
-                        texture
-                    )
-            )
-
-        let mesh =
-            MeshResource.generatePlane(
-                width:
-                    0.70,
-                height:
-                    0.30
-            )
-
-        let marker =
-            ModelEntity(
-                mesh:
-                    mesh,
-                materials:
-                    [
-                        material
-                    ]
-            )
-
-        marker.name =
-            "AR\(imageName)Marker"
-
-        marker.position =
-            SIMD3<Float>(
-                position.x,
-                floorOffset
-                    + lineOffset * 10,
-                position.z
-            )
-
-        let horizontalDirection =
-            SIMD2<Float>(
-                direction.x,
-                direction.z
-            )
-
-        guard simd_length_squared(
-            horizontalDirection
-        ) > 0.0001
-        else {
-            return
-        }
-
-        let normalized =
-            simd_normalize(
-                horizontalDirection
-            )
-
-        let yaw =
-            atan2(
-                normalized.x,
-                normalized.y
-            )
-
-        let layFlat =
-            simd_quatf(
-                angle:
-                    -.pi / 2,
-                axis:
-                    SIMD3<Float>(
-                        1,
-                        0,
-                        0
-                    )
-            )
-
-        let alignToTrack =
-            simd_quatf(
-                angle:
-                    -yaw,
-                axis:
-                    SIMD3<Float>(
-                        0,
-                        1,
-                        0
-                    )
-            )
-
-        marker.orientation =
-            alignToTrack
-            *
-            layFlat
-
-
-        parent.addChild(
-            marker
-        )
-
-        print(
-            "# TRACK MARKER ADDED | \(imageName)"
-        )
     }
 }

@@ -676,30 +676,40 @@ struct CameraARView: UIViewRepresentable {
                 visualCorrectionRoot
             )
 
+            alignModelBottomToGround(
+                eduard,
+                relativeTo:
+                    simulationRoot
+            )
+            
             context.coordinator.simulationRoot =
                 simulationRoot
 
             context.coordinator.eduard =
                 eduard
 
-            let occlusionRoot =
-                simulationRoot.clone(
-                    recursive:
-                        true
-                )
-
-            context.coordinator.occlusionRoot =
-                occlusionRoot
-
             controller.eduardSimulation.show(
                 entity:
                     simulationRoot
             )
 
-            controller.eduardOccluder.show(
-                entity:
+            if let occlusionRoot =
+                makeEduardOcclusionRoot() {
+
+                context.coordinator.occlusionRoot =
                     occlusionRoot
-            )
+
+                controller.eduardOccluder.show(
+                    entity:
+                        occlusionRoot
+                )
+
+            } else {
+
+                print(
+                    "# EDUARD OCCLUDER LOAD FAILED | eduard_occlusion"
+                )
+            }
 
             controller.eduardSimulation.setVisible(
                 controller.isSimulationVisible
@@ -716,10 +726,76 @@ struct CameraARView: UIViewRepresentable {
             )
         }
 
-
         return arView
     }
 
+
+    private func makeEduardOcclusionRoot() -> Entity? {
+        guard let model =
+            try? Entity.load(
+                named:
+                    "eduard_occlusion"
+            )
+        else {
+            return nil
+        }
+
+        let root =
+            Entity()
+
+        let visualCorrectionRoot =
+            Entity()
+
+        visualCorrectionRoot.orientation =
+            simd_quatf(
+                angle:
+                    .pi,
+                axis:
+                    SIMD3<Float>(
+                        0,
+                        1,
+                        0
+                    )
+            )
+
+        visualCorrectionRoot.addChild(
+            model
+        )
+
+        root.addChild(
+            visualCorrectionRoot
+        )
+
+        alignModelBottomToGround(
+            model,
+            relativeTo:
+                root
+        )
+
+        return root
+    }
+
+    private func alignModelBottomToGround(
+        _ model: Entity,
+        relativeTo parent: Entity
+    ) {
+        let bounds =
+            model.visualBounds(
+                relativeTo:
+                    parent
+            )
+
+        model.position.y -=
+            bounds.min.y
+
+        print(
+            "# MODEL GROUND ALIGN | minY:",
+            bounds.min.y,
+            "| correction:",
+            -bounds.min.y
+        )
+    }
+    
 
     // MARK: - Update ARView
 
@@ -867,6 +943,12 @@ struct CameraARView: UIViewRepresentable {
             (RobotPose) -> Void
         let onRobotPoseLost:
             () -> Void
+
+        private var lastRobotPoseUpdate =
+            Date.distantPast
+
+        private let robotPoseTimeout:
+            TimeInterval = 0.75
 
         init(
             mapBuilder: AprilTagMapBuilder,
@@ -1123,7 +1205,16 @@ struct CameraARView: UIViewRepresentable {
                         didUpdateRobotPose =
                             true
 
+                        lastRobotPoseUpdate =
+                            Date()
+
                         DispatchQueue.main.async {
+
+                            self.controller
+                                .eduardOccluder
+                                .setEnabled(
+                                    true
+                                )
 
                             self.onRobotPoseUpdated(
                                 robotPose
@@ -1215,9 +1306,19 @@ struct CameraARView: UIViewRepresentable {
 
                 if didUpdateRobotPose == false {
 
-                    DispatchQueue.main.async {
+                    let timeSinceLastPose =
+                        Date()
+                            .timeIntervalSince(
+                                lastRobotPoseUpdate
+                            )
 
-                        self.onRobotPoseLost()
+                    if timeSinceLastPose
+                        > robotPoseTimeout {
+
+                        DispatchQueue.main.async {
+
+                            self.onRobotPoseLost()
+                        }
                     }
                 }
 

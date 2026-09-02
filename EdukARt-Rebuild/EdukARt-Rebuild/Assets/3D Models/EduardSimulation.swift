@@ -931,7 +931,7 @@ final class EduardOccluder {
         self.entity =
             entity
 
-        applyOcclusionMaterial(
+        applyDebugMaterial(
             to:
                 entity
         )
@@ -994,7 +994,7 @@ final class EduardOccluder {
     }
 
 
-    private func applyOcclusionMaterial(
+    private func applyDebugMaterial(
         to entity:
             Entity
     ) {
@@ -1006,7 +1006,21 @@ final class EduardOccluder {
 
             model.materials =
                 model.materials.map { _ in
-                    OcclusionMaterial()
+                    SimpleMaterial(
+                        color:
+                            UIColor(
+                                red:
+                                    1,
+                                green:
+                                    0,
+                                blue:
+                                    0,
+                                alpha:
+                                    0.8
+                            ),
+                        isMetallic:
+                            false
+                    )
                 }
 
             entity.components.set(
@@ -1016,7 +1030,7 @@ final class EduardOccluder {
 
         for child in entity.children {
 
-            applyOcclusionMaterial(
+            applyDebugMaterial(
                 to:
                     child
             )

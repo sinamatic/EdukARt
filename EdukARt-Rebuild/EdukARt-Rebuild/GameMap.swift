@@ -320,7 +320,7 @@ enum MapObjectType:
             return 0.12
 
         case .oil:
-            return 0.35
+            return 0.25
 
         case .water:
             return 0.15

@@ -94,7 +94,7 @@ final class RobotController:
 
     @Published private(set)
     var isSimulationVisible =
-        true
+        false
 
 
     // MARK: - Physical Robot State
