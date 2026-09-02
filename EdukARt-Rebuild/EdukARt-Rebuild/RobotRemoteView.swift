@@ -543,7 +543,7 @@ private enum LightMode: String, CaseIterable, Identifiable {
             return .loading
 
         case .slowBlinking:
-            return .connectionLost
+            return .slowBlinking
 
         case .fastBlinking:
             return .rotation

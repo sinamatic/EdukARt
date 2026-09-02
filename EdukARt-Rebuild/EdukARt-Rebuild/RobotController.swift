@@ -169,6 +169,12 @@ final class RobotController:
     private var shitLightEffectTask:
         Task<Void, Never>?
 
+    private var oilEffectTask:
+        Task<Void, Never>?
+
+    private var isGameplayInputLocked =
+        false
+
     private var isCheckingConnection =
         false
 
@@ -237,6 +243,9 @@ final class RobotController:
             .invalidate()
 
         shitLightEffectTask?
+            .cancel()
+
+        oilEffectTask?
             .cancel()
     }
 
@@ -437,6 +446,11 @@ final class RobotController:
         y: Float
     ) {
 
+        guard isGameplayInputLocked == false
+        else {
+            return
+        }
+
         joystickInput =
             normalizedJoystickInput(
                 x:
@@ -463,6 +477,11 @@ final class RobotController:
 
     func stopJoystick() {
 
+        guard isGameplayInputLocked == false
+        else {
+            return
+        }
+
         joystickInput =
             (
                 x: 0,
@@ -483,6 +502,11 @@ final class RobotController:
     func updateMechanumRotationInput(
         x: Float
     ) {
+
+        guard isGameplayInputLocked == false
+        else {
+            return
+        }
 
         guard driveMode == .mechanum
         else {
@@ -505,6 +529,11 @@ final class RobotController:
     }
 
     func stopMechanumRotation() {
+
+        guard isGameplayInputLocked == false
+        else {
+            return
+        }
 
         mechanumRotationInput =
             0
@@ -568,13 +597,6 @@ final class RobotController:
         )
 
 
-        guard isConnected
-                || isWifiReachable
-        else {
-            return
-        }
-
-
         let previousLightMode =
             eduard.activeLightMode
 
@@ -584,17 +606,17 @@ final class RobotController:
 
         eduard.setAllLightsColor(
             red:
-                165,
+                117,
 
             green:
-                42,
+                76,
 
             blue:
-                42
+                41
         )
 
         eduard.setLightMode(
-            .solid
+            .slowBlinking
         )
 
         print(
@@ -619,6 +641,107 @@ final class RobotController:
                     return
                 }
 
+
+                self.eduard.setAllLightsColor(
+                    red:
+                        previousAllLightsColor.red,
+
+                    green:
+                        previousAllLightsColor.green,
+
+                    blue:
+                        previousAllLightsColor.blue
+                )
+
+                self.eduard.setLightMode(
+                    previousLightMode
+                )
+            }
+    }
+
+
+    func startOilEffect(
+        duration: TimeInterval
+    ) {
+
+        oilEffectTask?
+            .cancel()
+
+        eduardSimulation.startOilEffect(
+            duration:
+                duration
+        )
+
+
+        let previousLightMode =
+            eduard.activeLightMode
+
+        let previousAllLightsColor =
+            eduard.activeAllLightsColor
+
+
+        isGameplayInputLocked =
+            true
+
+        joystickInput =
+            (
+                x: 0,
+                y: 0
+            )
+
+        activeJoystickDirection =
+            .idle
+
+        mechanumRotationInput =
+            1
+
+        eduard.setAllLightsColor(
+            red:
+                255,
+
+            green:
+                0,
+
+            blue:
+                0
+        )
+
+        eduard.setLightMode(
+            .slowBlinking
+        )
+
+        sendCurrentCommand()
+
+        print(
+            "# OIL EFFECT | rotating"
+        )
+
+
+        oilEffectTask =
+            Task { [weak self] in
+
+                try? await Task.sleep(
+                    for:
+                        .seconds(
+                            duration
+                        )
+                )
+
+
+                guard Task.isCancelled == false,
+                      let self
+                else {
+                    return
+                }
+
+
+                self.mechanumRotationInput =
+                    0
+
+                self.isGameplayInputLocked =
+                    false
+
+                self.sendCurrentCommand()
 
                 self.eduard.setAllLightsColor(
                     red:

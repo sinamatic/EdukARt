@@ -727,6 +727,14 @@ struct GameView: View {
                     duration
             )
         }
+
+        gameController.setOilEffectHandler { duration in
+
+            controller.startOilEffect(
+                duration:
+                    duration
+            )
+        }
     }
 
 

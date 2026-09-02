@@ -344,6 +344,9 @@ enum MapObjectType:
         case .shit:
             "Shit"
 
+        case .oil:
+            "Oil"
+
         default:
             nil
         }

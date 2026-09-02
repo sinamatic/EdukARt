@@ -93,6 +93,9 @@ final class GameController:
     private var onShitEffectStarted:
         ((TimeInterval) -> Void)?
 
+    private var onOilEffectStarted:
+        ((TimeInterval) -> Void)?
+
     private var latestRobotPoses:
         [CollisionActor: RobotPose] = [:]
 
@@ -135,6 +138,15 @@ final class GameController:
     ) {
 
         onShitEffectStarted =
+            handler
+    }
+
+
+    func setOilEffectHandler(
+        _ handler: @escaping (TimeInterval) -> Void
+    ) {
+
+        onOilEffectStarted =
             handler
     }
 
@@ -286,7 +298,9 @@ final class GameController:
 
         case .oil:
 
-            hitOil()
+            hitOil(
+                object
+            )
 
 
         // --------------------------------------------------
@@ -570,12 +584,19 @@ final class GameController:
     // MARK: - Oil
     // ======================================================
 
-    private func hitOil() {
+    private func hitOil(
+        _ object:
+            PlacedMapObject
+    ) {
 
         score -= 5
 
         statusText =
             "Oil hit"
+
+        activeMapObjects.removeAll {
+            $0.id == object.id
+        }
 
 
         print(
@@ -587,11 +608,9 @@ final class GameController:
         )
 
 
-        // Later:
-        //
-        // RobotController:
-        // disable joystick temporarily
-        // and rotate Eduard for several seconds.
+        onOilEffectStarted?(
+            10
+        )
     }
 
 

@@ -1151,7 +1151,9 @@ struct CameraARView: UIViewRepresentable {
                     let basePosition =
                         SIMD3<Float>(
                             object.x,
-                            0.02,
+                            object.type == .oil
+                            ? 0
+                            : 0.02,
                             object.z
                         )
 
@@ -1195,7 +1197,9 @@ struct CameraARView: UIViewRepresentable {
                     entity.scale *=
                         SIMD3<Float>(
                             repeating:
-                                0.3
+                                object.type == .oil
+                                ? 0.2
+                                : 0.3
                         )
 
                     objectRoot.addChild(
@@ -1212,26 +1216,29 @@ struct CameraARView: UIViewRepresentable {
                     ] =
                         objectRoot
 
-                    animatedMapObjects.append(
-                        AnimatedMapObject(
-                            entity:
-                                objectRoot,
+                    if object.type != .oil {
 
-                            basePosition:
-                                basePosition,
+                        animatedMapObjects.append(
+                            AnimatedMapObject(
+                                entity:
+                                    objectRoot,
 
-                            baseOrientation:
-                                baseOrientation,
+                                basePosition:
+                                    basePosition,
 
-                            phase:
-                                Float(
-                                    animatedMapObjects.count
-                                )
-                                * 0.7
+                                baseOrientation:
+                                    baseOrientation,
+
+                                phase:
+                                    Float(
+                                        animatedMapObjects.count
+                                    )
+                                    * 0.7
+                            )
                         )
-                    )
 
-                    startMapObjectAnimationIfNeeded()
+                        startMapObjectAnimationIfNeeded()
+                    }
 
 
                     print(

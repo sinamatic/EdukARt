@@ -26,7 +26,7 @@ final class Eduard {
         case dimmed
         case enabled
         case loading
-        case connectionLost
+        case slowBlinking
         case beam
         case flashLeft
         case flashRight
@@ -45,7 +45,7 @@ final class Eduard {
         static let visibleModes: [LightMode] = [
             .enabled,
             .loading,
-            .connectionLost,
+            .slowBlinking,
             .rotation,
             .solid,
             .rainbow,
@@ -56,7 +56,7 @@ final class Eduard {
 
 
         static let allLightsModes: [LightMode] = [
-            .connectionLost,
+            .slowBlinking,
             .rotation,
             .running,
             .solid,
@@ -78,7 +78,7 @@ final class Eduard {
             case .loading:
                 return "Pulsation"
 
-            case .connectionLost:
+            case .slowBlinking:
                 return "Slow Blinking"
 
             case .beam:
@@ -121,7 +121,7 @@ final class Eduard {
             case .loading:
                 return "hourglass"
 
-            case .connectionLost:
+            case .slowBlinking:
                 return "exclamationmark.triangle"
 
             case .beam:
@@ -762,7 +762,7 @@ final class Eduard {
             ]
 
 
-        case .connectionLost:
+        case .slowBlinking:
 
             return [
                 lightingCommand(

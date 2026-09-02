@@ -67,6 +67,9 @@ final class EduardSimulation {
     private var shitLightEffectTask:
         Task<Void, Never>?
 
+    private var oilLightEffectTask:
+        Task<Void, Never>?
+
 
     // MARK: - Settings
 
@@ -190,6 +193,9 @@ final class EduardSimulation {
             nil
 
         shitLightEffectTask?
+            .cancel()
+
+        oilLightEffectTask?
             .cancel()
     }
 
@@ -370,6 +376,62 @@ final class EduardSimulation {
                             duration
                         )
                 )
+
+                guard Task.isCancelled == false,
+                      let self
+                else {
+                    return
+                }
+
+                self.applyDefaultLightMaterials()
+            }
+    }
+
+
+    func startOilEffect(
+        duration: TimeInterval
+    ) {
+
+        oilLightEffectTask?
+            .cancel()
+
+        oilLightEffectTask =
+            Task { @MainActor [weak self] in
+
+                let endDate =
+                    Date()
+                        .addingTimeInterval(
+                            duration
+                        )
+
+                var lightsOn =
+                    true
+
+                while Date() < endDate {
+
+                    guard Task.isCancelled == false,
+                          let self
+                    else {
+                        return
+                    }
+
+                    self.applyAllLightMaterials(
+                        color:
+                            lightsOn
+                            ? .red
+                            : .black
+                    )
+
+                    lightsOn
+                        .toggle()
+
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                0.35
+                            )
+                    )
+                }
 
                 guard Task.isCancelled == false,
                       let self
