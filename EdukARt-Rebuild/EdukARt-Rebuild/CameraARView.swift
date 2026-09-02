@@ -467,6 +467,8 @@ struct CameraARView: UIViewRepresentable {
         () -> Void
     let onRobotPoseUpdated:
         (RobotPose) -> Void
+    let onRobotPoseLost:
+        () -> Void
 
     init(
         eduardModelStore: EduardModelStore,
@@ -479,7 +481,8 @@ struct CameraARView: UIViewRepresentable {
         localizationResetID: Int = 0,
         requiredReferenceTagID: Int = 0,
         onReferenceTagLocalized: @escaping () -> Void = {},
-        onRobotPoseUpdated: @escaping (RobotPose) -> Void = { _ in }
+        onRobotPoseUpdated: @escaping (RobotPose) -> Void = { _ in },
+        onRobotPoseLost: @escaping () -> Void = {}
     ) {
 
         self.eduardModelStore =
@@ -514,6 +517,9 @@ struct CameraARView: UIViewRepresentable {
 
         self.onRobotPoseUpdated =
             onRobotPoseUpdated
+
+        self.onRobotPoseLost =
+            onRobotPoseLost
     }
 
     // MARK: - Coordinator
@@ -537,7 +543,10 @@ struct CameraARView: UIViewRepresentable {
                 onReferenceTagLocalized,
 
             onRobotPoseUpdated:
-                onRobotPoseUpdated
+                onRobotPoseUpdated,
+
+            onRobotPoseLost:
+                onRobotPoseLost
         )
     }
 
@@ -673,9 +682,23 @@ struct CameraARView: UIViewRepresentable {
             context.coordinator.eduard =
                 eduard
 
+            let occlusionRoot =
+                simulationRoot.clone(
+                    recursive:
+                        true
+                )
+
+            context.coordinator.occlusionRoot =
+                occlusionRoot
+
             controller.eduardSimulation.show(
                 entity:
                     simulationRoot
+            )
+
+            controller.eduardOccluder.show(
+                entity:
+                    occlusionRoot
             )
 
             controller.eduardSimulation.setVisible(
@@ -787,6 +810,7 @@ struct CameraARView: UIViewRepresentable {
         var mapAnchor: AnchorEntity?
         var mapRoot: Entity?
         var simulationRoot: Entity?
+        var occlusionRoot: Entity?
         var eduard: Entity?
         private let trackRenderer =
             ARTrackRenderer()
@@ -841,6 +865,8 @@ struct CameraARView: UIViewRepresentable {
             () -> Void
         let onRobotPoseUpdated:
             (RobotPose) -> Void
+        let onRobotPoseLost:
+            () -> Void
 
         init(
             mapBuilder: AprilTagMapBuilder,
@@ -848,7 +874,8 @@ struct CameraARView: UIViewRepresentable {
             gameMap: GameMap?,
             requiredReferenceTagID: Int,
             onReferenceTagLocalized: @escaping () -> Void,
-            onRobotPoseUpdated: @escaping (RobotPose) -> Void
+            onRobotPoseUpdated: @escaping (RobotPose) -> Void,
+            onRobotPoseLost: @escaping () -> Void
         ) {
 
             self.mapBuilder =
@@ -868,6 +895,9 @@ struct CameraARView: UIViewRepresentable {
 
             self.onRobotPoseUpdated =
                 onRobotPoseUpdated
+
+            self.onRobotPoseLost =
+                onRobotPoseLost
 
 
             super.init()
@@ -1072,7 +1102,10 @@ struct CameraARView: UIViewRepresentable {
                 // --------------------------------------------------
                 // Localize visible tags
                 // --------------------------------------------------
-                
+
+                var didUpdateRobotPose =
+                    false
+
                 for detection in detections {
 
                     if let robotPose =
@@ -1086,6 +1119,9 @@ struct CameraARView: UIViewRepresentable {
                             intrinsics:
                                 intrinsics
                         ) {
+
+                        didUpdateRobotPose =
+                            true
 
                         DispatchQueue.main.async {
 
@@ -1177,6 +1213,13 @@ struct CameraARView: UIViewRepresentable {
                     )
                 }
 
+                if didUpdateRobotPose == false {
+
+                    DispatchQueue.main.async {
+
+                        self.onRobotPoseLost()
+                    }
+                }
 
             } catch {
 
@@ -1405,6 +1448,8 @@ struct CameraARView: UIViewRepresentable {
             // Attach the virtual robot to the
             // localized map coordinate system.
             attachSimulationToMap()
+
+            attachOccluderToMap()
 
 
             print(
@@ -1885,19 +1930,40 @@ struct CameraARView: UIViewRepresentable {
         func attachSimulationToMap() {
 
             guard
-                let mapAnchor,
+                let mapRoot,
                 let simulationRoot
             else {
                 return
             }
 
 
-            if simulationRoot.parent !== mapAnchor {
+            if simulationRoot.parent !== mapRoot {
 
                 simulationRoot.removeFromParent()
 
-                mapAnchor.addChild(
+                mapRoot.addChild(
                     simulationRoot
+                )
+            }
+        }
+
+
+        func attachOccluderToMap() {
+
+            guard
+                let mapRoot,
+                let occlusionRoot
+            else {
+                return
+            }
+
+
+            if occlusionRoot.parent !== mapRoot {
+
+                occlusionRoot.removeFromParent()
+
+                mapRoot.addChild(
+                    occlusionRoot
                 )
             }
         }

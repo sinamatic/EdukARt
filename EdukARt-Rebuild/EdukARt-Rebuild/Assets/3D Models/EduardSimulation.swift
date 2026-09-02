@@ -85,9 +85,9 @@ final class EduardSimulation {
     // MARK: - AR Model Alignment
 
 
-    /// Visual offset from the AprilTag position.
-    private let modelForwardOffset: Float =
-    0.075
+    /// Visual offset from the logical robot pose.
+    static let modelForwardOffset: Float =
+        0.075
 
 
     // MARK: - Show
@@ -753,7 +753,7 @@ final class EduardSimulation {
         entity.position =
             pose.position
             + forward
-            * modelForwardOffset
+            * Self.modelForwardOffset
 
         // Rotate around vertical Y axis.
         entity.orientation =
@@ -914,5 +914,112 @@ final class EduardSimulation {
         wheel.orientation =
             rotation
             * wheel.orientation
+    }
+}
+
+
+final class EduardOccluder {
+
+    private(set) var entity:
+        Entity?
+
+
+    func show(
+        entity: Entity
+    ) {
+
+        self.entity =
+            entity
+
+        applyOcclusionMaterial(
+            to:
+                entity
+        )
+
+        setEnabled(
+            false
+        )
+    }
+
+
+    func setEnabled(
+        _ enabled: Bool
+    ) {
+
+        entity?.isEnabled =
+            enabled
+    }
+
+
+    func setPose(
+        _ pose:
+            RobotPose
+    ) {
+
+        guard let entity
+        else {
+            return
+        }
+
+        let rotation =
+            simd_quatf(
+                angle:
+                    pose.rotation,
+                axis:
+                    SIMD3<Float>(
+                        0,
+                        1,
+                        0
+                    )
+            )
+
+        let forward =
+            rotation.act(
+                SIMD3<Float>(
+                    0,
+                    0,
+                    -1
+                )
+            )
+
+        entity.position =
+            pose.position
+            +
+            forward
+            *
+            EduardSimulation.modelForwardOffset
+
+        entity.orientation =
+            rotation
+    }
+
+
+    private func applyOcclusionMaterial(
+        to entity:
+            Entity
+    ) {
+
+        if var model =
+            entity.components[
+                ModelComponent.self
+            ] {
+
+            model.materials =
+                model.materials.map { _ in
+                    OcclusionMaterial()
+                }
+
+            entity.components.set(
+                model
+            )
+        }
+
+        for child in entity.children {
+
+            applyOcclusionMaterial(
+                to:
+                    child
+            )
+        }
     }
 }

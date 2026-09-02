@@ -123,14 +123,6 @@ final class ARTrackRenderer {
 
 
     // ======================================================
-    // MARK: - Start Settings
-    // ======================================================
-
-    private let startLineDistance:
-        Float = 0.30
-
-
-    // ======================================================
     // MARK: - Render Track
     // ======================================================
 
@@ -253,14 +245,12 @@ final class ARTrackRenderer {
 
 
         // --------------------------------------------------
-        // 4. Start
+        // 4. Start / Finish
         // --------------------------------------------------
 
-        renderStartLine(
+        addStartFinishMarkers(
             path:
                 path,
-            aprilTags:
-                aprilTags,
             parent:
                 trackRoot
         )
@@ -1618,12 +1608,11 @@ final class ARTrackRenderer {
 
 
     // ======================================================
-    // MARK: - Start Line
+    // MARK: - Start / Finish Markers
     // ======================================================
 
-    private func renderStartLine(
+    private func addStartFinishMarkers(
         path: [SIMD3<Float>],
-        aprilTags: [StoredAprilTag],
         parent: Entity
     ) {
 
@@ -1632,7 +1621,10 @@ final class ARTrackRenderer {
         }
 
 
-        let direction =
+        let start =
+            path[0]
+
+        let startDirection =
             normalizedDirection(
                 from:
                     path[0],
@@ -1640,115 +1632,148 @@ final class ARTrackRenderer {
                     path[1]
             )
 
+        let finish =
+            path[
+                path.count - 1
+            ]
 
-        let referencePoint:
-            SIMD3<Float>
+        let finishDirection =
+            normalizedDirection(
+                from:
+                    path[
+                        path.count - 2
+                    ],
+                to:
+                    finish
+            )
 
-
-        if let firstTag =
-            aprilTags.first {
-
-            referencePoint =
-                SIMD3<Float>(
-                    firstTag.x,
-                    floorOffset
-                        + lineOffset * 2,
-                    firstTag.z
-                )
-
-        } else {
-
-            referencePoint =
-                path[0]
-        }
-
-
-        let origin =
-            referencePoint
-            - direction
-            * startLineDistance
-
-
-        addStartText(
-            origin:
-                origin
-                + direction
-                * 0.18,
+        addTrackMarker(
+            imageName:
+                "Start",
+            position:
+                start,
             direction:
-                direction,
+                startDirection,
+            parent:
+                parent
+        )
+
+        addTrackMarker(
+            imageName:
+                "Finish",
+            position:
+                finish,
+            direction:
+                finishDirection,
             parent:
                 parent
         )
     }
 
 
-    // ======================================================
-    // MARK: - Start Text
-    // ======================================================
-
-    private func addStartText(
-        origin: SIMD3<Float>,
+    private func addTrackMarker(
+        imageName: String,
+        position: SIMD3<Float>,
         direction: SIMD3<Float>,
         parent: Entity
     ) {
 
-        let mesh =
-            MeshResource.generateText(
-                "Start",
-                extrusionDepth:
-                    0.001,
-                font:
-                    .boldSystemFont(
-                        ofSize:
-                            0.10
-                    ),
-                containerFrame:
-                    .zero,
-                alignment:
-                    .center,
-                lineBreakMode:
-                    .byWordWrapping
+        guard let texture =
+            try? TextureResource.load(
+                named:
+                    imageName
+            )
+        else {
+
+            print(
+                "# TRACK MARKER ERROR | Missing \(imageName)"
             )
 
+            return
+        }
 
-        let entity =
+        var material =
+            UnlitMaterial()
+
+        material.color =
+            .init(
+                tint:
+                    .white,
+                texture:
+                    .init(
+                        texture
+                    )
+            )
+
+        let mesh =
+            MeshResource.generatePlane(
+                width:
+                    0.70,
+                height:
+                    0.30
+            )
+
+        let marker =
             ModelEntity(
                 mesh:
                     mesh,
                 materials:
                     [
-                        UnlitMaterial(
-                            color:
-                                .white
-                        )
+                        material
                     ]
             )
 
+        marker.name =
+            "AR\(imageName)Marker"
 
-        entity.name =
-            "ARStartText"
+        marker.position =
+            SIMD3<Float>(
+                position.x,
+                floorOffset
+                    + lineOffset * 10,
+                position.z
+            )
 
-        entity.position =
-            origin
+        let horizontalDirection =
+            SIMD2<Float>(
+                direction.x,
+                direction.z
+            )
 
+        guard simd_length_squared(
+            horizontalDirection
+        ) > 0.0001
+        else {
+            return
+        }
 
-        let trackOrientation =
+        let normalized =
+            simd_normalize(
+                horizontalDirection
+            )
+
+        let yaw =
+            atan2(
+                normalized.x,
+                normalized.y
+            )
+
+        let layFlat =
             simd_quatf(
-                from:
+                angle:
+                    -.pi / 2,
+                axis:
                     SIMD3<Float>(
                         1,
                         0,
                         0
-                    ),
-                to:
-                    direction
+                    )
             )
 
-
-        let turn =
+        let alignToTrack =
             simd_quatf(
                 angle:
-                    -.pi / 2,
+                    -yaw,
                 axis:
                     SIMD3<Float>(
                         0,
@@ -1757,14 +1782,18 @@ final class ARTrackRenderer {
                     )
             )
 
-
-        entity.orientation =
-            turn
-            * trackOrientation
+        marker.orientation =
+            alignToTrack
+            *
+            layFlat
 
 
         parent.addChild(
-            entity
+            marker
+        )
+
+        print(
+            "# TRACK MARKER ADDED | \(imageName)"
         )
     }
 }

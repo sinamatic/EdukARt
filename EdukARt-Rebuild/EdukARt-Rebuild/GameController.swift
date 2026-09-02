@@ -139,7 +139,7 @@ final class GameController:
         Float = 0.50
 
     private static let firstCoinDistance:
-        Float = 1.0
+        Float = 0.50
 
     private let coinCollisionRadius:
         Float = 0.035

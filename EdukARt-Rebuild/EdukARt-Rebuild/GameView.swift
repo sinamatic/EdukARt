@@ -176,6 +176,13 @@ struct GameView: View {
                 controller.updateRealRobotPose(
                     pose
                 )
+            },
+
+            onRobotPoseLost: {
+
+                controller.eduardOccluder.setEnabled(
+                    false
+                )
             }
         )
         .ignoresSafeArea()

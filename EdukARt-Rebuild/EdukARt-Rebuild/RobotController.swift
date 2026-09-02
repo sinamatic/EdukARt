@@ -71,6 +71,9 @@ final class RobotController:
     let eduardSimulation:
         EduardSimulation
 
+    let eduardOccluder:
+        EduardOccluder
+
 
     // MARK: - Control State
 
@@ -221,7 +224,11 @@ final class RobotController:
 
         eduardSimulation:
             EduardSimulation =
-                EduardSimulation()
+                EduardSimulation(),
+
+        eduardOccluder:
+            EduardOccluder =
+                EduardOccluder()
     ) {
 
         self.eduard =
@@ -229,6 +236,9 @@ final class RobotController:
 
         self.eduardSimulation =
             eduardSimulation
+
+        self.eduardOccluder =
+            eduardOccluder
 
         startConnectionChecks()
     }
@@ -781,6 +791,16 @@ final class RobotController:
         // Always store the current physical pose.
         realRobotPose =
             pose
+
+        eduardOccluder
+            .setEnabled(
+                true
+            )
+
+        eduardOccluder
+            .setPose(
+                pose
+            )
 
 
         // Continuously transfer the physical pose
