@@ -628,8 +628,14 @@ final class AprilTagLocalization {
             )
 
 
+        let horizontalTransform =
+            makeMapReferenceTransform(
+                from:
+                    flattenedTransform
+            )
+
         referenceMeasurements.append(
-            flattenedTransform
+            horizontalTransform
         )
 
 
@@ -676,17 +682,8 @@ final class AprilTagLocalization {
             [simd_float4x4]
     ) -> simd_float4x4 {
 
-        // --------------------------------------------------
-        // Average position
-        // --------------------------------------------------
-
         var position =
             SIMD3<Float>.zero
-
-
-        // --------------------------------------------------
-        // Circular average of horizontal rotation
-        // --------------------------------------------------
 
         var sineSum:
             Float = 0
@@ -708,13 +705,11 @@ final class AprilTagLocalization {
             let xAxis =
                 transform.columns.0
 
-
             let yaw =
                 atan2(
                     xAxis.z,
                     xAxis.x
                 )
-
 
             sineSum +=
                 sin(yaw)
@@ -737,10 +732,6 @@ final class AprilTagLocalization {
             )
 
 
-        // --------------------------------------------------
-        // Create perfectly horizontal transform
-        // --------------------------------------------------
-
         let xAxis =
             SIMD3<Float>(
                 cos(yaw),
@@ -748,14 +739,12 @@ final class AprilTagLocalization {
                 sin(yaw)
             )
 
-
         let yAxis =
             SIMD3<Float>(
                 0,
                 1,
                 0
             )
-
 
         let zAxis =
             simd_normalize(

@@ -87,7 +87,7 @@ final class EduardSimulation {
 
     /// Visual offset from the logical robot pose.
     static let modelForwardOffset: Float =
-        0.075
+        0.0
 
 
     // MARK: - Show
@@ -931,16 +931,16 @@ final class EduardOccluder {
         self.entity =
             entity
 
-//        applyDebugMaterial(
-//            to:
-//                entity
-//        )
+        applyDebugMaterial(
+            to:
+                entity
+        )
         
-        // MARK - Occluder Material is invisible
-        applyOcclusionMaterial(
-                to:
-                    entity
-            )
+//        // MARK - Occluder Material is invisible
+//        applyOcclusionMaterial(
+//                to:
+//                    entity
+//            )
 
         setEnabled(
             false

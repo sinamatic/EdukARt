@@ -676,12 +676,6 @@ struct CameraARView: UIViewRepresentable {
                 visualCorrectionRoot
             )
 
-            alignVisualRootToGround(
-                visualCorrectionRoot,
-                    relativeTo:
-                        simulationRoot
-            )
-            
             context.coordinator.simulationRoot =
                 simulationRoot
 
@@ -731,6 +725,7 @@ struct CameraARView: UIViewRepresentable {
 
 
     private func makeEduardOcclusionRoot() -> Entity? {
+
         guard let model =
             try? Entity.load(
                 named:
@@ -766,35 +761,10 @@ struct CameraARView: UIViewRepresentable {
             visualCorrectionRoot
         )
 
-        alignVisualRootToGround(
-            visualCorrectionRoot,
-            relativeTo:
-                root
-        )
         return root
     }
 
-    // MARK: - Align Eduard to Ground
-    private func alignModelBottomToGround(
-        _ model: Entity,
-        relativeTo parent: Entity
-    ) {
-        let bounds =
-            model.visualBounds(
-                relativeTo:
-                    parent
-            )
-
-        model.position.y -=
-        bounds.min.y - 0.13 // offset so occlusion lies on floor not on robot
-
-        print(
-            "# MODEL GROUND ALIGN | minY:",
-            bounds.min.y,
-            "| correction:",
-            -bounds.min.y
-        )
-    }
+   
     
     // MARK: - Occluder Position
     
@@ -2269,7 +2239,7 @@ struct CameraARView: UIViewRepresentable {
                 [PlacedMapObject]
         ) {
 
-            guard let mapAnchor
+            guard let mapRoot
             else {
                 return
             }
@@ -2408,7 +2378,7 @@ struct CameraARView: UIViewRepresentable {
                         entity
                     )
 
-                    mapAnchor.addChild(
+                    mapRoot.addChild(
                         objectRoot
                     )
 
@@ -2468,7 +2438,7 @@ struct CameraARView: UIViewRepresentable {
                 [ShitDot]
         ) {
 
-            guard let mapAnchor
+            guard let mapRoot
             else {
                 return
             }
@@ -2549,7 +2519,7 @@ struct CameraARView: UIViewRepresentable {
                     )
 
 
-                mapAnchor.addChild(
+                mapRoot.addChild(
                     entity
                 )
 
