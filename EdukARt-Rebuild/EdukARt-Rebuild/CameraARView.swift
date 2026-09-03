@@ -676,10 +676,10 @@ struct CameraARView: UIViewRepresentable {
                 visualCorrectionRoot
             )
 
-            alignModelBottomToGround(
-                eduard,
-                relativeTo:
-                    simulationRoot
+            alignVisualRootToGround(
+                visualCorrectionRoot,
+                    relativeTo:
+                        simulationRoot
             )
             
             context.coordinator.simulationRoot =
@@ -766,15 +766,15 @@ struct CameraARView: UIViewRepresentable {
             visualCorrectionRoot
         )
 
-        alignModelBottomToGround(
-            model,
+        alignVisualRootToGround(
+            visualCorrectionRoot,
             relativeTo:
                 root
         )
-
         return root
     }
 
+    // MARK: - Align Eduard to Ground
     private func alignModelBottomToGround(
         _ model: Entity,
         relativeTo parent: Entity
@@ -786,7 +786,7 @@ struct CameraARView: UIViewRepresentable {
             )
 
         model.position.y -=
-            bounds.min.y
+        bounds.min.y - 0.13 // offset so occlusion lies on floor not on robot
 
         print(
             "# MODEL GROUND ALIGN | minY:",
@@ -795,6 +795,36 @@ struct CameraARView: UIViewRepresentable {
             -bounds.min.y
         )
     }
+    
+    // MARK: - Occluder Position
+    
+    private func alignVisualRootToGround(
+        _ visualRoot: Entity,
+        relativeTo root: Entity
+    ) {
+        let bounds =
+            visualRoot.visualBounds(
+                relativeTo:
+                    root
+            )
+
+        visualRoot.position.y -=
+            bounds.min.y
+
+        let correctedBounds =
+            visualRoot.visualBounds(
+                relativeTo:
+                    root
+            )
+
+        print(
+            "# GROUND ALIGN | before:",
+            bounds.min.y,
+            "| after:",
+            correctedBounds.min.y
+        )
+    }
+
     
 
     // MARK: - Update ARView
@@ -870,6 +900,9 @@ struct CameraARView: UIViewRepresentable {
                     .coins
             )
     }
+    
+    
+
 
 
 
@@ -1707,9 +1740,7 @@ struct CameraARView: UIViewRepresentable {
                     let basePosition =
                         SIMD3<Float>(
                             object.x,
-                            object.type == .oil
-                            ? 0
-                            : 0.02,
+                            0,
                             object.z
                         )
 
@@ -1893,7 +1924,7 @@ struct CameraARView: UIViewRepresentable {
                         dot.position.x,
 
                         // Slightly above the road.
-                        0.008,
+                        0.001,
 
                         dot.position.y
                     )
@@ -2047,7 +2078,8 @@ struct CameraARView: UIViewRepresentable {
                 )
             }
         }
-
+        
+        
 
         func attachOccluderToMap() {
 

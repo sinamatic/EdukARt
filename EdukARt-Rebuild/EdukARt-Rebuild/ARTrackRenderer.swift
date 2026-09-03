@@ -40,7 +40,7 @@ final class ARTrackRenderer {
 
     /// Complete road width.
     private let roadWidth:
-        Float = 0.60
+        Float = 0.70
 
     /// Distance from center to road boundary.
     private var roadHalfWidth:
@@ -115,7 +115,7 @@ final class ARTrackRenderer {
 
     /// Base height above mapped floor.
     private let floorOffset:
-        Float = 0.006
+        Float = 0.00
 
     /// Markings sit slightly above the road.
     private let lineOffset:
@@ -249,10 +249,10 @@ final class ARTrackRenderer {
         // --------------------------------------------------
 
         addStartFinishMarkers(
-            trackPoints:
-                trackPoints,
-            parent:
-                trackRoot
+            path:
+                    path,
+                parent:
+                    trackRoot
         )
     }
 
@@ -1612,81 +1612,100 @@ final class ARTrackRenderer {
     // ======================================================
 
     private func addStartFinishMarkers(
-        trackPoints:
-            [StoredTrackPoint],
+        path: [SIMD3<Float>],
         parent: Entity
     ) {
 
-        guard trackPoints.count >= 2 else {
-
-            print(
-                "# TRACK MARKER ERROR | Not enough track points"
-            )
-
+        guard path.count >= 2 else {
             return
         }
 
 
-        let start =
-            SIMD2<Float>(
-                trackPoints[0].x,
-                trackPoints[0].z
+        // ======================================================
+        // START
+        // ======================================================
+
+        let startDirection =
+            normalizedDirection(
+                from: path[0],
+                to: path[1]
             )
 
-        let next =
-            SIMD2<Float>(
-                trackPoints[1].x,
-                trackPoints[1].z
+        let startSide =
+            sideVector(
+                from: path[0],
+                to: path[1]
             )
 
-        let finish =
-            SIMD2<Float>(
-                trackPoints[
-                    trackPoints.count - 1
-                ].x,
-                trackPoints[
-                    trackPoints.count - 1
-                ].z
-            )
+        let startPosition =
+            path[0]
+            + startDirection * 0.30
+            + startSide * 0.10
 
-        let previous =
-            SIMD2<Float>(
-                trackPoints[
-                    trackPoints.count - 2
-                ].x,
-                trackPoints[
-                    trackPoints.count - 2
-                ].z
-            )
 
         makeMarker(
-            imageName:
-                "Start",
-            position:
-                start,
-            direction:
-                next - start,
-            parent:
-                parent
+            imageName: "Start",
+            position: startPosition,
+            direction: startDirection,
+            parent: parent
         )
 
-        makeMarker(
-            imageName:
-                "Finish",
-            position:
-                finish,
-            direction:
-                finish - previous,
-            parent:
-                parent
-        )
-    }
+
+        // ======================================================
+        // FINISH
+        // ======================================================
+
+        let lastIndex =
+               path.count - 1
+
+           let finishPosition =
+               path[lastIndex]
+
+           let finishDirection =
+               normalizedDirection(
+                   from: path[lastIndex - 1],
+                   to: path[lastIndex]
+               )
+
+
+           makeMarker(
+               imageName: "Finish",
+               position: finishPosition,
+               direction: finishDirection,
+               rotationOffset: 60 * .pi / 180,
+               parent: parent
+           )
+
+
+           // DEBUG
+
+           print(
+               "# TRACK START |",
+               path[0].x,
+               path[0].z
+           )
+
+           print(
+               "# TRACK FINISH |",
+               finishPosition.x,
+               finishPosition.z
+           )
+
+           print(
+               "# START-FINISH DISTANCE |",
+               horizontalDistance(
+                   path[0],
+                   finishPosition
+               )
+           )
+       }
 
 
     private func makeMarker(
         imageName: String,
-        position: SIMD2<Float>,
-        direction: SIMD2<Float>,
+        position: SIMD3<Float>,
+        direction: SIMD3<Float>,
+        rotationOffset: Float = 0,
         parent: Entity
     ) {
 
@@ -1714,11 +1733,20 @@ final class ARTrackRenderer {
                             texture
                         )
                 )
+            
+            // IMPORTANT:
+            // UnlitMaterial is opaque by default.
+                   // Enable alpha blending so the PNG transparency works.
+            material.blending =
+                .transparent(
+                        opacity: 1.0
+                )
+
 
             let mesh =
                 MeshResource.generatePlane(
                     width:
-                        0.60,
+                        roadWidth,
                     depth:
                         0.30
                 )
@@ -1739,8 +1767,8 @@ final class ARTrackRenderer {
             marker.position =
                 SIMD3<Float>(
                     position.x,
-                    0.02,
-                    position.y
+                    0.001,
+                    position.z
                 )
 
             guard simd_length_squared(
@@ -1769,7 +1797,9 @@ final class ARTrackRenderer {
             marker.orientation =
                 simd_quatf(
                     angle:
-                        -yaw,
+                        yaw
+                        + .pi / 2
+                        + rotationOffset,
                     axis:
                         SIMD3<Float>(
                             0,
@@ -1783,7 +1813,7 @@ final class ARTrackRenderer {
             )
 
             print(
-                "# TRACK MARKER ADDED | \(imageName) | X \(position.x) | Z \(position.y)"
+                "# TRACK MARKER ADDED | \(imageName) | X \(position.x) | Z \(position.z)"
             )
 
         } catch {

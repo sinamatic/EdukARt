@@ -931,10 +931,16 @@ final class EduardOccluder {
         self.entity =
             entity
 
-        applyDebugMaterial(
-            to:
-                entity
-        )
+//        applyDebugMaterial(
+//            to:
+//                entity
+//        )
+        
+        // MARK - Occluder Material is invisible
+        applyOcclusionMaterial(
+                to:
+                    entity
+            )
 
         setEnabled(
             false
@@ -991,6 +997,33 @@ final class EduardOccluder {
 
         entity.orientation =
             rotation
+    }
+    
+    
+    private func applyOcclusionMaterial(
+        to entity: Entity
+    ) {
+        if var modelComponent =
+            entity.components[
+                ModelComponent.self
+            ] {
+
+            modelComponent.materials =
+                modelComponent.materials.map { _ in
+                    OcclusionMaterial()
+                }
+
+            entity.components.set(
+                modelComponent
+            )
+        }
+
+        for child in entity.children {
+            applyOcclusionMaterial(
+                to:
+                    child
+            )
+        }
     }
 
 
