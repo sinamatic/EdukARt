@@ -658,12 +658,11 @@ struct CameraARView: UIViewRepresentable {
             let simulationRoot =
                 Entity()
 
-
             let eduard =
                 model.clone(
-                    recursive: true
+                    recursive:
+                        true
                 )
-
 
             let visualCorrectionRoot =
                 Entity()
@@ -675,6 +674,29 @@ struct CameraARView: UIViewRepresentable {
             simulationRoot.addChild(
                 visualCorrectionRoot
             )
+            
+            // Debug AR Robot offset
+            let eduardBounds =
+                eduard.visualBounds(
+                    relativeTo:
+                        simulationRoot
+                )
+
+            print(
+                String(
+                    format:
+                        "# EDUARD MODEL BOUNDS | minY %.3f | maxY %.3f | centerY %.3f",
+                    eduardBounds.min.y,
+                    eduardBounds.max.y,
+                    eduardBounds.center.y
+                )
+            )
+
+            // Important:
+            // RobotPose already uses map floor y = 0.
+            // Do not move the visual model upward through visualBounds.
+            visualCorrectionRoot.position.y =
+                0
 
             context.coordinator.simulationRoot =
                 simulationRoot
@@ -743,8 +765,7 @@ struct CameraARView: UIViewRepresentable {
 
         visualCorrectionRoot.orientation =
             simd_quatf(
-                angle:
-                    .pi,
+                angle: 0,
                 axis:
                     SIMD3<Float>(
                         0,
@@ -760,40 +781,31 @@ struct CameraARView: UIViewRepresentable {
         root.addChild(
             visualCorrectionRoot
         )
-
-        return root
-    }
-
-   
-    
-    // MARK: - Occluder Position
-    
-    private func alignVisualRootToGround(
-        _ visualRoot: Entity,
-        relativeTo root: Entity
-    ) {
-        let bounds =
-            visualRoot.visualBounds(
-                relativeTo:
-                    root
-            )
-
-        visualRoot.position.y -=
-            bounds.min.y
-
-        let correctedBounds =
-            visualRoot.visualBounds(
+        
+        let occluderBounds =
+            model.visualBounds(
                 relativeTo:
                     root
             )
 
         print(
-            "# GROUND ALIGN | before:",
-            bounds.min.y,
-            "| after:",
-            correctedBounds.min.y
+            String(
+                format:
+                    "# OCCLUDER MODEL BOUNDS | minY %.3f | maxY %.3f | centerY %.3f",
+                occluderBounds.min.y,
+                occluderBounds.max.y,
+                occluderBounds.center.y
+            )
         )
+
+        // Same vertical reference as the visible Eduard.
+        visualCorrectionRoot.position.y =
+            0
+
+        return root
     }
+
+   
 
     
 
