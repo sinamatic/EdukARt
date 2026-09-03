@@ -795,7 +795,11 @@ struct CameraARView: UIViewRepresentable {
         context.coordinator
             .updateRuntimeMapObjects(
                 gameController
-                    .activeMapObjects
+                    .activeMapObjects,
+
+                revealedTreeIDs:
+                    gameController
+                        .revealedTreeIDs
             )
 
         context.coordinator
@@ -951,6 +955,9 @@ struct CameraARView: UIViewRepresentable {
         var mapObjectEntities:
             [UUID: Entity] = [:]
 
+        var revealedTreeEntityIDs:
+            Set<UUID> = []
+
         var shitDotEntities:
             [UUID: Entity] = [:]
 
@@ -959,6 +966,15 @@ struct CameraARView: UIViewRepresentable {
 
         let eggRenderer =
             AREggRenderer()
+
+        private let treeHiddenDepth:
+            Float = -0.80 // ToDo: position
+
+        private let treeSpawnOffset:
+            Float = 0.50 // ToDo: position
+
+        private let treeRevealDuration:
+            TimeInterval = 1.0
 
         var lastLocalizationResetID:
             Int = 0
@@ -2300,7 +2316,10 @@ struct CameraARView: UIViewRepresentable {
 
         func updateRuntimeMapObjects(
             _ activeObjects:
-                [PlacedMapObject]
+                [PlacedMapObject],
+
+            revealedTreeIDs:
+                Set<UUID>
         ) {
 
             guard let mapRoot
@@ -2360,6 +2379,18 @@ struct CameraARView: UIViewRepresentable {
                     object.id
                 ] == nil
                 else {
+
+                    if object.type == .tree {
+
+                        revealTreeIfNeeded(
+                            object:
+                                object,
+
+                            revealedTreeIDs:
+                                revealedTreeIDs
+                        )
+                    }
+
                     continue
                 }
 
@@ -2388,14 +2419,39 @@ struct CameraARView: UIViewRepresentable {
 
 
                     let basePosition =
-                        SIMD3<Float>(
-                            object.x,
-                            0,
-                            object.z
+                        mapObjectPosition(
+                            for:
+                                object
                         )
 
-                    objectRoot.position =
-                        basePosition
+                    if object.type == .tree
+                        && revealedTreeIDs.contains(
+                            object.id
+                        ) == false {
+
+                        objectRoot.position =
+                            basePosition
+                            - SIMD3<Float>(
+                                0,
+                                treeHiddenDepth,
+                                0
+                            )
+
+                        objectRoot.isEnabled =
+                            false
+
+                    } else {
+
+                        objectRoot.position =
+                            basePosition
+
+                        if object.type == .tree {
+
+                            revealedTreeEntityIDs.insert(
+                                object.id
+                            )
+                        }
+                    }
 
 
                     let uprightRotation =
@@ -2458,7 +2514,8 @@ struct CameraARView: UIViewRepresentable {
                         objectRoot
 
                     if object.type != .oil
-                        && object.type != .eggCup {
+                        && object.type != .eggCup
+                        && object.type != .tree {
 
                         animatedMapObjects.append(
                             AnimatedMapObject(
@@ -2497,6 +2554,100 @@ struct CameraARView: UIViewRepresentable {
                     )
                 }
             }
+        }
+
+
+        private func revealTreeIfNeeded(
+            object:
+                PlacedMapObject,
+
+            revealedTreeIDs:
+                Set<UUID>
+        ) {
+
+            guard object.type == .tree,
+                  revealedTreeIDs.contains(
+                    object.id
+                  ),
+                  revealedTreeEntityIDs.contains(
+                    object.id
+                  ) == false,
+                  let entity =
+                    mapObjectEntities[
+                        object.id
+                    ]
+            else {
+                return
+            }
+
+            revealedTreeEntityIDs.insert(
+                object.id
+            )
+
+            entity.isEnabled =
+                true
+
+            let target =
+                Transform(
+                    scale:
+                        entity.transform.scale,
+
+                    rotation:
+                        entity.transform.rotation,
+
+                    translation:
+                        mapObjectPosition(
+                            for:
+                                object
+                        )
+                )
+
+            entity.move(
+                to:
+                    target,
+
+                relativeTo:
+                    entity.parent,
+
+                duration:
+                    treeRevealDuration,
+
+                timingFunction:
+                    .easeOut
+            )
+        }
+
+
+        private func mapObjectPosition(
+            for object:
+                PlacedMapObject
+        ) -> SIMD3<Float> {
+
+            guard object.type == .tree
+            else {
+
+                return SIMD3<Float>(
+                    object.x,
+                    0,
+                    object.z
+                )
+            }
+
+            return SIMD3<Float>(
+                object.x
+                + sin(
+                    object.rotation
+                )
+                * treeSpawnOffset,
+
+                0,
+
+                object.z
+                + cos(
+                    object.rotation
+                )
+                * treeSpawnOffset
+            )
         }
 
 
@@ -2676,6 +2827,9 @@ struct CameraARView: UIViewRepresentable {
             }
 
             mapObjectEntities
+                .removeAll()
+
+            revealedTreeEntityIDs
                 .removeAll()
 
             for entity in shitDotEntities.values {

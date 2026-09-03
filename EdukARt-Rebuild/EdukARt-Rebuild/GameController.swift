@@ -116,6 +116,10 @@ final class GameController:
         [PlacedMapObject]
 
     @Published private(set)
+    var revealedTreeIDs:
+        Set<UUID> = []
+
+    @Published private(set)
     var coins:
         [GameCoin] = []
 
@@ -214,6 +218,23 @@ final class GameController:
     private var shitEffectActor:
         CollisionActor = .simulation
 
+
+    private var carriedEggCount:
+        Int {
+
+        runtimeEggs.filter {
+
+            if case .carried =
+                $0.state {
+
+                return true
+            }
+
+            return false
+        }
+        .count
+    }
+
     private let shitEffectDuration:
         TimeInterval = 10
 
@@ -241,8 +262,17 @@ final class GameController:
     private let startClearRadius:
         Float = 0.45
 
-    private let maximumCarriedEggs:
-        Int = 2
+    private let treeRevealRadius:
+        Float = 0.70 // ToDo: size
+
+    private let treeSpawnOffset:
+        Float = 0.50 // ToDo: position
+
+    private let eggDeliveryScore:
+        Int = 300
+
+    private let undeliveredEggPenalty:
+        Int = 600
 
     private let map:
         GameMap
@@ -363,6 +393,11 @@ final class GameController:
 
         updateOilCooldowns()
 
+        updateTreeReveals(
+            robotPose:
+                pose
+        )
+
         let collidableObjects =
             activeMapObjects.filter { object in
 
@@ -370,6 +405,12 @@ final class GameController:
                     || oilCooldownEndDates[
                         object.id
                     ] == nil
+            }
+            .map {
+                collisionObject(
+                    for:
+                        $0
+                )
             }
 
         let collisions =
@@ -726,6 +767,15 @@ final class GameController:
 
 
         // --------------------------------------------------
+        // Stonehendge
+        // --------------------------------------------------
+
+        case .stonehendge:
+
+            hitRock()
+
+
+        // --------------------------------------------------
         // Tree
         // --------------------------------------------------
 
@@ -768,41 +818,12 @@ final class GameController:
     ) {
 
         // --------------------------------------------------
-        // Maximum two eggs at the same time
-        // --------------------------------------------------
-
-        let carriedEggCount =
-            runtimeEggs.filter {
-
-                if case .carried =
-                    $0.state {
-
-                    return true
-                }
-
-                return false
-            }
-            .count
-
-
-        guard carriedEggCount
-                < maximumCarriedEggs
-        else {
-
-            statusText =
-                "Eduard already carries two eggs"
-
-            print(
-                "# EGG | Cannot collect | already carrying 2"
-            )
-
-            return
-        }
-
-
-        // --------------------------------------------------
         // Add runtime egg
         // --------------------------------------------------
+
+        let slot =
+            carriedEggCount
+
 
         let egg =
             RuntimeEgg(
@@ -812,7 +833,7 @@ final class GameController:
                 state:
                     .carried(
                         slot:
-                            carriedEggCount
+                            slot
                     )
             )
 
@@ -838,7 +859,7 @@ final class GameController:
 
 
         collectedEggs =
-            carriedEggCount
+            slot
             + 1
 
         statusText =
@@ -846,7 +867,7 @@ final class GameController:
 
 
         print(
-            "# EGG | Collected | carrying \(collectedEggs)/2"
+            "# EGG | Collected | carrying \(collectedEggs)"
         )
     }
 
@@ -914,7 +935,7 @@ final class GameController:
 
         score +=
             deliveredNow
-            * 300
+            * eggDeliveryScore
 
 
         deliveredEggs +=
@@ -1404,6 +1425,9 @@ final class GameController:
         shitDots
             .removeAll()
 
+        revealedTreeIDs
+            .removeAll()
+
         oilCooldownEndDates
             .removeAll()
 
@@ -1515,8 +1539,35 @@ final class GameController:
                 10
         }
 
-        statusText =
-            "Finished"
+        let remainingEggs =
+            carriedEggCount
+
+        if remainingEggs > 0 {
+
+            let penalty =
+                remainingEggs
+                * undeliveredEggPenalty
+
+            score -=
+                penalty
+
+            statusText =
+                "Finished | \(remainingEggs) egg penalty"
+
+            print(
+                "# GAME | Undelivered eggs penalty | Eggs:",
+                remainingEggs,
+                "| Penalty:",
+                penalty,
+                "| Score:",
+                score
+            )
+
+        } else {
+
+            statusText =
+                "Finished"
+        }
     }
 
 
@@ -1558,6 +1609,116 @@ final class GameController:
             +
             dz * dz
         )
+    }
+
+
+    private func distance(
+        from pose:
+            RobotPose,
+
+        to point:
+            SIMD2<Float>
+    ) -> Float {
+
+        let dx =
+            pose.position.x
+            -
+            point.x
+
+        let dz =
+            pose.position.z
+            -
+            point.y
+
+        return sqrt(
+            dx * dx
+            +
+            dz * dz
+        )
+    }
+
+
+    private func updateTreeReveals(
+        robotPose:
+            RobotPose
+    ) {
+
+        for object in activeMapObjects
+        where object.type == .tree
+            && revealedTreeIDs.contains(object.id) == false {
+
+            guard distance(
+                from:
+                    robotPose,
+
+                to:
+                    SIMD2<Float>(
+                        object.x,
+                        object.z
+                    )
+            ) <= treeRevealRadius
+            else {
+                continue
+            }
+
+            revealedTreeIDs.insert(
+                object.id
+            )
+
+            print(
+                "# TREE | Revealed | \(object.id)"
+            )
+        }
+    }
+
+
+    private func treeSpawnPosition(
+        for object:
+            PlacedMapObject
+    ) -> SIMD2<Float> {
+
+        SIMD2<Float>(
+            object.x
+            + sin(
+                object.rotation
+            )
+            * treeSpawnOffset,
+
+            object.z
+            + cos(
+                object.rotation
+            )
+            * treeSpawnOffset
+        )
+    }
+
+
+    private func collisionObject(
+        for object:
+            PlacedMapObject
+    ) -> PlacedMapObject {
+
+        guard object.type == .tree
+        else {
+            return object
+        }
+
+        let spawnPosition =
+            treeSpawnPosition(
+                for:
+                    object
+            )
+
+        var collisionObject =
+            object
+
+        collisionObject.x =
+            spawnPosition.x
+
+        collisionObject.z =
+            spawnPosition.y
+
+        return collisionObject
     }
 
 

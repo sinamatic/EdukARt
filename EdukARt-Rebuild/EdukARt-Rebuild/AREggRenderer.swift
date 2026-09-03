@@ -124,17 +124,11 @@ final class AREggRenderer {
         // Update/create eggs
         // --------------------------------------------------
 
+        var didRenderCarriedEgg =
+            false
+
+
         for egg in eggs {
-
-            let entity =
-                ensureEggEntity(
-                    id:
-                        egg.id,
-
-                    parent:
-                        parent
-                )
-
 
             switch egg.state {
 
@@ -151,6 +145,41 @@ final class AREggRenderer {
                 else {
                     continue
                 }
+
+                guard didRenderCarriedEgg
+                        == false
+                else {
+
+                    eggEntities[
+                        egg.id
+                    ]?.removeFromParent()
+
+                    eggEntities[
+                        egg.id
+                    ] =
+                        nil
+
+                    previousStates[
+                        egg.id
+                    ] =
+                        egg.state
+
+                    continue
+                }
+
+
+                didRenderCarriedEgg =
+                    true
+
+
+                let entity =
+                    ensureEggEntity(
+                        id:
+                            egg.id,
+
+                        parent:
+                            parent
+                    )
 
 
                 let transform =
@@ -180,6 +209,21 @@ final class AREggRenderer {
                     continue
                 }
 
+                let hadEntity =
+                    eggEntities[
+                        egg.id
+                    ] != nil
+
+
+                let entity =
+                    ensureEggEntity(
+                        id:
+                            egg.id,
+
+                        parent:
+                            parent
+                    )
+
 
                 let target =
                     eggCupTransform(
@@ -195,7 +239,8 @@ final class AREggRenderer {
                 // actually changed to delivered.
                 if previousStates[
                     egg.id
-                ] != egg.state {
+                ] != egg.state
+                    && hadEntity {
 
                     entity.move(
                         to:

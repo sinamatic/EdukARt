@@ -92,7 +92,8 @@ struct CreateMapView: View {
             .oil,
             .water,
             .rock,
-            .tree
+            .tree,
+            .stonehendge
         ]
 
     private var footerHeight: CGFloat {
