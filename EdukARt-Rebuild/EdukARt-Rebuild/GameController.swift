@@ -72,6 +72,9 @@ struct GameResult:
     let collectedCoins:
         Int
 
+    let deliveredEggs:
+        Int?
+
     let oilHits:
         Int
 
@@ -147,6 +150,30 @@ final class GameController:
     var bestTimeBonusEarned:
         Bool = false
 
+    // ======================================================
+    // MARK: - Eggs
+    // ======================================================
+
+    /// Eggs currently carried by Eduard or already delivered.
+    @Published private(set)
+    var runtimeEggs:
+        [RuntimeEgg] = []
+
+
+    /// Number of eggs successfully delivered to Egg Cup.
+    @Published private(set)
+    var deliveredEggs:
+        Int = 0
+
+
+    /// Latest robot pose used by gameplay.
+    ///
+    /// CameraARView uses this pose to place carried eggs
+    /// on the physical or simulated Eduard.
+    @Published private(set)
+    var latestRobotPose:
+        RobotPose?
+
 
     /// Indicates whether Eduard currently leaves a shit trail.
     @Published private(set)
@@ -212,6 +239,9 @@ final class GameController:
 
     private let startClearRadius:
         Float = 0.45
+
+    private let maximumCarriedEggs:
+        Int = 2
 
     private let map:
         GameMap
@@ -309,6 +339,9 @@ final class GameController:
         actor:
             CollisionActor
     ) {
+
+        latestRobotPose =
+            pose
 
         latestRobotPoses[actor] =
             pose
@@ -450,6 +483,9 @@ final class GameController:
 
                 collectedCoins:
                     collectedCoins,
+
+                deliveredEggs:
+                    deliveredEggs,
 
                 oilHits:
                     oilHits,
@@ -680,12 +716,12 @@ final class GameController:
 
 
         // --------------------------------------------------
-        // Tongue
+        // Egg Cup
         // --------------------------------------------------
 
-        case .tongue:
+        case .eggCup:
 
-            hitTongue()
+            deliverEggsToEggCup()
         }
     }
 
@@ -704,7 +740,7 @@ final class GameController:
 
 
     // ======================================================
-    // MARK: - Eggs
+    // MARK: - Collect Egg
     // ======================================================
 
     private func collectEggs(
@@ -712,30 +748,181 @@ final class GameController:
             PlacedMapObject
     ) {
 
-        collectedEggs += 1
+        // --------------------------------------------------
+        // Maximum two eggs at the same time
+        // --------------------------------------------------
 
-        score += 10
+        let carriedEggCount =
+            runtimeEggs.filter {
+
+                if case .carried =
+                    $0.state {
+
+                    return true
+                }
+
+                return false
+            }
+            .count
+
+
+        guard carriedEggCount
+                < maximumCarriedEggs
+        else {
+
+            statusText =
+                "Eduard already carries two eggs"
+
+            print(
+                "# EGG | Cannot collect | already carrying 2"
+            )
+
+            return
+        }
+
+
+        // --------------------------------------------------
+        // Add runtime egg
+        // --------------------------------------------------
+
+        let egg =
+            RuntimeEgg(
+                id:
+                    object.id,
+
+                state:
+                    .carried(
+                        slot:
+                            carriedEggCount
+                    )
+            )
+
+
+        runtimeEggs.append(
+            egg
+        )
+
+
+        // --------------------------------------------------
+        // Remove original floor egg from runtime map
+        // --------------------------------------------------
+        //
+        // It is NOT deleted from the saved GameMap.
+        // --------------------------------------------------
+
+        activeMapObjects
+            .removeAll {
+
+                $0.id
+                    == object.id
+            }
+
+
+        collectedEggs =
+            carriedEggCount
+            + 1
 
         statusText =
             "Egg collected"
 
 
-        // Remove only from the current runtime session.
-        activeMapObjects.removeAll {
-            $0.id == object.id
+        print(
+            "# EGG | Collected | carrying \(collectedEggs)/2"
+        )
+    }
+
+
+    // ======================================================
+    // MARK: - Deliver Eggs to Egg Cup
+    // ======================================================
+
+    private func deliverEggsToEggCup() {
+
+        // All currently carried eggs.
+        let carriedIndices =
+            runtimeEggs.indices.filter {
+
+                if case .carried =
+                    runtimeEggs[$0].state {
+
+                    return true
+                }
+
+                return false
+            }
+
+
+        guard carriedIndices.isEmpty
+                == false
+        else {
+
+            statusText =
+                "No eggs to deliver"
+
+            return
         }
 
 
+        // Existing eggs on Egg Cup determine
+        // the next visual slot.
+        var nextDeliveredSlot =
+            deliveredEggs
+
+
+        var deliveredNow =
+            0
+
+
+        for index in carriedIndices {
+
+            runtimeEggs[index].state =
+                .delivered(
+                    slot:
+                        nextDeliveredSlot
+                )
+
+            nextDeliveredSlot +=
+                1
+
+            deliveredNow +=
+                1
+        }
+
+
+        // --------------------------------------------------
+        // Score
+        // --------------------------------------------------
+
+        score +=
+            deliveredNow
+            * 300
+
+
+        deliveredEggs +=
+            deliveredNow
+
+
+        collectedEggs =
+            0
+
+
+        statusText =
+            "\(deliveredNow) egg(s) delivered"
+
+
         print(
-            "# GAME | Egg collected"
+            "# EGG CUP | Delivered:",
+            deliveredNow
         )
 
         print(
-            "# GAME | Eggs: \(collectedEggs)"
+            "# EGG CUP | Total delivered:",
+            deliveredEggs
         )
 
         print(
-            "# GAME | Score: \(score)"
+            "# GAME | Score:",
+            score
         )
     }
 
@@ -1090,28 +1277,6 @@ final class GameController:
 
 
     // ======================================================
-    // MARK: - Tongue
-    // ======================================================
-
-    private func hitTongue() {
-
-        score += 5
-
-        statusText =
-            "Tongue collected"
-
-
-        print(
-            "# GAME | Tongue hit"
-        )
-
-        print(
-            "# GAME | Score: \(score)"
-        )
-    }
-
-
-    // ======================================================
     // MARK: - Reset
     // ======================================================
 
@@ -1128,6 +1293,15 @@ final class GameController:
 
         collectedEggs =
             0
+
+        runtimeEggs
+            .removeAll()
+
+        deliveredEggs =
+            0
+
+        latestRobotPose =
+            nil
 
         oilHits =
             0

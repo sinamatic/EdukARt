@@ -82,16 +82,6 @@ final class AprilTagLocalization {
 
 
     // --------------------------------------------------
-    // Robot tag mounting
-    // --------------------------------------------------
-
-    /// Distance from AprilTag #0 center
-    /// to Eduard's physical center.
-    private let robotTagToCenterDistance:
-        Float = 0.19
-
-
-    // --------------------------------------------------
     // Reference measurements
     // --------------------------------------------------
 
@@ -409,14 +399,20 @@ final class AprilTagLocalization {
     func localizeRobot(
         detection: Detection,
         frame: ARFrame,
-        intrinsics: CameraIntrinsics
+        intrinsics: CameraIntrinsics,
+        mapWorldTransform: simd_float4x4? = nil
     ) -> RobotPose? {
 
+        // Tag 0 belongs to the physical Eduard.
         guard detection.id == 0
         else {
             return nil
         }
 
+
+        // --------------------------------------------------
+        // Estimate AprilTag #0 pose relative to camera
+        // --------------------------------------------------
 
         guard let pose =
             detection.estimatePose(
@@ -429,6 +425,10 @@ final class AprilTagLocalization {
         }
 
 
+        // --------------------------------------------------
+        // Reject poor measurements
+        // --------------------------------------------------
+
         guard pose.reprojectionError
                 <= maximumReprojectionError
 
@@ -437,8 +437,7 @@ final class AprilTagLocalization {
             print(
                 String(
                     format:
-                        "# ROBOT TAG REJECTED | ID %d | reprojection error %.3f",
-                    detection.id,
+                        "# ROBOT TAG REJECTED | error %.3f",
                     pose.reprojectionError
                 )
             )
@@ -446,6 +445,10 @@ final class AprilTagLocalization {
             return nil
         }
 
+
+        // --------------------------------------------------
+        // AprilTag camera coordinates -> ARKit coordinates
+        // --------------------------------------------------
 
         let aprilTagToARKitCamera =
             simd_float4x4(
@@ -459,114 +462,82 @@ final class AprilTagLocalization {
             )
 
 
+        // --------------------------------------------------
+        // Robot tag -> ARKit world
+        // --------------------------------------------------
+
         let robotWorldTransform =
             frame.camera.transform
             * aprilTagToARKitCamera
             * pose.transform
 
 
-        guard let referenceTransform =
-            referenceTagWorldTransform
+        // --------------------------------------------------
+        // Choose map coordinate system
+        // --------------------------------------------------
+        //
+        // During normal gameplay we prefer the current
+        // multi-tag stabilized map transform.
+        //
+        // Before that exists, fall back to the original
+        // reference-tag transform.
+        // --------------------------------------------------
+
+        guard let mapTransform =
+            mapWorldTransform
+            ?? referenceTagWorldTransform
 
         else {
             return nil
         }
 
 
+        // --------------------------------------------------
+        // ARKit world -> map coordinates
+        // --------------------------------------------------
+
         let relativeTransform =
             simd_inverse(
-                referenceTransform
+                mapTransform
             )
             * robotWorldTransform
 
 
-        // --------------------------------------------------
-        // Robot tag center
-        // --------------------------------------------------
+        let mapX =
+            relativeTransform
+                .columns.3.x
 
-        let tagPosition =
-            SIMD3<Float>(
-                relativeTransform.columns.3.x,
-                0,
-                relativeTransform.columns.3.z
-            )
+        let mapZ =
+            relativeTransform
+                .columns.3.z
 
 
         // --------------------------------------------------
-        // Robot direction
+        // Robot rotation
         // --------------------------------------------------
-        //
-        // AprilTag #0 lies flat on top of Eduard.
-        // Therefore its Z axis is approximately vertical.
-        //
-        // The robot's horizontal direction must come from
-        // one of the two axes inside the tag plane.
-        //
-        // Start with the tag X axis because this is also
-        // the axis the old implementation used for yaw.
-        //
 
-        var robotForward =
-            SIMD3<Float>(
-                -relativeTransform.columns.1.x,
-                0,
-                -relativeTransform.columns.1.z
-            )
-
-        guard simd_length_squared(
-            robotForward
-        ) > 0.0001
-        else {
-            return nil
-        }
-
-        robotForward =
-            simd_normalize(
-                robotForward
-            )
-
-
-        // --------------------------------------------------
-        // Robot center
-        // --------------------------------------------------
-        //
-        // AprilTag #0 is mounted at the front of Eduard.
-        // Therefore the physical robot center is behind
-        // the tag along the robot's forward direction.
-        //
-
-        let robotPosition =
-            tagPosition
-            - robotForward
-            * robotTagToCenterDistance
-
-
-        // --------------------------------------------------
-        // Logical robot rotation
-        // --------------------------------------------------
-        //
-        // EduardSimulation defines rotation 0 as forward -Z.
-        //
-        // Convert the horizontal forward vector into the
-        // same convention.
-        //
+        let robotXAxis =
+            relativeTransform
+                .columns.0
 
         let rotation =
             atan2(
-                -robotForward.x,
-                -robotForward.z
+                robotXAxis.z,
+                robotXAxis.x
             )
 
 
         return RobotPose(
             position:
-                robotPosition,
-
+                SIMD3<Float>(
+                    mapX,
+                    0,
+                    mapZ
+                ),
             rotation:
                 rotation
         )
     }
-
 
     // MARK: - Collect Reference Measurement
 

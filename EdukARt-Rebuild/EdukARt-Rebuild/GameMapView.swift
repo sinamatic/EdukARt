@@ -735,7 +735,7 @@ struct GameMapView: View {
         .rotationEffect(
             .radians(
                 Double(
-                    -tag.rotation
+                    tag.rotation
                 )
             )
         )

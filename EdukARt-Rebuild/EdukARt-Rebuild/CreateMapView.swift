@@ -82,7 +82,7 @@ struct CreateMapView: View {
     private let mapSizeFactor: CGFloat = 2.0 / 3.0
     private let items:
         [MapObjectType] = [
-            .tongue,
+            .eggCup,
             .eggs,
             .shit
         ]

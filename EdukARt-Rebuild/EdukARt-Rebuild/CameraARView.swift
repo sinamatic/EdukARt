@@ -841,6 +841,9 @@ struct CameraARView: UIViewRepresentable {
                 .aprilTagLocalization
                 .reset()
 
+            context.coordinator
+                .resetMultiTagLocalization()
+
 
             if context.coordinator.requiredReferenceTagID > 0 {
 
@@ -899,6 +902,16 @@ struct CameraARView: UIViewRepresentable {
                 gameController
                     .coins
             )
+
+        context.coordinator
+            .updateEggs(
+                gameController
+                    .runtimeEggs,
+
+                robotPose:
+                    gameController
+                        .latestRobotPose
+            )
     }
     
     
@@ -918,6 +931,42 @@ struct CameraARView: UIViewRepresentable {
         weak var arView: ARView?
         var mapAnchor: AnchorEntity?
         var mapRoot: Entity?
+
+        // ======================================================
+        // MARK: - Multi-Tag Map Stabilization
+        // ======================================================
+
+        /// Current best estimate of the complete
+        /// map coordinate system in ARKit world space.
+        private var stabilizedMapWorldTransform:
+            simd_float4x4?
+
+
+        /// We only correct the map occasionally.
+        private var lastMapStabilization =
+            Date.distantPast
+
+
+        /// Maximum frequency of multi-tag map correction.
+        private let mapStabilizationInterval:
+            TimeInterval = 0.75
+
+
+        /// Require at least two known map tags.
+        private let minimumStabilizationTagCount =
+            2
+
+
+        /// Small corrections are interpolated instead of
+        /// instantly moving the complete map.
+        private let mapStabilizationFactor:
+            Float = 0.05
+
+
+        /// Ignore obviously implausible jumps.
+        private let maximumMapCorrectionDistance:
+            Float = 0.25
+
         var simulationRoot: Entity?
         var occlusionRoot: Entity?
         var eduard: Entity?
@@ -934,6 +983,15 @@ struct CameraARView: UIViewRepresentable {
         var animatedMapObjects:
             [AnimatedMapObject] = []
 
+        private struct VisibleMapTag {
+
+            let stored:
+                StoredAprilTag
+
+            let worldTransform:
+                simd_float4x4
+        }
+
         // MARK: - Runtime Game AR Content
 
         var mapObjectEntities:
@@ -944,6 +1002,9 @@ struct CameraARView: UIViewRepresentable {
 
         let coinRenderer =
             ARCoinRenderer()
+
+        let eggRenderer =
+            AREggRenderer()
 
         var lastLocalizationResetID:
             Int = 0
@@ -1214,17 +1275,46 @@ struct CameraARView: UIViewRepresentable {
                     }
                 }
                 
-                // --------------------------------------------------
-                // Localize visible tags
-                // --------------------------------------------------
+                // ======================================================
+                // Localize visible AprilTags
+                // ======================================================
 
                 var didUpdateRobotPose =
                     false
 
+
+                var visibleMapTags:
+                    [VisibleMapTag] = []
+
+
+                // Keep robot detection for a moment.
+                // We localize it AFTER map stabilization.
+                var robotDetection:
+                    Detection?
+
+
                 for detection in detections {
 
-                    if let robotPose =
-                        aprilTagLocalization.localizeRobot(
+
+                    // --------------------------------------------------
+                    // Robot tag #0
+                    // --------------------------------------------------
+
+                    if detection.id == 0 {
+
+                        robotDetection =
+                            detection
+
+                        continue
+                    }
+
+
+                    // --------------------------------------------------
+                    // Map tags
+                    // --------------------------------------------------
+
+                    guard let mapPose =
+                        aprilTagLocalization.localize(
                             detection:
                                 detection,
 
@@ -1233,61 +1323,49 @@ struct CameraARView: UIViewRepresentable {
 
                             intrinsics:
                                 intrinsics
-                        ) {
-
-                        didUpdateRobotPose =
-                            true
-
-                        lastRobotPoseUpdate =
-                            Date()
-
-                        DispatchQueue.main.async {
-
-                            self.controller
-                                .eduardOccluder
-                                .setEnabled(
-                                    true
-                                )
-
-                            self.onRobotPoseUpdated(
-                                robotPose
-                            )
-                        }
-                    }
-
-
-                    guard let mapPose =
-                        aprilTagLocalization.localize(
-                            detection: detection,
-                            frame: frame,
-                            intrinsics: intrinsics
                         )
                     else {
                         continue
                     }
 
 
+                    // --------------------------------------------------
+                    // Initial localization through reference tag
+                    // --------------------------------------------------
+
                     if detection.id
                         == requiredReferenceTagID {
 
-                        DispatchQueue.main.async {
+                        if let mapReferenceWorldTransform =
+                            aprilTagLocalization
+                                .mapReferenceWorldTransform {
 
-                            if let mapReferenceWorldTransform =
-                                self.aprilTagLocalization
-                                    .mapReferenceWorldTransform {
-
-                                let mapRootTransform =
-                                    self.makeMapRootTransform(
-                                        from:
-                                            mapReferenceWorldTransform
-                                    )
-
-
-                                self.localizeMapAnchor(
-                                    with:
-                                        mapRootTransform
+                            let mapRootTransform =
+                                makeMapRootTransform(
+                                    from:
+                                        mapReferenceWorldTransform
                                 )
+
+
+                            // Use initial reference as first
+                            // stabilized map estimate.
+                            if stabilizedMapWorldTransform
+                                == nil {
+
+                                stabilizedMapWorldTransform =
+                                    mapRootTransform
+
+                                DispatchQueue.main.async {
+
+                                    self.localizeMapAnchor(
+                                        with:
+                                            mapRootTransform
+                                    )
+                                }
                             }
+                        }
+
+                        DispatchQueue.main.async {
 
                             self
                                 .onReferenceTagLocalized()
@@ -1295,29 +1373,45 @@ struct CameraARView: UIViewRepresentable {
                     }
 
 
-                    // ----------------------------------------------
-                    // Update 2D AprilTag map
-                    // ----------------------------------------------
+                    // --------------------------------------------------
+                    // Map Builder
+                    // --------------------------------------------------
 
                     DispatchQueue.main.async {
 
                         self.mapBuilder.add(
-                            pose: mapPose
+                            pose:
+                                mapPose
                         )
                     }
 
 
-                    // ----------------------------------------------
-                    // Place AR cube on AprilTag
-                    // ----------------------------------------------
+                    // --------------------------------------------------
+                    // Is this tag part of the SAVED game map?
+                    // --------------------------------------------------
 
-//                    DispatchQueue.main.async {
-//
-//                        self.placeCube(
-//                            for: mapPose
-//                        )
-//                    }
-                    
+                    if let storedTag =
+                        gameMap?
+                            .aprilTags
+                            .first(
+                                where: {
+                                    $0.id
+                                        == detection.id
+                                }
+                            ) {
+
+                        visibleMapTags.append(
+                            VisibleMapTag(
+                                stored:
+                                    storedTag,
+
+                                worldTransform:
+                                    mapPose.worldTransform
+                            )
+                        )
+                    }
+
+
                     // ----------------------------------------------
                     // Debug output
                     // ----------------------------------------------
@@ -1335,6 +1429,63 @@ struct CameraARView: UIViewRepresentable {
                             mapPose.height
                         )
                     )
+                }
+
+
+                // ======================================================
+                // Multi-Tag map stabilization
+                // ======================================================
+                if gameMap != nil {
+
+                    stabilizeMap(
+                        using:
+                            visibleMapTags
+                    )
+                }
+
+
+                // ======================================================
+                // Robot localization
+                // ======================================================
+
+                if let robotDetection {
+
+                    if let robotPose =
+                        aprilTagLocalization.localizeRobot(
+                            detection:
+                                robotDetection,
+
+                            frame:
+                                frame,
+
+                            intrinsics:
+                                intrinsics,
+
+                            mapWorldTransform:
+                                stabilizedMapWorldTransform
+                        ) {
+
+                        didUpdateRobotPose =
+                            true
+
+                        lastRobotPoseUpdate =
+                            Date()
+
+
+                        DispatchQueue.main.async {
+
+                            self.controller
+                                .eduardOccluder
+                                .setEnabled(
+                                    true
+                                )
+
+
+                            self.onRobotPoseUpdated(
+                                robotPose
+                            )
+                        }
+                    }
                 }
 
                 if didUpdateRobotPose == false {
@@ -1453,6 +1604,889 @@ struct CameraARView: UIViewRepresentable {
                     )
                 )
             )
+        }
+
+
+        // MARK: - Stored AprilTag Transform
+
+        private func makeStoredTagTransform(
+            _ tag: StoredAprilTag
+        ) -> simd_float4x4 {
+
+            // Stored rotation describes the tag's X axis
+            // inside the 2D map.
+            let xAxis =
+                SIMD3<Float>(
+                    cos(tag.rotation),
+                    0,
+                    sin(tag.rotation)
+                )
+
+
+            let yAxis =
+                SIMD3<Float>(
+                    0,
+                    1,
+                    0
+                )
+
+
+            let zAxis =
+                simd_normalize(
+                    simd_cross(
+                        xAxis,
+                        yAxis
+                    )
+                )
+
+
+            return simd_float4x4(
+                columns: (
+
+                    SIMD4<Float>(
+                        xAxis.x,
+                        xAxis.y,
+                        xAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        yAxis.x,
+                        yAxis.y,
+                        yAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        zAxis.x,
+                        zAxis.y,
+                        zAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        tag.x,
+                        0,
+                        tag.z,
+                        1
+                    )
+                )
+            )
+        }
+
+
+        // MARK: - Map Transform Candidate
+
+        private func mapTransformCandidate(
+            from visibleTag:
+                VisibleMapTag
+        ) -> simd_float4x4 {
+
+            // --------------------------------------------------
+            // Stored pose of this AprilTag inside the saved map
+            // --------------------------------------------------
+
+            let storedTagTransform =
+                makeStoredTagTransform(
+                    visibleTag.stored
+                )
+
+
+            // --------------------------------------------------
+            // Currently measured pose of the same AprilTag
+            // in ARKit world space
+            // --------------------------------------------------
+            //
+            // Flatten the tag onto the horizontal plane so
+            // small measured floor tilts do not tilt the map.
+            // --------------------------------------------------
+
+            let measuredTagTransform =
+                makeMapRootTransform(
+                    from:
+                        visibleTag.worldTransform
+                )
+
+
+            // --------------------------------------------------
+            // Calculate map -> ARKit world transform
+            // --------------------------------------------------
+            //
+            // measuredTagWorld
+            // =
+            // mapWorld * storedTagMap
+            //
+            // therefore:
+            //
+            // mapWorld
+            // =
+            // measuredTagWorld
+            // * inverse(storedTagMap)
+            // --------------------------------------------------
+
+            return measuredTagTransform
+                * simd_inverse(
+                    storedTagTransform
+                )
+        }
+
+
+        // MARK: - Average Map Transforms
+
+        private func averageMapTransforms(
+            _ transforms: [simd_float4x4]
+        ) -> simd_float4x4? {
+
+            guard transforms.isEmpty == false else {
+                return nil
+            }
+
+
+            // --------------------------------------------------
+            // Average position
+            // --------------------------------------------------
+
+            var positionSum =
+                SIMD3<Float>.zero
+
+
+            // --------------------------------------------------
+            // Average horizontal rotation
+            // --------------------------------------------------
+
+            var sineSum:
+                Float = 0
+
+            var cosineSum:
+                Float = 0
+
+
+            for transform in transforms {
+
+                positionSum +=
+                    SIMD3<Float>(
+                        transform.columns.3.x,
+                        transform.columns.3.y,
+                        transform.columns.3.z
+                    )
+
+
+                let xAxis =
+                    transform.columns.0
+
+                let yaw =
+                    atan2(
+                        xAxis.z,
+                        xAxis.x
+                    )
+
+
+                sineSum +=
+                    sin(yaw)
+
+                cosineSum +=
+                    cos(yaw)
+            }
+
+
+            let count =
+                Float(
+                    transforms.count
+                )
+
+
+            let position =
+                positionSum
+                / count
+
+
+            let yaw =
+                atan2(
+                    sineSum,
+                    cosineSum
+                )
+
+
+            // --------------------------------------------------
+            // Build clean horizontal map transform
+            // --------------------------------------------------
+
+            let xAxis =
+                SIMD3<Float>(
+                    cos(yaw),
+                    0,
+                    sin(yaw)
+                )
+
+
+            let yAxis =
+                SIMD3<Float>(
+                    0,
+                    1,
+                    0
+                )
+
+
+            let zAxis =
+                simd_normalize(
+                    simd_cross(
+                        xAxis,
+                        yAxis
+                    )
+                )
+
+
+            return simd_float4x4(
+                columns: (
+
+                    SIMD4<Float>(
+                        xAxis.x,
+                        xAxis.y,
+                        xAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        yAxis.x,
+                        yAxis.y,
+                        yAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        zAxis.x,
+                        zAxis.y,
+                        zAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        position.x,
+                        position.y,
+                        position.z,
+                        1
+                    )
+                )
+            )
+        }
+
+
+        // MARK: - Interpolate Map Transform
+
+        private func interpolateMapTransform(
+            from current:
+                simd_float4x4,
+
+            to target:
+                simd_float4x4,
+
+            factor:
+                Float
+        ) -> simd_float4x4 {
+
+
+            // --------------------------------------------------
+            // Position
+            // --------------------------------------------------
+
+            let currentPosition =
+                SIMD3<Float>(
+                    current.columns.3.x,
+                    current.columns.3.y,
+                    current.columns.3.z
+                )
+
+            let targetPosition =
+                SIMD3<Float>(
+                    target.columns.3.x,
+                    target.columns.3.y,
+                    target.columns.3.z
+                )
+
+
+            let position =
+                simd_mix(
+                    currentPosition,
+                    targetPosition,
+                    SIMD3<Float>(
+                        repeating:
+                            factor
+                    )
+                )
+
+
+            // --------------------------------------------------
+            // Rotation
+            // --------------------------------------------------
+
+            let currentYaw =
+                atan2(
+                    current.columns.0.z,
+                    current.columns.0.x
+                )
+
+            let targetYaw =
+                atan2(
+                    target.columns.0.z,
+                    target.columns.0.x
+                )
+
+
+            let currentRotation =
+                simd_quatf(
+                    angle:
+                        currentYaw,
+
+                    axis:
+                        SIMD3<Float>(
+                            0,
+                            1,
+                            0
+                        )
+                )
+
+
+            let targetRotation =
+                simd_quatf(
+                    angle:
+                        targetYaw,
+
+                    axis:
+                        SIMD3<Float>(
+                            0,
+                            1,
+                            0
+                        )
+                )
+
+
+            let rotation =
+                simd_slerp(
+                    currentRotation,
+                    targetRotation,
+                    factor
+                )
+
+
+            var transform =
+                simd_float4x4(
+                    rotation
+                )
+
+
+            transform.columns.3 =
+                SIMD4<Float>(
+                    position.x,
+                    position.y,
+                    position.z,
+                    1
+                )
+
+
+            return transform
+        }
+
+
+        // MARK: - Stabilize Map
+
+        private func stabilizeMap(
+            using visibleTags:
+                [VisibleMapTag]
+        ) {
+
+            // --------------------------------------------------
+            // Only occasionally
+            // --------------------------------------------------
+
+            guard Date()
+                .timeIntervalSince(
+                    lastMapStabilization
+                )
+                >= mapStabilizationInterval
+            else {
+                return
+            }
+
+
+            // --------------------------------------------------
+            // At least two known tags
+            // --------------------------------------------------
+
+            guard visibleTags.count
+                    >= minimumStabilizationTagCount
+            else {
+                return
+            }
+
+
+            // --------------------------------------------------
+            // Initial localization must already exist
+            // --------------------------------------------------
+
+            guard let currentTransform =
+                stabilizedMapWorldTransform
+            else {
+                return
+            }
+
+
+            lastMapStabilization =
+                Date()
+
+
+            // --------------------------------------------------
+            // Estimate complete map pose from tag CENTERS.
+            // --------------------------------------------------
+
+            guard let measuredTransform =
+                estimateMapTransform(
+                    from:
+                        visibleTags,
+
+                    currentTransform:
+                        currentTransform
+                )
+            else {
+                return
+            }
+
+
+            // --------------------------------------------------
+            // Current / measured positions
+            // --------------------------------------------------
+
+            let currentPosition =
+                SIMD3<Float>(
+                    currentTransform.columns.3.x,
+                    currentTransform.columns.3.y,
+                    currentTransform.columns.3.z
+                )
+
+
+            let measuredPosition =
+                SIMD3<Float>(
+                    measuredTransform.columns.3.x,
+                    measuredTransform.columns.3.y,
+                    measuredTransform.columns.3.z
+                )
+
+
+            let correctionDistance =
+                simd_distance(
+                    currentPosition,
+                    measuredPosition
+                )
+
+
+            // --------------------------------------------------
+            // Rotation difference
+            // --------------------------------------------------
+
+            let currentYaw =
+                atan2(
+                    currentTransform.columns.0.z,
+                    currentTransform.columns.0.x
+                )
+
+
+            let measuredYaw =
+                atan2(
+                    measuredTransform.columns.0.z,
+                    measuredTransform.columns.0.x
+                )
+
+
+            let rawYawDifference =
+                measuredYaw
+                - currentYaw
+
+
+            // Normalize to -π ... +π.
+            let yawDifference =
+                atan2(
+                    sin(rawYawDifference),
+                    cos(rawYawDifference)
+                )
+
+
+            // --------------------------------------------------
+            // Reject obviously bad measurements
+            // --------------------------------------------------
+
+            guard correctionDistance
+                    <= maximumMapCorrectionDistance
+            else {
+
+                print(
+                    String(
+                        format:
+                            "# MAP CORRECTION REJECTED | %.3f m",
+                        correctionDistance
+                    )
+                )
+
+                return
+            }
+
+
+            // Also reject unreasonable rotation jumps.
+            let maximumYawCorrection =
+                Float(
+                    15.0 * .pi / 180.0
+                )
+
+
+            guard abs(yawDifference)
+                    <= maximumYawCorrection
+            else {
+
+                print(
+                    String(
+                        format:
+                            "# MAP ROTATION REJECTED | %.2f°",
+                        yawDifference
+                            * 180
+                            / .pi
+                    )
+                )
+
+                return
+            }
+
+
+            // --------------------------------------------------
+            // Smooth correction
+            // --------------------------------------------------
+
+            let correctedTransform =
+                interpolateMapTransform(
+                    from:
+                        currentTransform,
+
+                    to:
+                        measuredTransform,
+
+                    factor:
+                        mapStabilizationFactor
+                )
+
+
+            stabilizedMapWorldTransform =
+                correctedTransform
+
+
+            // RealityKit mutation belongs on Main.
+            DispatchQueue.main.async {
+
+                self.localizeMapAnchor(
+                    with:
+                        correctedTransform
+                )
+            }
+
+
+            print(
+                String(
+                    format:
+                        "# MAP STABILIZED | %d tags | pos %.3f m | rot %.2f°",
+                    visibleTags.count,
+                    correctionDistance,
+                    yawDifference
+                        * 180
+                        / .pi
+                )
+            )
+        }
+        
+        // MARK: - Estimate Map Transform From Tag Positions
+
+        private func estimateMapTransform(
+            from visibleTags:
+                [VisibleMapTag],
+
+            currentTransform:
+                simd_float4x4
+        ) -> simd_float4x4? {
+
+            // At least two different tag positions are required
+            // to determine both position and rotation.
+            guard visibleTags.count >= 2
+            else {
+                return nil
+            }
+            
+            // --------------------------------------------------
+            // The visible tag constellation must span enough space.
+            // --------------------------------------------------
+            //
+            // Two tags that are almost next to each other provide
+            // a poor estimate of map rotation.
+            // --------------------------------------------------
+
+            var maximumStoredDistance:
+                Float = 0
+
+
+            for firstIndex in
+                visibleTags.indices {
+
+                for secondIndex in
+                    visibleTags.indices
+                where secondIndex > firstIndex {
+
+                    let first =
+                        SIMD2<Float>(
+                            visibleTags[firstIndex].stored.x,
+                            visibleTags[firstIndex].stored.z
+                        )
+
+                    let second =
+                        SIMD2<Float>(
+                            visibleTags[secondIndex].stored.x,
+                            visibleTags[secondIndex].stored.z
+                        )
+
+
+                    maximumStoredDistance =
+                        max(
+                            maximumStoredDistance,
+
+                            simd_distance(
+                                first,
+                                second
+                            )
+                        )
+                }
+            }
+
+
+            guard maximumStoredDistance
+                    >= 0.50
+            else {
+
+                print(
+                    "# MAP STABILIZATION SKIPPED | tags too close"
+                )
+
+                return nil
+            }
+            
+
+            // --------------------------------------------------
+            // Calculate centroids
+            // --------------------------------------------------
+
+            var storedCentroid =
+                SIMD2<Float>.zero
+
+            var observedCentroid =
+                SIMD2<Float>.zero
+
+
+            for tag in visibleTags {
+
+                storedCentroid +=
+                    SIMD2<Float>(
+                        tag.stored.x,
+                        tag.stored.z
+                    )
+
+                observedCentroid +=
+                    SIMD2<Float>(
+                        tag.worldTransform.columns.3.x,
+                        tag.worldTransform.columns.3.z
+                    )
+            }
+
+
+            let count =
+                Float(
+                    visibleTags.count
+                )
+
+
+            storedCentroid /=
+                count
+
+            observedCentroid /=
+                count
+
+
+            // --------------------------------------------------
+            // Find best horizontal rotation
+            // --------------------------------------------------
+            //
+            // We align the STORED tag positions with the
+            // currently OBSERVED ARKit world positions.
+            //
+            // Important:
+            // Individual AprilTag rotations are NOT used.
+            // Only the centers of the tags matter.
+            // --------------------------------------------------
+
+            var dotSum:
+                Float = 0
+
+            var crossSum:
+                Float = 0
+
+
+            for tag in visibleTags {
+
+                let stored =
+                    SIMD2<Float>(
+                        tag.stored.x,
+                        tag.stored.z
+                    )
+                    - storedCentroid
+
+
+                let observed =
+                    SIMD2<Float>(
+                        tag.worldTransform.columns.3.x,
+                        tag.worldTransform.columns.3.z
+                    )
+                    - observedCentroid
+
+
+                dotSum +=
+                    stored.x * observed.x
+                    +
+                    stored.y * observed.y
+
+
+                crossSum +=
+                    stored.x * observed.y
+                    -
+                    stored.y * observed.x
+            }
+
+
+            guard abs(dotSum) + abs(crossSum)
+                    > 0.0001
+            else {
+                return nil
+            }
+
+
+            let yaw =
+                atan2(
+                    crossSum,
+                    dotSum
+                )
+
+
+            let cosYaw =
+                cos(yaw)
+
+            let sinYaw =
+                sin(yaw)
+
+
+            // --------------------------------------------------
+            // Rotate stored centroid into ARKit world orientation
+            // --------------------------------------------------
+
+            let rotatedStoredCentroid =
+                SIMD2<Float>(
+                    cosYaw * storedCentroid.x
+                        - sinYaw * storedCentroid.y,
+
+                    sinYaw * storedCentroid.x
+                        + cosYaw * storedCentroid.y
+                )
+
+
+            // --------------------------------------------------
+            // Translation of complete map
+            // --------------------------------------------------
+
+            let translation =
+                observedCentroid
+                - rotatedStoredCentroid
+
+
+            // --------------------------------------------------
+            // Build horizontal map transform
+            // --------------------------------------------------
+
+            let xAxis =
+                SIMD3<Float>(
+                    cosYaw,
+                    0,
+                    sinYaw
+                )
+
+
+            let yAxis =
+                SIMD3<Float>(
+                    0,
+                    1,
+                    0
+                )
+
+
+            let zAxis =
+                SIMD3<Float>(
+                    -sinYaw,
+                    0,
+                    cosYaw
+                )
+
+
+            // Keep the original floor height.
+            //
+            // Multi-tag stabilization should not move
+            // the complete map vertically.
+            let mapHeight =
+                currentTransform
+                    .columns.3.y
+
+
+            return simd_float4x4(
+                columns: (
+
+                    SIMD4<Float>(
+                        xAxis.x,
+                        xAxis.y,
+                        xAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        yAxis.x,
+                        yAxis.y,
+                        yAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        zAxis.x,
+                        zAxis.y,
+                        zAxis.z,
+                        0
+                    ),
+
+                    SIMD4<Float>(
+                        translation.x,
+                        mapHeight,
+                        translation.y,
+                        1
+                    )
+                )
+            )
+        }
+
+
+        // MARK: - Reset Multi-Tag Localization
+
+        func resetMultiTagLocalization() {
+
+            stabilizedMapWorldTransform =
+                nil
+
+            lastMapStabilization =
+                .distantPast
         }
         
         // MARK: - Place AR Cube
@@ -1784,9 +2818,8 @@ struct CameraARView: UIViewRepresentable {
                     entity.scale *=
                         SIMD3<Float>(
                             repeating:
-                                object.type == .oil
-                                ? 0.15
-                                : 0.3
+                                object.type
+                                    .arModelScale
                         )
 
                     objectRoot.addChild(
@@ -1966,6 +2999,50 @@ struct CameraARView: UIViewRepresentable {
         }
 
 
+        // ======================================================
+        // MARK: - Update Runtime Eggs
+        // ======================================================
+
+        func updateEggs(
+            _ eggs:
+                [RuntimeEgg],
+
+            robotPose:
+                RobotPose?
+        ) {
+
+            guard let mapRoot
+            else {
+                return
+            }
+
+
+            let eggCup =
+                gameMap?
+                    .mapObjects
+                    .first {
+
+                        $0.type
+                            == .eggCup
+                    }
+
+
+            eggRenderer.update(
+                eggs:
+                    eggs,
+
+                robotPose:
+                    robotPose,
+
+                eggCup:
+                    eggCup,
+
+                parent:
+                    mapRoot
+            )
+        }
+
+
         func clearRuntimeGameARContent() {
 
             for entity in mapObjectEntities.values {
@@ -1985,6 +3062,9 @@ struct CameraARView: UIViewRepresentable {
                 .removeAll()
 
             coinRenderer
+                .clear()
+
+            eggRenderer
                 .clear()
         }
 

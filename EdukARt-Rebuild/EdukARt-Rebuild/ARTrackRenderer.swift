@@ -1631,12 +1631,6 @@ final class ARTrackRenderer {
                 to: path[1]
             )
 
-        let startSide =
-            sideVector(
-                from: path[0],
-                to: path[1]
-            )
-
         let startPosition =
             path[0]
             + startDirection * 0.30
@@ -1671,7 +1665,7 @@ final class ARTrackRenderer {
                imageName: "Finish",
                position: finishPosition,
                direction: finishDirection,
-               rotationOffset: -.pi / 180,
+               rotationOffset: -.pi,
                parent: parent
            )
 

@@ -58,6 +58,9 @@ struct GameView: View {
     @State private var hasSavedFinishedResult =
         false
 
+    @State private var didDisableEduardAfterFinish =
+        false
+
     private let collisionTimer =
         Timer.publish(
             every:
@@ -126,6 +129,12 @@ struct GameView: View {
             .onAppear {
 
                 configureGameController()
+            }
+            .onDisappear {
+
+                controller.setGameplayInputLocked(
+                    false
+                )
             }
     }
 
@@ -1055,7 +1064,23 @@ struct GameView: View {
             controller.setGameplayInputLocked(
                 true
             )
+
+            disableEduardAfterFinishIfNeeded()
         }
+    }
+
+
+    private func disableEduardAfterFinishIfNeeded() {
+
+        guard didDisableEduardAfterFinish == false
+        else {
+            return
+        }
+
+        didDisableEduardAfterFinish =
+            true
+
+        controller.sendDisable()
     }
 
 
@@ -1406,6 +1431,9 @@ struct GameView: View {
                 "Coins \(gameController.collectedCoins) x 100"
             )
             Text(
+                "Delivered Eggs \(gameController.deliveredEggs) x 300"
+            )
+            Text(
                 "Oil \(gameController.oilHits) x 0"
             )
             Text(
@@ -1487,7 +1515,7 @@ struct GameView: View {
                         )
 
                         Text(
-                            "Time \(formattedTime(result.elapsedTime)) | Coins \(result.collectedCoins) | Oil \(result.oilHits) | Shit \(result.shitHits) | Points \(result.score)"
+                            "Time \(formattedTime(result.elapsedTime)) | Coins \(result.collectedCoins) | Eggs \(result.deliveredEggs ?? 0) | Oil \(result.oilHits) | Shit \(result.shitHits) | Points \(result.score)"
                         )
                         .font(
                             .caption

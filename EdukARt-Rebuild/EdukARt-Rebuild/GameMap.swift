@@ -205,7 +205,7 @@ enum MapObjectType:
     CaseIterable {
 
     // Items
-    case tongue
+    case eggCup
     case eggs
     case shit
 
@@ -216,12 +216,66 @@ enum MapObjectType:
     case tree
 
 
+    init(
+        from decoder:
+            Decoder
+    ) throws {
+
+        let container =
+            try decoder.singleValueContainer()
+
+        let rawValue =
+            try container.decode(
+                String.self
+            )
+
+        switch rawValue {
+
+        case "eggCup":
+            self =
+                .eggCup
+
+        default:
+            guard let type =
+                Self(
+                    rawValue:
+                        rawValue
+                )
+            else {
+                throw DecodingError.dataCorruptedError(
+                    in:
+                        container,
+                    debugDescription:
+                        "Invalid map object type: \(rawValue)"
+                )
+            }
+
+            self =
+                type
+        }
+    }
+
+
+    func encode(
+        to encoder:
+            Encoder
+    ) throws {
+
+        var container =
+            encoder.singleValueContainer()
+
+        try container.encode(
+            rawValue
+        )
+    }
+
+
     var symbol: String {
 
         switch self {
 
-        case .tongue:
-            "👅"
+        case .eggCup:
+            "🪺"
 
         case .eggs:
             "🥚"
@@ -248,8 +302,8 @@ enum MapObjectType:
 
         switch self {
 
-        case .tongue:
-            "Tongue"
+        case .eggCup:
+            "Egg Cup"
 
         case .eggs:
             "Eggs"
@@ -295,7 +349,7 @@ enum MapObjectType:
 
         switch self {
 
-        case .tongue,
+        case .eggCup,
              .eggs,
              .shit,
              .oil,
@@ -310,29 +364,48 @@ enum MapObjectType:
 
         switch self {
 
-        case .tongue:
-            return 0.10
+        case .eggCup:
+            return 0.1 // ToDo: size
 
         case .eggs:
-            return 0.10
+            return 0.1 // ToDo: size
 
         case .shit:
-            return 0.12
+            return 0.12 // ToDo: size
 
         case .oil:
-            return 0.25
+            return 0.25 // ToDo: size
 
         case .water:
-            return 0.15
+            return 0.15 // ToDo: size
 
         case .rock:
-            return 0.18
+            return 0.18 // ToDo: size
 
         case .tree:
-            return 0.20
+            return 0.20 // ToDo: size
         }
    
     
+    }
+
+
+    var arModelScale: Float {
+
+        switch self {
+
+        case .eggCup:
+            return 0.01 // ToDo: size
+
+        case .eggs:
+            return 0.01 // ToDo: size
+
+        case .oil:
+            return 0.15 // ToDo: size
+
+        default:
+            return 0.3 // ToDo: size
+        }
     }
     
     // MARK: - AR Model
@@ -346,6 +419,12 @@ enum MapObjectType:
 
         case .oil:
             "Oil"
+
+        case .eggs:
+            "Egg"
+
+        case .eggCup:
+            "mrz" // ToDo: size
 
         default:
             nil
@@ -369,13 +448,13 @@ struct PlacedMapObject:
         MapObjectType
 
     var x:
-        Float
+        Float // ToDo: position
 
     var z:
-        Float
+        Float // ToDo: position
 
     var rotation:
-        Float
+        Float // ToDo: rotation
 
 
     init(
