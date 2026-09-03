@@ -43,6 +43,9 @@ struct GameView: View {
     @State private var countdownText:
         String?
 
+    @State private var isCountdownRunning =
+        false
+
     @State private var hasStartedGameplay =
         false
 
@@ -429,6 +432,11 @@ struct GameView: View {
                         .buttonStyle(
                             .borderedProminent
                         )
+                        .tint(
+                            Color(
+                                "BrandGreen"
+                            )
+                        )
                         .padding(
                             .top,
                             4
@@ -448,10 +456,13 @@ struct GameView: View {
             )
             .padding(
                 .top,
-                70
+                isMapLocalized
+                ? 220
+                : 70
             )
             .allowsHitTesting(
-                isRobotReadyForRace
+                isMapLocalized
+                && isRobotReadyForRace
             )
         }
     }
@@ -817,11 +828,8 @@ struct GameView: View {
         _ input: CGPoint
     ) {
 
-        guard isNoDebugMode == false
-                || (
-                    hasStartedGameplay
-                    && gameController.isRaceFinished == false
-                )
+        guard isCountdownRunning == false,
+              gameController.isRaceFinished == false
         else {
             return
         }
@@ -844,11 +852,8 @@ struct GameView: View {
         _ input: CGPoint
     ) {
 
-        guard isNoDebugMode == false
-                || (
-                    hasStartedGameplay
-                    && gameController.isRaceFinished == false
-                )
+        guard isCountdownRunning == false,
+              gameController.isRaceFinished == false
         else {
             return
         }
@@ -917,7 +922,7 @@ struct GameView: View {
         }
 
         controller.setGameplayInputLocked(
-            true
+            false
         )
     }
 
@@ -943,9 +948,15 @@ struct GameView: View {
 
         Task { @MainActor in
 
+            isCountdownRunning =
+                true
+
+            controller.setGameplayInputLocked(
+                true
+            )
+
             let countdownSteps =
                 [
-                    "Get Ready.",
                     "3",
                     "2",
                     "1",
@@ -970,6 +981,9 @@ struct GameView: View {
 
             hasStartedGameplay =
                 true
+
+            isCountdownRunning =
+                false
 
             controller.setGameplayInputLocked(
                 false
@@ -1168,27 +1182,8 @@ struct GameView: View {
 
         if let countdownText {
 
-            Text(
+            outlinedCountdownText(
                 countdownText
-            )
-            .font(
-                .system(
-                    size:
-                        56,
-
-                    weight:
-                        .bold,
-
-                    design:
-                        .rounded
-                )
-            )
-            .foregroundStyle(
-                .white
-            )
-            .shadow(
-                radius:
-                    8
             )
             .frame(
                 maxWidth:
@@ -1206,6 +1201,88 @@ struct GameView: View {
 
             finishView
         }
+    }
+
+
+    private func outlinedCountdownText(
+        _ text:
+            String
+    ) -> some View {
+
+        Text(
+            text
+        )
+        .font(
+            .system(
+                size:
+                    168,
+
+                weight:
+                    .bold,
+
+                design:
+                    .rounded
+            )
+        )
+        .foregroundStyle(
+            .white
+        )
+        .shadow(
+            color:
+                .black,
+
+            radius:
+                0,
+
+            x:
+                4,
+
+            y:
+                0
+        )
+        .shadow(
+            color:
+                .black,
+
+            radius:
+                0,
+
+            x:
+                -4,
+
+            y:
+                0
+        )
+        .shadow(
+            color:
+                .black,
+
+            radius:
+                0,
+
+            x:
+                0,
+
+            y:
+                4
+        )
+        .shadow(
+            color:
+                .black,
+
+            radius:
+                0,
+
+            x:
+                0,
+
+            y:
+                -4
+        )
+        .shadow(
+            radius:
+                8
+        )
     }
 
 
