@@ -485,6 +485,33 @@ final class RobotController:
     }
 
 
+    func setGameplayInputLocked(
+        _ isLocked:
+            Bool
+    ) {
+
+        isGameplayInputLocked =
+            isLocked
+
+        if isLocked {
+
+            joystickInput =
+                (
+                    x: 0,
+                    y: 0
+                )
+
+            activeJoystickDirection =
+                .idle
+
+            mechanumRotationInput =
+                0
+
+            sendCurrentCommand()
+        }
+    }
+
+
     func stopJoystick() {
 
         guard isGameplayInputLocked == false

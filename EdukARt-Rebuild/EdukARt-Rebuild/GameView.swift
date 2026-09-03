@@ -37,6 +37,24 @@ struct GameView: View {
     @State private var collisionDebugCounter =
         0
 
+    private let isGameplayDebugMode =
+        false
+
+    @State private var countdownText:
+        String?
+
+    @State private var hasStartedGameplay =
+        false
+
+    @State private var didPrepareGameStart =
+        false
+
+    @State private var playerName =
+        ""
+
+    @State private var hasSavedFinishedResult =
+        false
+
     private let collisionTimer =
         Timer.publish(
             every:
@@ -123,6 +141,9 @@ struct GameView: View {
                 .allowsHitTesting(false)
             arRobotControl
             joystickControl
+            timerDisplay
+                .allowsHitTesting(false)
+            gameplayOverlay
         }
     }
 
@@ -723,6 +744,15 @@ struct GameView: View {
         _ input: CGPoint
     ) {
 
+        guard isGameplayDebugMode
+                || (
+                    hasStartedGameplay
+                    && gameController.isRaceFinished == false
+                )
+        else {
+            return
+        }
+
         controller.updateJoystickInput(
             x:
                 Float(
@@ -740,6 +770,15 @@ struct GameView: View {
     private func handleTurnJoystickInput(
         _ input: CGPoint
     ) {
+
+        guard isGameplayDebugMode
+                || (
+                    hasStartedGameplay
+                    && gameController.isRaceFinished == false
+                )
+        else {
+            return
+        }
 
         controller.updateMechanumRotationInput(
             x:
@@ -777,10 +816,84 @@ struct GameView: View {
                     duration
             )
         }
+
+        prepareGameStartIfNeeded()
+    }
+
+
+    private func prepareGameStartIfNeeded() {
+
+        guard didPrepareGameStart == false
+        else {
+            return
+        }
+
+        didPrepareGameStart =
+            true
+
+        if isGameplayDebugMode {
+
+            hasStartedGameplay =
+                true
+
+            controller.setGameplayInputLocked(
+                false
+            )
+
+            return
+        }
+
+        controller.setGameplayInputLocked(
+            true
+        )
+
+        Task { @MainActor in
+
+            let countdownSteps =
+                [
+                    "Get Ready.",
+                    "3",
+                    "2",
+                    "1",
+                    "Start"
+                ]
+
+            for step in countdownSteps {
+
+                countdownText =
+                    step
+
+                try? await Task.sleep(
+                    for:
+                        .seconds(
+                            1
+                        )
+                )
+            }
+
+            countdownText =
+                nil
+
+            hasStartedGameplay =
+                true
+
+            controller.setGameplayInputLocked(
+                false
+            )
+
+            gameController.startRace()
+        }
     }
 
 
     private func updateGameCollision() {
+
+        guard isGameplayDebugMode == false,
+              hasStartedGameplay,
+              gameController.isRaceFinished == false
+        else {
+            return
+        }
 
         if let realPose =
             controller.realRobotPose {
@@ -828,6 +941,13 @@ struct GameView: View {
             actor:
                 actor
         )
+
+        if gameController.isRaceFinished {
+
+            controller.setGameplayInputLocked(
+                true
+            )
+        }
     }
 
 
@@ -891,6 +1011,358 @@ struct GameView: View {
             joystickMonitor.xyPoint.y,
             joystickMonitor.xyPoint.x,
             turnJoystickMonitor.xyPoint.x
+        )
+    }
+
+
+    // MARK: - Gameplay UI
+
+    @ViewBuilder
+    private var timerDisplay: some View {
+
+        if isGameplayDebugMode == false,
+           hasStartedGameplay,
+           gameController.isRaceFinished == false {
+
+            Text(
+                formattedTime(
+                    gameController.elapsedTime
+                )
+            )
+            .font(
+                .headline.monospacedDigit()
+            )
+            .foregroundStyle(
+                .white
+            )
+            .padding(
+                .horizontal,
+                14
+            )
+            .padding(
+                .vertical,
+                8
+            )
+            .background(
+                .black.opacity(
+                    0.62
+                )
+            )
+            .clipShape(
+                Capsule()
+            )
+            .frame(
+                maxWidth:
+                    .infinity,
+
+                maxHeight:
+                    .infinity,
+
+                alignment:
+                    .top
+            )
+            .padding(
+                .top,
+                28
+            )
+        }
+    }
+
+
+    @ViewBuilder
+    private var gameplayOverlay: some View {
+
+        if let countdownText {
+
+            Text(
+                countdownText
+            )
+            .font(
+                .system(
+                    size:
+                        56,
+
+                    weight:
+                        .bold,
+
+                    design:
+                        .rounded
+                )
+            )
+            .foregroundStyle(
+                .white
+            )
+            .shadow(
+                radius:
+                    8
+            )
+            .frame(
+                maxWidth:
+                    .infinity,
+
+                maxHeight:
+                    .infinity
+            )
+            .allowsHitTesting(
+                false
+            )
+
+        } else if gameController.isRaceFinished {
+
+            finishView
+        }
+    }
+
+
+    private var finishView: some View {
+
+        ScrollView {
+
+            VStack(
+                alignment:
+                    .leading,
+
+                spacing:
+                    14
+            ) {
+
+                Text(
+                    "Finished. Your Time \(formattedTime(gameController.elapsedTime))"
+                )
+                .font(
+                    .title2.bold()
+                )
+                .foregroundStyle(
+                    .white
+                )
+
+                scoreSummary
+
+                TextField(
+                    "Name",
+                    text:
+                        $playerName
+                )
+                .textFieldStyle(
+                    .roundedBorder
+                )
+                .disabled(
+                    hasSavedFinishedResult
+                )
+
+                Button {
+
+                    gameController.saveFinishedResult(
+                        playerName:
+                            playerName
+                    )
+
+                    hasSavedFinishedResult =
+                        true
+
+                } label: {
+
+                    Text(
+                        hasSavedFinishedResult
+                        ? "Saved"
+                        : "Save Result"
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .disabled(
+                    hasSavedFinishedResult
+                )
+
+                leaderboardView
+            }
+            .padding(
+                18
+            )
+            .background(
+                .black.opacity(
+                    0.82
+                )
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        8,
+
+                    style:
+                        .continuous
+                )
+            )
+            .padding(
+                24
+            )
+        }
+        .frame(
+            maxWidth:
+                .infinity,
+
+            maxHeight:
+                .infinity
+        )
+        .background(
+            .black.opacity(
+                0.35
+            )
+        )
+    }
+
+
+    private var scoreSummary: some View {
+
+        VStack(
+            alignment:
+                .leading,
+
+            spacing:
+                6
+        ) {
+
+            Text(
+                "Points \(gameController.score)"
+            )
+            Text(
+                "Coins \(gameController.collectedCoins) x 100"
+            )
+            Text(
+                "Oil \(gameController.oilHits) x 0"
+            )
+            Text(
+                "Shit \(gameController.shitHits) x -50"
+            )
+            Text(
+                "Finish 1000"
+            )
+            Text(
+                "Best Time Bonus \(gameController.bestTimeBonusEarned ? 10 : 0)"
+            )
+        }
+        .font(
+            .subheadline
+        )
+        .foregroundStyle(
+            .white.opacity(
+                0.9
+            )
+        )
+    }
+
+
+    private var leaderboardView: some View {
+
+        VStack(
+            alignment:
+                .leading,
+
+            spacing:
+                8
+        ) {
+
+            Text(
+                "Leaderboard"
+            )
+            .font(
+                .headline
+            )
+            .foregroundStyle(
+                .white
+            )
+
+            if gameController.leaderboard.isEmpty {
+
+                Text(
+                    "No saved results yet"
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .white.opacity(
+                        0.7
+                    )
+                )
+
+            } else {
+
+                ForEach(
+                    gameController.leaderboard.prefix(
+                        10
+                    )
+                ) { result in
+
+                    VStack(
+                        alignment:
+                            .leading,
+
+                        spacing:
+                            3
+                    ) {
+
+                        Text(
+                            "\(result.playerName) | \(result.trackName)"
+                        )
+                        .font(
+                            .subheadline.bold()
+                        )
+
+                        Text(
+                            "Time \(formattedTime(result.elapsedTime)) | Coins \(result.collectedCoins) | Oil \(result.oilHits) | Shit \(result.shitHits) | Points \(result.score)"
+                        )
+                        .font(
+                            .caption
+                        )
+                    }
+                    .foregroundStyle(
+                        .white
+                    )
+                    .padding(
+                        8
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity,
+
+                        alignment:
+                            .leading
+                    )
+                    .background(
+                        .white.opacity(
+                            0.08
+                        )
+                    )
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius:
+                                8,
+
+                            style:
+                                .continuous
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+
+    private func formattedTime(
+        _ time:
+            TimeInterval
+    ) -> String {
+
+        String(
+            format:
+                "%.2f s",
+            time
         )
     }
 

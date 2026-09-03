@@ -48,6 +48,41 @@ struct GameCoin:
 }
 
 
+// MARK: - Game Result
+
+struct GameResult:
+    Identifiable,
+    Codable {
+
+    let id:
+        UUID
+
+    let playerName:
+        String
+
+    let finishedAt:
+        Date
+
+    let trackName:
+        String
+
+    let elapsedTime:
+        TimeInterval
+
+    let collectedCoins:
+        Int
+
+    let oilHits:
+        Int
+
+    let shitHits:
+        Int
+
+    let score:
+        Int
+}
+
+
 @MainActor
 final class GameController:
     ObservableObject {
@@ -83,6 +118,34 @@ final class GameController:
     @Published private(set)
     var collectedCoins:
         Int = 0
+
+    @Published private(set)
+    var oilHits:
+        Int = 0
+
+    @Published private(set)
+    var shitHits:
+        Int = 0
+
+    @Published private(set)
+    var isRaceRunning:
+        Bool = false
+
+    @Published private(set)
+    var isRaceFinished:
+        Bool = false
+
+    @Published private(set)
+    var elapsedTime:
+        TimeInterval = 0
+
+    @Published private(set)
+    var leaderboard:
+        [GameResult] = []
+
+    @Published private(set)
+    var bestTimeBonusEarned:
+        Bool = false
 
 
     /// Indicates whether Eduard currently leaves a shit trail.
@@ -144,6 +207,24 @@ final class GameController:
     private let coinCollisionRadius:
         Float = 0.035
 
+    private let finishCollisionRadius:
+        Float = 0.35
+
+    private let startClearRadius:
+        Float = 0.45
+
+    private let map:
+        GameMap
+
+    private var raceStartDate:
+        Date?
+
+    private var hasLeftStartArea:
+        Bool = false
+
+    private var timerTask:
+        Task<Void, Never>?
+
 
     // ======================================================
     // MARK: - Collision
@@ -161,6 +242,9 @@ final class GameController:
         map: GameMap
     ) {
 
+        self.map =
+            map
+
         // Runtime copy.
         //
         // The stored map itself is not modified.
@@ -172,6 +256,18 @@ final class GameController:
                 from:
                     map.trackPoints
             )
+
+        loadLeaderboard()
+    }
+
+
+    deinit {
+
+        timerTask?
+            .cancel()
+
+        shitEffectTask?
+            .cancel()
     }
 
 
@@ -259,6 +355,127 @@ final class GameController:
             actor:
                 actor
         )
+
+        updateFinishState(
+            robotPose:
+                pose
+        )
+    }
+
+
+    func startRace() {
+
+        guard isRaceRunning == false
+        else {
+            return
+        }
+
+        score =
+            0
+
+        elapsedTime =
+            0
+
+        raceStartDate =
+            Date()
+
+        hasLeftStartArea =
+            false
+
+        bestTimeBonusEarned =
+            false
+
+        isRaceFinished =
+            false
+
+        isRaceRunning =
+            true
+
+        timerTask?
+            .cancel()
+
+        timerTask =
+            Task { @MainActor [weak self] in
+
+                while Task.isCancelled == false {
+
+                    self?.updateElapsedTime()
+
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                0.05
+                            )
+                    )
+                }
+            }
+    }
+
+
+    func saveFinishedResult(
+        playerName:
+            String
+    ) {
+
+        guard isRaceFinished
+        else {
+            return
+        }
+
+        let trimmedName =
+            playerName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        let result =
+            GameResult(
+                id:
+                    UUID(),
+
+                playerName:
+                    trimmedName.isEmpty
+                    ? "Player"
+                    : trimmedName,
+
+                finishedAt:
+                    Date(),
+
+                trackName:
+                    map.name,
+
+                elapsedTime:
+                    elapsedTime,
+
+                collectedCoins:
+                    collectedCoins,
+
+                oilHits:
+                    oilHits,
+
+                shitHits:
+                    shitHits,
+
+                score:
+                    score
+            )
+
+        leaderboard.append(
+            result
+        )
+
+        leaderboard.sort {
+
+            if $0.score == $1.score {
+
+                return $0.elapsedTime < $1.elapsedTime
+            }
+
+            return $0.score > $1.score
+        }
+
+        saveLeaderboard()
     }
 
 
@@ -321,6 +538,11 @@ final class GameController:
 
         collectedCoins +=
             collectedIDs.count
+
+        score +=
+            collectedIDs.count
+            *
+            100
 
         print(
             "# GAME | Coin collected by \(actor.rawValue) | Coins: \(collectedCoins)"
@@ -530,7 +752,9 @@ final class GameController:
             CollisionActor
     ) {
 
-        score -= 5
+        shitHits += 1
+
+        score -= 50
 
         statusText =
             "Shit hit"
@@ -716,7 +940,7 @@ final class GameController:
             PlacedMapObject
     ) {
 
-        score -= 5
+        oilHits += 1
 
         statusText =
             "Oil hit"
@@ -905,6 +1129,36 @@ final class GameController:
         collectedEggs =
             0
 
+        oilHits =
+            0
+
+        shitHits =
+            0
+
+        elapsedTime =
+            0
+
+        isRaceRunning =
+            false
+
+        isRaceFinished =
+            false
+
+        raceStartDate =
+            nil
+
+        hasLeftStartArea =
+            false
+
+        bestTimeBonusEarned =
+            false
+
+        timerTask?
+            .cancel()
+
+        timerTask =
+            nil
+
         statusText =
             ""
 
@@ -941,6 +1195,196 @@ final class GameController:
 
         print(
             "# GAME | Reset"
+        )
+    }
+
+
+    private func updateElapsedTime() {
+
+        guard let raceStartDate,
+              isRaceRunning
+        else {
+            return
+        }
+
+        elapsedTime =
+            Date()
+                .timeIntervalSince(
+                    raceStartDate
+                )
+    }
+
+
+    private func updateFinishState(
+        robotPose:
+            RobotPose
+    ) {
+
+        guard isRaceRunning,
+              isRaceFinished == false,
+              let startPoint =
+                map.trackPoints.first,
+              let finishPoint =
+                map.trackPoints.last
+        else {
+            return
+        }
+
+        let startDistance =
+            distance(
+                from:
+                    robotPose,
+                to:
+                    startPoint
+            )
+
+        if startDistance > startClearRadius {
+
+            hasLeftStartArea =
+                true
+        }
+
+        guard hasLeftStartArea
+        else {
+            return
+        }
+
+        let finishDistance =
+            distance(
+                from:
+                    robotPose,
+                to:
+                    finishPoint
+            )
+
+        guard finishDistance <= finishCollisionRadius
+        else {
+            return
+        }
+
+        finishRace()
+    }
+
+
+    private func finishRace() {
+
+        updateElapsedTime()
+
+        isRaceRunning =
+            false
+
+        isRaceFinished =
+            true
+
+        timerTask?
+            .cancel()
+
+        timerTask =
+            nil
+
+        score +=
+            1000
+
+        bestTimeBonusEarned =
+            isNewBestTime
+
+        if bestTimeBonusEarned {
+
+            score +=
+                10
+        }
+
+        statusText =
+            "Finished"
+    }
+
+
+    private var isNewBestTime:
+        Bool {
+
+        guard let bestTime =
+            leaderboard
+                .map(\.elapsedTime)
+                .min()
+        else {
+            return false
+        }
+
+        return elapsedTime < bestTime
+    }
+
+
+    private func distance(
+        from pose:
+            RobotPose,
+
+        to point:
+            StoredTrackPoint
+    ) -> Float {
+
+        let dx =
+            pose.position.x
+            -
+            point.x
+
+        let dz =
+            pose.position.z
+            -
+            point.z
+
+        return sqrt(
+            dx * dx
+            +
+            dz * dz
+        )
+    }
+
+
+    private var leaderboardKey:
+        String {
+
+        "leaderboard-\(map.id.uuidString)"
+    }
+
+
+    private func loadLeaderboard() {
+
+        guard let data =
+            UserDefaults.standard.data(
+                forKey:
+                    leaderboardKey
+            ),
+              let decoded =
+                try? JSONDecoder()
+                    .decode(
+                        [GameResult].self,
+                        from:
+                            data
+                    )
+        else {
+            return
+        }
+
+        leaderboard =
+            decoded
+    }
+
+
+    private func saveLeaderboard() {
+
+        guard let data =
+            try? JSONEncoder()
+                .encode(
+                    leaderboard
+                )
+        else {
+            return
+        }
+
+        UserDefaults.standard.set(
+            data,
+            forKey:
+                leaderboardKey
         )
     }
 
