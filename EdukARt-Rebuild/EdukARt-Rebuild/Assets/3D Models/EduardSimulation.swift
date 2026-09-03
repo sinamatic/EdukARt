@@ -18,6 +18,20 @@ import simd
 import UIKit
 
 
+enum EduardModelAlignment {
+
+    /// Move the visible robot and occluder backward
+    /// relative to Eduard's local heading.
+    static let backwardOffset:
+        Float = 0.13
+
+    /// Negative yaw is a small clockwise/right correction
+    /// in the current map coordinate convention.
+    static let yawCorrection:
+        Float = -.pi / 180
+}
+
+
 final class EduardSimulation {
 
     // MARK: - Robot State
@@ -726,13 +740,27 @@ final class EduardSimulation {
         // Logical heading of Eduard.
         let rotation =
             simd_quatf(
-                angle: pose.rotation,
+                angle:
+                    pose.rotation
+                    + EduardModelAlignment.yawCorrection,
+
                 axis: SIMD3<Float>(0, 1, 0)
             )
 
-        // Place visible model at the logical robot pose.
+        let backward =
+            rotation.act(
+                SIMD3<Float>(
+                    0,
+                    0,
+                    1
+                )
+            )
+
+        // Place visible model relative to the logical robot pose.
         entity.position =
             pose.position
+            + backward
+            * EduardModelAlignment.backwardOffset
 
         // Rotate around vertical Y axis.
         entity.orientation =
@@ -910,16 +938,11 @@ final class EduardOccluder {
         self.entity =
             entity
 
-        applyDebugMaterial(
+        // MARK - Occluder Material is invisible
+        applyOcclusionMaterial(
             to:
                 entity
         )
-        
-//        // MARK - Occluder Material is invisible
-//        applyOcclusionMaterial(
-//                to:
-//                    entity
-//            )
 
         setEnabled(
             false
@@ -949,7 +972,9 @@ final class EduardOccluder {
         let rotation =
             simd_quatf(
                 angle:
-                    pose.rotation,
+                    pose.rotation
+                    + EduardModelAlignment.yawCorrection,
+
                 axis:
                     SIMD3<Float>(
                         0,
@@ -958,8 +983,19 @@ final class EduardOccluder {
                     )
             )
 
+        let backward =
+            rotation.act(
+                SIMD3<Float>(
+                    0,
+                    0,
+                    1
+                )
+            )
+
         entity.position =
             pose.position
+            + backward
+            * EduardModelAlignment.backwardOffset
 
         entity.orientation =
             rotation

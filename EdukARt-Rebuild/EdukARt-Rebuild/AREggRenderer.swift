@@ -33,73 +33,20 @@ final class AREggRenderer {
             .collisionRadius // ToDo: size
 
 
-    // --------------------------------------------------
-    // Eggs on Eduard
-    // --------------------------------------------------
-    //
-    // These offsets are in ROBOT-LOCAL coordinates.
-    //
-    // X = left / right
-    // Y = height
-    // Z = forward / backward
-    //
-    // Adjust these values by trial and error.
-    // --------------------------------------------------
-
-    private let carriedEggOffsets:
-        [SIMD3<Float>] = [
-
-            SIMD3<Float>(
-                -0.07, // ToDo: position
-                0.31, // ToDo: position
-                0.02 // ToDo: position
-            ),
-
-            SIMD3<Float>(
-                0.07, // ToDo: position
-                0.31, // ToDo: position
-                0.02 // ToDo: position
-            )
-        ]
+    private let eggCarryHeight:
+        Float = -0.12 // ToDo: position
 
 
-    // --------------------------------------------------
-    // Eggs on Egg Cup
-    // --------------------------------------------------
-    //
-    // These offsets are Egg-Cup-local.
-    //
-    // You can tune these later without touching
-    // gameplay or collision logic.
-    // --------------------------------------------------
+    private let eggCarryForwardOffset:
+        Float = 0.07 // ToDo: position
 
-    private let eggCupEggOffsets:
-        [SIMD3<Float>] = [
 
-            SIMD3<Float>(
-                -0.07, // ToDo: position
-                0.08, // ToDo: position
-                0 // ToDo: position
-            ),
+    private let eggCupHeight:
+        Float = -0.17 // ToDo: position
 
-            SIMD3<Float>(
-                0.07, // ToDo: position
-                0.08, // ToDo: position
-                0 // ToDo: position
-            ),
 
-            SIMD3<Float>(
-                0, // ToDo: position
-                0.08, // ToDo: position
-                0.08 // ToDo: position
-            ),
-
-            SIMD3<Float>(
-                0, // ToDo: position
-                0.08, // ToDo: position
-                -0.08 // ToDo: position
-            )
-        ]
+    private let eggCupBackwardOffset:
+        Float = -0.07 // ToDo: position
 
 
     /// Duration of robot -> Egg Cup movement.
@@ -386,30 +333,19 @@ final class AREggRenderer {
     // ======================================================
 
     private func carriedTransform(
-        slot:
+        slot _:
             Int,
 
         robotPose:
             RobotPose
     ) -> Transform {
 
-        let safeSlot =
-            min(
-                slot,
-                carriedEggOffsets.count - 1
-            )
-
-
-        let localOffset =
-            carriedEggOffsets[
-                safeSlot
-            ]
-
-
         let robotRotation =
             simd_quatf(
                 angle:
-                    robotPose.rotation, // ToDo: rotation
+                    robotPose.rotation // ToDo: rotation
+                    + EduardModelAlignment
+                        .yawCorrection,
 
                 axis:
                     SIMD3<Float>(
@@ -420,15 +356,28 @@ final class AREggRenderer {
             )
 
 
-        let rotatedOffset =
+        let backward =
             robotRotation.act(
-                localOffset
+                SIMD3<Float>(
+                    0,
+                    0,
+                    1
+                )
             )
 
 
         let position =
             robotPose.position
-            + rotatedOffset
+            + backward
+            * EduardModelAlignment
+                .backwardOffset
+            - backward
+            * eggCarryForwardOffset
+            + SIMD3<Float>(
+                0,
+                eggCarryHeight,
+                0
+            )
 
 
         return Transform(
@@ -449,24 +398,18 @@ final class AREggRenderer {
     // ======================================================
 
     private func eggCupTransform(
-        slot:
+        slot _:
             Int,
 
         eggCup:
             PlacedMapObject
     ) -> Transform {
 
-        let safeSlot =
-            min(
-                slot,
-                eggCupEggOffsets.count - 1
-            )
-
-
         let eggCupRotation =
             simd_quatf(
                 angle:
-                    eggCup.rotation, // ToDo: rotation
+                    eggCup.rotation // ToDo: rotation
+                    + .pi,
 
                 axis:
                     SIMD3<Float>(
@@ -477,25 +420,25 @@ final class AREggRenderer {
             )
 
 
-        let localOffset =
-            eggCupEggOffsets[
-                safeSlot
-            ]
-
-
-        let rotatedOffset =
+        let backward =
             eggCupRotation.act(
-                localOffset
+                SIMD3<Float>(
+                    0,
+                    0,
+                    1
+                )
             )
 
 
         let position =
             SIMD3<Float>(
                 eggCup.x, // ToDo: position
-                0, // ToDo: position
+                eggCupHeight, // ToDo: position
                 eggCup.z // ToDo: position
             )
-            + rotatedOffset
+            + backward
+            * eggCupBackwardOffset
+
 
 
         return Transform(

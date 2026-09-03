@@ -722,6 +722,12 @@ struct CameraARView: UIViewRepresentable {
         let root =
             Entity()
 
+        model.scale *=
+            SIMD3<Float>(
+                repeating:
+                    0.85
+            )
+
         root.addChild(
             model
         )
@@ -900,6 +906,17 @@ struct CameraARView: UIViewRepresentable {
         /// 0.20 means 20 % of the measured drift.
         private let mapCorrectionFactor:
             Float = 0.20
+
+
+        // ======================================================
+        // MARK: - Robot Pose Stabilization
+        // ======================================================
+
+        private var stabilizedRobotPose:
+            RobotPose?
+
+        private let robotPoseStabilizationFactor:
+            Float = 0.35
 
         var simulationRoot: Entity?
         var occlusionRoot: Entity?
@@ -1448,6 +1465,11 @@ struct CameraARView: UIViewRepresentable {
                                 stabilizedMapWorldTransform
                         ) {
 
+                        let stabilizedPose =
+                            stabilizeRobotPose(
+                                robotPose
+                            )
+
                         didUpdateRobotPose =
                             true
 
@@ -1465,7 +1487,7 @@ struct CameraARView: UIViewRepresentable {
 
 
                             self.onRobotPoseUpdated(
-                                robotPose
+                                stabilizedPose
                             )
                         }
                     }
@@ -1969,6 +1991,112 @@ struct CameraARView: UIViewRepresentable {
 
             correctionSamples
                 .removeAll()
+
+            stabilizedRobotPose =
+                nil
+        }
+
+
+        // MARK: - Stabilize Robot Pose
+
+        private func stabilizeRobotPose(
+            _ pose:
+                RobotPose
+        ) -> RobotPose {
+
+            guard let currentPose =
+                stabilizedRobotPose
+            else {
+
+                stabilizedRobotPose =
+                    pose
+
+                return pose
+            }
+
+
+            let factor =
+                robotPoseStabilizationFactor
+
+
+            let position =
+                simd_mix(
+                    currentPose.position,
+                    pose.position,
+                    SIMD3<Float>(
+                        repeating:
+                            factor
+                    )
+                )
+
+
+            let currentRotation =
+                simd_quatf(
+                    angle:
+                        currentPose.rotation,
+
+                    axis:
+                        SIMD3<Float>(
+                            0,
+                            1,
+                            0
+                        )
+                )
+
+
+            let targetRotation =
+                simd_quatf(
+                    angle:
+                        pose.rotation,
+
+                    axis:
+                        SIMD3<Float>(
+                            0,
+                            1,
+                            0
+                        )
+                )
+
+
+            let rotation =
+                simd_slerp(
+                    currentRotation,
+                    targetRotation,
+                    factor
+                )
+
+
+            let xAxis =
+                rotation.act(
+                    SIMD3<Float>(
+                        1,
+                        0,
+                        0
+                    )
+                )
+
+
+            let stabilizedPose =
+                RobotPose(
+                    position:
+                        SIMD3<Float>(
+                            position.x,
+                            0,
+                            position.z
+                        ),
+
+                    rotation:
+                        atan2(
+                            xAxis.z,
+                            xAxis.x
+                        )
+                )
+
+
+            stabilizedRobotPose =
+                stabilizedPose
+
+            return stabilizedPose
         }
         
         // MARK: - Place AR Cube
@@ -2286,7 +2414,12 @@ struct CameraARView: UIViewRepresentable {
                     let mapRotation =
                         simd_quatf(
                             angle:
-                                object.rotation,
+                                object.rotation
+                                + (
+                                    object.type == .eggCup
+                                    ? .pi
+                                    : 0
+                                ),
 
                             axis:
                                 SIMD3<Float>(

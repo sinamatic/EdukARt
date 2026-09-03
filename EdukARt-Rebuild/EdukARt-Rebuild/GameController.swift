@@ -17,6 +17,7 @@
 import Foundation
 import simd
 import Combine
+import UIKit
 
 
 // MARK: - Shit Dot
@@ -340,11 +341,25 @@ final class GameController:
             CollisionActor
     ) {
 
-        latestRobotPose =
-            pose
-
         latestRobotPoses[actor] =
             pose
+
+        switch actor {
+
+        case .real:
+
+            latestRobotPose =
+                pose
+
+        case .simulation:
+
+            if latestRobotPoses[.real]
+                == nil {
+
+                latestRobotPose =
+                    pose
+            }
+        }
 
         updateOilCooldowns()
 
@@ -579,6 +594,10 @@ final class GameController:
             collectedIDs.count
             *
             100
+
+        triggerGameplayFeedback(
+            .success
+        )
 
         print(
             "# GAME | Coin collected by \(actor.rawValue) | Coins: \(collectedCoins)"
@@ -943,6 +962,10 @@ final class GameController:
 
         score -= 50
 
+        triggerGameplayFeedback(
+            .warning
+        )
+
         statusText =
             "Shit hit"
 
@@ -1129,6 +1152,10 @@ final class GameController:
 
         oilHits += 1
 
+        triggerGameplayFeedback(
+            .warning
+        )
+
         statusText =
             "Oil hit"
 
@@ -1195,6 +1222,26 @@ final class GameController:
                 $0.value > now
             }
 
+    }
+
+
+    // ======================================================
+    // MARK: - Haptic Feedback
+    // ======================================================
+
+    private func triggerGameplayFeedback(
+        _ type:
+            UINotificationFeedbackGenerator.FeedbackType
+    ) {
+
+        let generator =
+            UINotificationFeedbackGenerator()
+
+        generator.prepare()
+
+        generator.notificationOccurred(
+            type
+        )
     }
 
 
