@@ -395,10 +395,10 @@ enum MapObjectType:
         switch self {
 
         case .eggCup:
-            return 0.01 // ToDo: size
+            return 0.2 // ToDo: size
 
         case .eggs:
-            return 0.01 // ToDo: size
+            return 0.2 // ToDo: size
 
         case .oil:
             return 0.15 // ToDo: size

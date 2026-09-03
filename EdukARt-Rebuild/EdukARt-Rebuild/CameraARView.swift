@@ -936,36 +936,69 @@ struct CameraARView: UIViewRepresentable {
         // MARK: - Multi-Tag Map Stabilization
         // ======================================================
 
-        /// Current best estimate of the complete
-        /// map coordinate system in ARKit world space.
+        /// Current rendered map transform.
+        ///
+        /// Position may be corrected during gameplay.
+        /// Rotation and height stay locked to the
+        /// initial reference-tag localization.
         private var stabilizedMapWorldTransform:
             simd_float4x4?
 
 
-        /// We only correct the map occasionally.
-        private var lastMapStabilization =
-            Date.distantPast
+        /// Initial map transform established by
+        /// the reference AprilTag.
+        ///
+        /// This defines:
+        /// - map rotation
+        /// - floor height
+        /// - original map origin
+        ///
+        /// It is never modified by runtime stabilization.
+        private var lockedMapWorldTransform:
+            simd_float4x4?
 
 
-        /// Maximum frequency of multi-tag map correction.
-        private let mapStabilizationInterval:
-            TimeInterval = 0.75
+        /// AprilTag currently used for drift correction.
+        private var activeCorrectionTagID:
+            Int?
 
 
-        /// Require at least two known map tags.
-        private let minimumStabilizationTagCount =
-            2
+        /// Recent X/Z correction measurements
+        /// from the same AprilTag.
+        private var correctionSamples:
+            [SIMD2<Float>] = []
 
 
-        /// Small corrections are interpolated instead of
-        /// instantly moving the complete map.
-        private let mapStabilizationFactor:
-            Float = 0.05
+        /// Number of measurements before one
+        /// correction is applied.
+        private let requiredCorrectionSamples =
+            5
 
 
-        /// Ignore obviously implausible jumps.
-        private let maximumMapCorrectionDistance:
-            Float = 0.25
+        /// Only use nearby tags for runtime correction.
+        ///
+        /// A distant AprilTag pose is less reliable.
+        private let maximumCorrectionTagDistance:
+            Float = 1.50
+
+
+        /// Ignore extremely small corrections.
+        ///
+        /// Prevents constant micro-jitter.
+        private let minimumCorrectionDistance:
+            Float = 0.01
+
+
+        /// Reject clearly implausible measurements.
+        private let maximumCorrectionDistance:
+            Float = 0.20
+
+
+        /// Apply only part of the measured correction.
+        ///
+        /// 0.20 means 20 % of the measured drift.
+        private let mapCorrectionFactor:
+            Float = 0.20
 
         var simulationRoot: Entity?
         var occlusionRoot: Entity?
@@ -990,6 +1023,10 @@ struct CameraARView: UIViewRepresentable {
 
             let worldTransform:
                 simd_float4x4
+
+            /// Distance between camera and detected tag.
+            let cameraDistance:
+                Float
         }
 
         // MARK: - Runtime Game AR Content
@@ -1094,6 +1131,9 @@ struct CameraARView: UIViewRepresentable {
 
             let entity:
                 Entity
+
+            let type:
+                MapObjectType
 
             let basePosition:
                 SIMD3<Float>
@@ -1352,8 +1392,17 @@ struct CameraARView: UIViewRepresentable {
                             if stabilizedMapWorldTransform
                                 == nil {
 
+                                // Initial localization through reference tag #1.
+                                //
+                                // This transform establishes the map coordinate
+                                // system and is used as the permanent orientation
+                                // and floor-height reference.
                                 stabilizedMapWorldTransform =
                                     mapRootTransform
+
+                                lockedMapWorldTransform =
+                                    mapRootTransform
+
 
                                 DispatchQueue.main.async {
 
@@ -1400,13 +1449,47 @@ struct CameraARView: UIViewRepresentable {
                                 }
                             ) {
 
+                        // --------------------------------------------------
+                        // Current tag position in ARKit world space
+                        // --------------------------------------------------
+
+                        let tagWorldPosition =
+                            SIMD3<Float>(
+                                mapPose.worldTransform.columns.3.x,
+                                mapPose.worldTransform.columns.3.y,
+                                mapPose.worldTransform.columns.3.z
+                            )
+
+
+                        // --------------------------------------------------
+                        // Current camera position in ARKit world space
+                        // --------------------------------------------------
+
+                        let cameraWorldPosition =
+                            SIMD3<Float>(
+                                frame.camera.transform.columns.3.x,
+                                frame.camera.transform.columns.3.y,
+                                frame.camera.transform.columns.3.z
+                            )
+
+
+                        let cameraDistance =
+                            simd_distance(
+                                tagWorldPosition,
+                                cameraWorldPosition
+                            )
+
+
                         visibleMapTags.append(
                             VisibleMapTag(
                                 stored:
                                     storedTag,
 
                                 worldTransform:
-                                    mapPose.worldTransform
+                                    mapPose.worldTransform,
+
+                                cameraDistance:
+                                    cameraDistance
                             )
                         )
                     }
@@ -1607,387 +1690,46 @@ struct CameraARView: UIViewRepresentable {
         }
 
 
-        // MARK: - Stored AprilTag Transform
-
-        private func makeStoredTagTransform(
-            _ tag: StoredAprilTag
-        ) -> simd_float4x4 {
-
-            // Stored rotation describes the tag's X axis
-            // inside the 2D map.
-            let xAxis =
-                SIMD3<Float>(
-                    cos(tag.rotation),
-                    0,
-                    sin(tag.rotation)
-                )
-
-
-            let yAxis =
-                SIMD3<Float>(
-                    0,
-                    1,
-                    0
-                )
-
-
-            let zAxis =
-                simd_normalize(
-                    simd_cross(
-                        xAxis,
-                        yAxis
-                    )
-                )
-
-
-            return simd_float4x4(
-                columns: (
-
-                    SIMD4<Float>(
-                        xAxis.x,
-                        xAxis.y,
-                        xAxis.z,
-                        0
-                    ),
-
-                    SIMD4<Float>(
-                        yAxis.x,
-                        yAxis.y,
-                        yAxis.z,
-                        0
-                    ),
-
-                    SIMD4<Float>(
-                        zAxis.x,
-                        zAxis.y,
-                        zAxis.z,
-                        0
-                    ),
-
-                    SIMD4<Float>(
-                        tag.x,
-                        0,
-                        tag.z,
-                        1
-                    )
-                )
-            )
-        }
-
-
-        // MARK: - Map Transform Candidate
-
-        private func mapTransformCandidate(
-            from visibleTag:
-                VisibleMapTag
-        ) -> simd_float4x4 {
-
-            // --------------------------------------------------
-            // Stored pose of this AprilTag inside the saved map
-            // --------------------------------------------------
-
-            let storedTagTransform =
-                makeStoredTagTransform(
-                    visibleTag.stored
-                )
-
-
-            // --------------------------------------------------
-            // Currently measured pose of the same AprilTag
-            // in ARKit world space
-            // --------------------------------------------------
-            //
-            // Flatten the tag onto the horizontal plane so
-            // small measured floor tilts do not tilt the map.
-            // --------------------------------------------------
-
-            let measuredTagTransform =
-                makeMapRootTransform(
-                    from:
-                        visibleTag.worldTransform
-                )
-
-
-            // --------------------------------------------------
-            // Calculate map -> ARKit world transform
-            // --------------------------------------------------
-            //
-            // measuredTagWorld
-            // =
-            // mapWorld * storedTagMap
-            //
-            // therefore:
-            //
-            // mapWorld
-            // =
-            // measuredTagWorld
-            // * inverse(storedTagMap)
-            // --------------------------------------------------
-
-            return measuredTagTransform
-                * simd_inverse(
-                    storedTagTransform
-                )
-        }
-
-
-        // MARK: - Average Map Transforms
-
-        private func averageMapTransforms(
-            _ transforms: [simd_float4x4]
-        ) -> simd_float4x4? {
-
-            guard transforms.isEmpty == false else {
-                return nil
-            }
-
-
-            // --------------------------------------------------
-            // Average position
-            // --------------------------------------------------
-
-            var positionSum =
-                SIMD3<Float>.zero
-
-
-            // --------------------------------------------------
-            // Average horizontal rotation
-            // --------------------------------------------------
-
-            var sineSum:
-                Float = 0
-
-            var cosineSum:
-                Float = 0
-
-
-            for transform in transforms {
-
-                positionSum +=
-                    SIMD3<Float>(
-                        transform.columns.3.x,
-                        transform.columns.3.y,
-                        transform.columns.3.z
-                    )
-
-
-                let xAxis =
-                    transform.columns.0
-
-                let yaw =
-                    atan2(
-                        xAxis.z,
-                        xAxis.x
-                    )
-
-
-                sineSum +=
-                    sin(yaw)
-
-                cosineSum +=
-                    cos(yaw)
-            }
-
-
-            let count =
-                Float(
-                    transforms.count
-                )
-
-
-            let position =
-                positionSum
-                / count
-
-
-            let yaw =
-                atan2(
-                    sineSum,
-                    cosineSum
-                )
-
-
-            // --------------------------------------------------
-            // Build clean horizontal map transform
-            // --------------------------------------------------
-
-            let xAxis =
-                SIMD3<Float>(
-                    cos(yaw),
-                    0,
-                    sin(yaw)
-                )
-
-
-            let yAxis =
-                SIMD3<Float>(
-                    0,
-                    1,
-                    0
-                )
-
-
-            let zAxis =
-                simd_normalize(
-                    simd_cross(
-                        xAxis,
-                        yAxis
-                    )
-                )
-
-
-            return simd_float4x4(
-                columns: (
-
-                    SIMD4<Float>(
-                        xAxis.x,
-                        xAxis.y,
-                        xAxis.z,
-                        0
-                    ),
-
-                    SIMD4<Float>(
-                        yAxis.x,
-                        yAxis.y,
-                        yAxis.z,
-                        0
-                    ),
-
-                    SIMD4<Float>(
-                        zAxis.x,
-                        zAxis.y,
-                        zAxis.z,
-                        0
-                    ),
-
-                    SIMD4<Float>(
-                        position.x,
-                        position.y,
-                        position.z,
-                        1
-                    )
-                )
-            )
-        }
-
-
-        // MARK: - Interpolate Map Transform
-
-        private func interpolateMapTransform(
-            from current:
-                simd_float4x4,
-
-            to target:
-                simd_float4x4,
-
-            factor:
-                Float
-        ) -> simd_float4x4 {
-
-
-            // --------------------------------------------------
-            // Position
-            // --------------------------------------------------
-
-            let currentPosition =
-                SIMD3<Float>(
-                    current.columns.3.x,
-                    current.columns.3.y,
-                    current.columns.3.z
-                )
-
-            let targetPosition =
-                SIMD3<Float>(
-                    target.columns.3.x,
-                    target.columns.3.y,
-                    target.columns.3.z
-                )
-
-
-            let position =
-                simd_mix(
-                    currentPosition,
-                    targetPosition,
-                    SIMD3<Float>(
-                        repeating:
-                            factor
-                    )
-                )
-
-
-            // --------------------------------------------------
-            // Rotation
-            // --------------------------------------------------
-
-            let currentYaw =
-                atan2(
-                    current.columns.0.z,
-                    current.columns.0.x
-                )
-
-            let targetYaw =
-                atan2(
-                    target.columns.0.z,
-                    target.columns.0.x
-                )
-
-
-            let currentRotation =
-                simd_quatf(
-                    angle:
-                        currentYaw,
-
-                    axis:
-                        SIMD3<Float>(
-                            0,
-                            1,
-                            0
-                        )
-                )
-
-
-            let targetRotation =
-                simd_quatf(
-                    angle:
-                        targetYaw,
-
-                    axis:
-                        SIMD3<Float>(
-                            0,
-                            1,
-                            0
-                        )
-                )
-
-
-            let rotation =
-                simd_slerp(
-                    currentRotation,
-                    targetRotation,
-                    factor
-                )
-
-
-            var transform =
-                simd_float4x4(
-                    rotation
-                )
-
-
-            transform.columns.3 =
+        // ======================================================
+        // MARK: - Predicted Tag World Position
+        // ======================================================
+
+        private func predictedWorldPosition(
+            of tag:
+                StoredAprilTag,
+
+            mapTransform:
+                simd_float4x4
+        ) -> SIMD3<Float> {
+
+            // Tag position inside the persistent map.
+            let mapPosition =
                 SIMD4<Float>(
-                    position.x,
-                    position.y,
-                    position.z,
+                    tag.x,
+                    0,
+                    tag.z,
                     1
                 )
 
 
-            return transform
+            // Convert map-local coordinates
+            // into ARKit world coordinates.
+            let worldPosition =
+                mapTransform
+                * mapPosition
+
+
+            return SIMD3<Float>(
+                worldPosition.x,
+                worldPosition.y,
+                worldPosition.z
+            )
         }
 
 
+        // ======================================================
         // MARK: - Stabilize Map
+        // ======================================================
 
         private func stabilizeMap(
             using visibleTags:
@@ -1995,32 +1737,7 @@ struct CameraARView: UIViewRepresentable {
         ) {
 
             // --------------------------------------------------
-            // Only occasionally
-            // --------------------------------------------------
-
-            guard Date()
-                .timeIntervalSince(
-                    lastMapStabilization
-                )
-                >= mapStabilizationInterval
-            else {
-                return
-            }
-
-
-            // --------------------------------------------------
-            // At least two known tags
-            // --------------------------------------------------
-
-            guard visibleTags.count
-                    >= minimumStabilizationTagCount
-            else {
-                return
-            }
-
-
-            // --------------------------------------------------
-            // Initial localization must already exist
+            // Map must already be initialized through #1.
             // --------------------------------------------------
 
             guard let currentTransform =
@@ -2030,21 +1747,52 @@ struct CameraARView: UIViewRepresentable {
             }
 
 
-            lastMapStabilization =
-                Date()
+            guard lockedMapWorldTransform
+                    != nil
+            else {
+                return
+            }
 
 
             // --------------------------------------------------
-            // Estimate complete map pose from tag CENTERS.
+            // Only use nearby known AprilTags.
             // --------------------------------------------------
 
-            guard let measuredTransform =
-                estimateMapTransform(
-                    from:
-                        visibleTags,
+            let usableTags =
+                visibleTags.filter {
 
-                    currentTransform:
-                        currentTransform
+                    $0.cameraDistance
+                        <= maximumCorrectionTagDistance
+
+                    &&
+
+                    $0.stored.id
+                        != requiredReferenceTagID
+                }
+
+
+            guard usableTags.isEmpty
+                    == false
+            else {
+                return
+            }
+
+
+            // --------------------------------------------------
+            // Select nearest visible tag.
+            // --------------------------------------------------
+            //
+            // We deliberately use ONE good tag instead of
+            // combining several noisy poses.
+            // --------------------------------------------------
+
+            guard let bestTag =
+                usableTags.min(
+                    by: {
+
+                        $0.cameraDistance
+                            < $1.cameraDistance
+                    }
                 )
             else {
                 return
@@ -2052,75 +1800,89 @@ struct CameraARView: UIViewRepresentable {
 
 
             // --------------------------------------------------
-            // Current / measured positions
+            // When correction tag changes, start a fresh
+            // measurement batch.
             // --------------------------------------------------
 
-            let currentPosition =
-                SIMD3<Float>(
-                    currentTransform.columns.3.x,
-                    currentTransform.columns.3.y,
-                    currentTransform.columns.3.z
+            if activeCorrectionTagID
+                != bestTag.stored.id {
+
+                activeCorrectionTagID =
+                    bestTag.stored.id
+
+                correctionSamples
+                    .removeAll()
+
+                print(
+                    "# MAP CORRECTION TAG | ID \(bestTag.stored.id)"
+                )
+
+                return
+            }
+
+
+            // --------------------------------------------------
+            // Where should this tag currently be?
+            // --------------------------------------------------
+
+            let predictedPosition =
+                predictedWorldPosition(
+                    of:
+                        bestTag.stored,
+
+                    mapTransform:
+                        currentTransform
                 )
 
 
-            let measuredPosition =
+            // --------------------------------------------------
+            // Where is this tag actually measured?
+            // --------------------------------------------------
+
+            let observedPosition =
                 SIMD3<Float>(
-                    measuredTransform.columns.3.x,
-                    measuredTransform.columns.3.y,
-                    measuredTransform.columns.3.z
+                    bestTag.worldTransform.columns.3.x,
+                    bestTag.worldTransform.columns.3.y,
+                    bestTag.worldTransform.columns.3.z
+                )
+
+
+            // --------------------------------------------------
+            // Difference = horizontal map drift.
+            // --------------------------------------------------
+            //
+            // Y is intentionally ignored.
+            // --------------------------------------------------
+
+            let correction =
+                SIMD2<Float>(
+                    observedPosition.x
+                        - predictedPosition.x,
+
+                    observedPosition.z
+                        - predictedPosition.z
                 )
 
 
             let correctionDistance =
-                simd_distance(
-                    currentPosition,
-                    measuredPosition
+                simd_length(
+                    correction
                 )
 
 
             // --------------------------------------------------
-            // Rotation difference
-            // --------------------------------------------------
-
-            let currentYaw =
-                atan2(
-                    currentTransform.columns.0.z,
-                    currentTransform.columns.0.x
-                )
-
-
-            let measuredYaw =
-                atan2(
-                    measuredTransform.columns.0.z,
-                    measuredTransform.columns.0.x
-                )
-
-
-            let rawYawDifference =
-                measuredYaw
-                - currentYaw
-
-
-            // Normalize to -π ... +π.
-            let yawDifference =
-                atan2(
-                    sin(rawYawDifference),
-                    cos(rawYawDifference)
-                )
-
-
-            // --------------------------------------------------
-            // Reject obviously bad measurements
+            // Reject clearly bad individual measurements.
             // --------------------------------------------------
 
             guard correctionDistance
-                    <= maximumMapCorrectionDistance
+                    <= maximumCorrectionDistance
             else {
 
                 print(
                     String(
                         format:
-                            "# MAP CORRECTION REJECTED | %.3f m",
+                            "# MAP SAMPLE REJECTED | Tag %d | %.3f m",
+                        bestTag.stored.id,
                         correctionDistance
                     )
                 )
@@ -2129,24 +1891,67 @@ struct CameraARView: UIViewRepresentable {
             }
 
 
-            // Also reject unreasonable rotation jumps.
-            let maximumYawCorrection =
+            // --------------------------------------------------
+            // Store measurement.
+            // --------------------------------------------------
+
+            correctionSamples.append(
+                correction
+            )
+
+
+            guard correctionSamples.count
+                    >= requiredCorrectionSamples
+            else {
+                return
+            }
+
+
+            // --------------------------------------------------
+            // Average measurements.
+            // --------------------------------------------------
+
+            var averageCorrection =
+                SIMD2<Float>.zero
+
+
+            for sample in correctionSamples {
+
+                averageCorrection +=
+                    sample
+            }
+
+
+            averageCorrection /=
                 Float(
-                    15.0 * .pi / 180.0
+                    correctionSamples.count
                 )
 
 
-            guard abs(yawDifference)
-                    <= maximumYawCorrection
+            correctionSamples
+                .removeAll()
+
+
+            let averageDistance =
+                simd_length(
+                    averageCorrection
+                )
+
+
+            // --------------------------------------------------
+            // Ignore tiny residual drift.
+            // --------------------------------------------------
+
+            guard averageDistance
+                    >= minimumCorrectionDistance
             else {
 
                 print(
                     String(
                         format:
-                            "# MAP ROTATION REJECTED | %.2f°",
-                        yawDifference
-                            * 180
-                            / .pi
+                            "# MAP CORRECTION IGNORED | Tag %d | %.3f m",
+                        bestTag.stored.id,
+                        averageDistance
                     )
                 )
 
@@ -2155,27 +1960,78 @@ struct CameraARView: UIViewRepresentable {
 
 
             // --------------------------------------------------
-            // Smooth correction
+            // Final safety check.
             // --------------------------------------------------
 
-            let correctedTransform =
-                interpolateMapTransform(
-                    from:
-                        currentTransform,
+            guard averageDistance
+                    <= maximumCorrectionDistance
+            else {
 
-                    to:
-                        measuredTransform,
-
-                    factor:
-                        mapStabilizationFactor
+                print(
+                    String(
+                        format:
+                            "# MAP CORRECTION REJECTED | Tag %d | %.3f m",
+                        bestTag.stored.id,
+                        averageDistance
+                    )
                 )
+
+                return
+            }
+
+
+            // --------------------------------------------------
+            // Correct ONLY X and Z.
+            // --------------------------------------------------
+            //
+            // Rotation stays unchanged.
+            // Height stays unchanged.
+            // --------------------------------------------------
+
+            var correctedTransform =
+                currentTransform
+
+
+            correctedTransform.columns.3.x +=
+                averageCorrection.x
+                * mapCorrectionFactor
+
+
+            correctedTransform.columns.3.z +=
+                averageCorrection.y
+                * mapCorrectionFactor
+
+
+            // --------------------------------------------------
+            // Explicitly preserve original rotation + height.
+            // --------------------------------------------------
+            //
+            // This makes it impossible for runtime stabilization
+            // to tilt or rotate the map.
+            // --------------------------------------------------
+
+            if let locked =
+                lockedMapWorldTransform {
+
+                correctedTransform.columns.0 =
+                    locked.columns.0
+
+                correctedTransform.columns.1 =
+                    locked.columns.1
+
+                correctedTransform.columns.2 =
+                    locked.columns.2
+
+                correctedTransform.columns.3.y =
+                    locked.columns.3.y
+            }
 
 
             stabilizedMapWorldTransform =
                 correctedTransform
 
 
-            // RealityKit mutation belongs on Main.
+            // RealityKit Entity updates on Main.
             DispatchQueue.main.async {
 
                 self.localizeMapAnchor(
@@ -2188,291 +2044,11 @@ struct CameraARView: UIViewRepresentable {
             print(
                 String(
                     format:
-                        "# MAP STABILIZED | %d tags | pos %.3f m | rot %.2f°",
-                    visibleTags.count,
-                    correctionDistance,
-                    yawDifference
-                        * 180
-                        / .pi
-                )
-            )
-        }
-        
-        // MARK: - Estimate Map Transform From Tag Positions
-
-        private func estimateMapTransform(
-            from visibleTags:
-                [VisibleMapTag],
-
-            currentTransform:
-                simd_float4x4
-        ) -> simd_float4x4? {
-
-            // At least two different tag positions are required
-            // to determine both position and rotation.
-            guard visibleTags.count >= 2
-            else {
-                return nil
-            }
-            
-            // --------------------------------------------------
-            // The visible tag constellation must span enough space.
-            // --------------------------------------------------
-            //
-            // Two tags that are almost next to each other provide
-            // a poor estimate of map rotation.
-            // --------------------------------------------------
-
-            var maximumStoredDistance:
-                Float = 0
-
-
-            for firstIndex in
-                visibleTags.indices {
-
-                for secondIndex in
-                    visibleTags.indices
-                where secondIndex > firstIndex {
-
-                    let first =
-                        SIMD2<Float>(
-                            visibleTags[firstIndex].stored.x,
-                            visibleTags[firstIndex].stored.z
-                        )
-
-                    let second =
-                        SIMD2<Float>(
-                            visibleTags[secondIndex].stored.x,
-                            visibleTags[secondIndex].stored.z
-                        )
-
-
-                    maximumStoredDistance =
-                        max(
-                            maximumStoredDistance,
-
-                            simd_distance(
-                                first,
-                                second
-                            )
-                        )
-                }
-            }
-
-
-            guard maximumStoredDistance
-                    >= 0.50
-            else {
-
-                print(
-                    "# MAP STABILIZATION SKIPPED | tags too close"
-                )
-
-                return nil
-            }
-            
-
-            // --------------------------------------------------
-            // Calculate centroids
-            // --------------------------------------------------
-
-            var storedCentroid =
-                SIMD2<Float>.zero
-
-            var observedCentroid =
-                SIMD2<Float>.zero
-
-
-            for tag in visibleTags {
-
-                storedCentroid +=
-                    SIMD2<Float>(
-                        tag.stored.x,
-                        tag.stored.z
-                    )
-
-                observedCentroid +=
-                    SIMD2<Float>(
-                        tag.worldTransform.columns.3.x,
-                        tag.worldTransform.columns.3.z
-                    )
-            }
-
-
-            let count =
-                Float(
-                    visibleTags.count
-                )
-
-
-            storedCentroid /=
-                count
-
-            observedCentroid /=
-                count
-
-
-            // --------------------------------------------------
-            // Find best horizontal rotation
-            // --------------------------------------------------
-            //
-            // We align the STORED tag positions with the
-            // currently OBSERVED ARKit world positions.
-            //
-            // Important:
-            // Individual AprilTag rotations are NOT used.
-            // Only the centers of the tags matter.
-            // --------------------------------------------------
-
-            var dotSum:
-                Float = 0
-
-            var crossSum:
-                Float = 0
-
-
-            for tag in visibleTags {
-
-                let stored =
-                    SIMD2<Float>(
-                        tag.stored.x,
-                        tag.stored.z
-                    )
-                    - storedCentroid
-
-
-                let observed =
-                    SIMD2<Float>(
-                        tag.worldTransform.columns.3.x,
-                        tag.worldTransform.columns.3.z
-                    )
-                    - observedCentroid
-
-
-                dotSum +=
-                    stored.x * observed.x
-                    +
-                    stored.y * observed.y
-
-
-                crossSum +=
-                    stored.x * observed.y
-                    -
-                    stored.y * observed.x
-            }
-
-
-            guard abs(dotSum) + abs(crossSum)
-                    > 0.0001
-            else {
-                return nil
-            }
-
-
-            let yaw =
-                atan2(
-                    crossSum,
-                    dotSum
-                )
-
-
-            let cosYaw =
-                cos(yaw)
-
-            let sinYaw =
-                sin(yaw)
-
-
-            // --------------------------------------------------
-            // Rotate stored centroid into ARKit world orientation
-            // --------------------------------------------------
-
-            let rotatedStoredCentroid =
-                SIMD2<Float>(
-                    cosYaw * storedCentroid.x
-                        - sinYaw * storedCentroid.y,
-
-                    sinYaw * storedCentroid.x
-                        + cosYaw * storedCentroid.y
-                )
-
-
-            // --------------------------------------------------
-            // Translation of complete map
-            // --------------------------------------------------
-
-            let translation =
-                observedCentroid
-                - rotatedStoredCentroid
-
-
-            // --------------------------------------------------
-            // Build horizontal map transform
-            // --------------------------------------------------
-
-            let xAxis =
-                SIMD3<Float>(
-                    cosYaw,
-                    0,
-                    sinYaw
-                )
-
-
-            let yAxis =
-                SIMD3<Float>(
-                    0,
-                    1,
-                    0
-                )
-
-
-            let zAxis =
-                SIMD3<Float>(
-                    -sinYaw,
-                    0,
-                    cosYaw
-                )
-
-
-            // Keep the original floor height.
-            //
-            // Multi-tag stabilization should not move
-            // the complete map vertically.
-            let mapHeight =
-                currentTransform
-                    .columns.3.y
-
-
-            return simd_float4x4(
-                columns: (
-
-                    SIMD4<Float>(
-                        xAxis.x,
-                        xAxis.y,
-                        xAxis.z,
-                        0
-                    ),
-
-                    SIMD4<Float>(
-                        yAxis.x,
-                        yAxis.y,
-                        yAxis.z,
-                        0
-                    ),
-
-                    SIMD4<Float>(
-                        zAxis.x,
-                        zAxis.y,
-                        zAxis.z,
-                        0
-                    ),
-
-                    SIMD4<Float>(
-                        translation.x,
-                        mapHeight,
-                        translation.y,
-                        1
-                    )
+                        "# MAP CORRECTED | Tag %d | measured %.3f m | applied %.3f m",
+                    bestTag.stored.id,
+                    averageDistance,
+                    averageDistance
+                        * self.mapCorrectionFactor
                 )
             )
         }
@@ -2485,8 +2061,14 @@ struct CameraARView: UIViewRepresentable {
             stabilizedMapWorldTransform =
                 nil
 
-            lastMapStabilization =
-                .distantPast
+            lockedMapWorldTransform =
+                nil
+
+            activeCorrectionTagID =
+                nil
+
+            correctionSamples
+                .removeAll()
         }
         
         // MARK: - Place AR Cube
@@ -2836,12 +2418,16 @@ struct CameraARView: UIViewRepresentable {
                     ] =
                         objectRoot
 
-                    if object.type != .oil {
+                    if object.type != .oil
+                        && object.type != .eggCup {
 
                         animatedMapObjects.append(
                             AnimatedMapObject(
                                 entity:
                                     objectRoot,
+
+                                type:
+                                    object.type,
 
                                 basePosition:
                                     basePosition,
@@ -3101,6 +2687,31 @@ struct CameraARView: UIViewRepresentable {
                         let time =
                             self.mapObjectAnimationTime
                             + object.phase
+
+                        if object.type == .eggs {
+
+                            let verticalOffset =
+                                max(
+                                    0,
+                                    sin(time * 5.0)
+                                )
+                                * 0.03 // ToDo: position
+
+
+                            object.entity.position =
+                                object.basePosition
+                                + SIMD3<Float>(
+                                    0,
+                                    verticalOffset,
+                                    0
+                                )
+
+                            object.entity.orientation =
+                                object.baseOrientation
+
+                            continue
+                        }
+
 
                         let verticalOffset =
                             sin(time * 3.2)
