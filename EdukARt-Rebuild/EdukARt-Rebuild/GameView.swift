@@ -37,8 +37,8 @@ struct GameView: View {
     @State private var collisionDebugCounter =
         0
 
-    private let isGameplayDebugMode =
-        false
+    private let isNoDebugMode =
+        true
 
     @State private var countdownText:
         String?
@@ -137,8 +137,7 @@ struct GameView: View {
             arView
             savedMapView
                 .allowsHitTesting(false)
-            localizationHeading
-                .allowsHitTesting(false)
+            preRaceGuidance
             arRobotControl
             joystickControl
             timerDisplay
@@ -333,38 +332,109 @@ struct GameView: View {
     }
 
 
-    // MARK: - Localization Heading
+    // MARK: - Pre Race Guidance
 
     @ViewBuilder
-    private var localizationHeading: some View {
+    private var preRaceGuidance: some View {
 
-        if isMapLocalized == false {
+        if isNoDebugMode,
+           hasStartedGameplay == false,
+           countdownText == nil {
 
             VStack(
                 spacing:
-                    8
+                    12
             ) {
 
-                Text(
-                    "Localize Course"
-                )
-                .font(
-                    .largeTitle.bold()
-                )
-                .foregroundStyle(
-                    .white
-                )
+                if isMapLocalized == false {
+
+                    Text(
+                        "Localize Map"
+                    )
+                    .font(
+                        .largeTitle.bold()
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
 
 
-                Text(
-                    "Scan AprilTag #\(map.referenceTagID)"
-                )
-                .font(
-                    .headline
-                )
-                .foregroundStyle(
-                    .white.opacity(0.8)
-                )
+                    Text(
+                        "Scan and hold the reference AprilTag #\(map.referenceTagID) for 3 seconds. It is marked red in the minimap."
+                    )
+                    .font(
+                        .headline
+                    )
+                    .multilineTextAlignment(
+                        .center
+                    )
+                    .foregroundStyle(
+                        .white.opacity(0.84)
+                    )
+                    .frame(
+                        maxWidth:
+                            320
+                    )
+
+                } else {
+
+                    Text(
+                        "Connect to robot"
+                    )
+                    .font(
+                        .largeTitle.bold()
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+
+
+                    Text(
+                        "Connect to robot (top right corner) and place it on the reference AprilTag. Or insert AR model of robot (top left corner)."
+                    )
+                    .font(
+                        .headline
+                    )
+                    .multilineTextAlignment(
+                        .center
+                    )
+                    .foregroundStyle(
+                        .white.opacity(0.84)
+                    )
+                    .frame(
+                        maxWidth:
+                            340
+                    )
+
+
+                    if isRobotReadyForRace {
+
+                        Button {
+
+                            startCountdown()
+
+                        } label: {
+
+                            Text(
+                                "I'm Ready"
+                            )
+                            .font(
+                                .headline.bold()
+                            )
+                            .frame(
+                                minWidth:
+                                    180
+                            )
+                        }
+                        .buttonStyle(
+                            .borderedProminent
+                        )
+                        .padding(
+                            .top,
+                            4
+                        )
+                    }
+                }
             }
             .frame(
                 maxWidth:
@@ -379,6 +449,9 @@ struct GameView: View {
             .padding(
                 .top,
                 70
+            )
+            .allowsHitTesting(
+                isRobotReadyForRace
             )
         }
     }
@@ -744,7 +817,7 @@ struct GameView: View {
         _ input: CGPoint
     ) {
 
-        guard isGameplayDebugMode
+        guard isNoDebugMode == false
                 || (
                     hasStartedGameplay
                     && gameController.isRaceFinished == false
@@ -771,7 +844,7 @@ struct GameView: View {
         _ input: CGPoint
     ) {
 
-        guard isGameplayDebugMode
+        guard isNoDebugMode == false
                 || (
                     hasStartedGameplay
                     && gameController.isRaceFinished == false
@@ -831,7 +904,7 @@ struct GameView: View {
         didPrepareGameStart =
             true
 
-        if isGameplayDebugMode {
+        if isNoDebugMode == false {
 
             hasStartedGameplay =
                 true
@@ -846,6 +919,27 @@ struct GameView: View {
         controller.setGameplayInputLocked(
             true
         )
+    }
+
+
+    private var isRobotReadyForRace:
+        Bool {
+
+        controller.realRobotPose != nil
+            || controller.isSimulationVisible
+    }
+
+
+    private func startCountdown() {
+
+        guard isNoDebugMode,
+              isMapLocalized,
+              isRobotReadyForRace,
+              countdownText == nil,
+              hasStartedGameplay == false
+        else {
+            return
+        }
 
         Task { @MainActor in
 
@@ -888,7 +982,7 @@ struct GameView: View {
 
     private func updateGameCollision() {
 
-        guard isGameplayDebugMode == false,
+        guard isNoDebugMode,
               hasStartedGameplay,
               gameController.isRaceFinished == false
         else {
@@ -1020,7 +1114,7 @@ struct GameView: View {
     @ViewBuilder
     private var timerDisplay: some View {
 
-        if isGameplayDebugMode == false,
+        if isNoDebugMode,
            hasStartedGameplay,
            gameController.isRaceFinished == false {
 
@@ -1107,7 +1201,8 @@ struct GameView: View {
                 false
             )
 
-        } else if gameController.isRaceFinished {
+        } else if isNoDebugMode,
+                  gameController.isRaceFinished {
 
             finishView
         }

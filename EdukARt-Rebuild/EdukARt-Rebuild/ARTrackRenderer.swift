@@ -1640,7 +1640,6 @@ final class ARTrackRenderer {
         let startPosition =
             path[0]
             + startDirection * 0.30
-            + startSide * 0.10
 
 
         makeMarker(
@@ -1672,7 +1671,7 @@ final class ARTrackRenderer {
                imageName: "Finish",
                position: finishPosition,
                direction: finishDirection,
-               rotationOffset: 60 * .pi / 180,
+               rotationOffset: -.pi / 180,
                parent: parent
            )
 
