@@ -82,14 +82,6 @@ final class EduardSimulation {
     private let wheelRotationSpeed:
         Float = 0.12
     
-    // MARK: - AR Model Alignment
-
-
-    /// Visual offset from the logical robot pose.
-    static let modelForwardOffset: Float =
-        0.0
-
-
     // MARK: - Show
 
     func show(
@@ -738,22 +730,9 @@ final class EduardSimulation {
                 axis: SIMD3<Float>(0, 1, 0)
             )
 
-        // Robot forward direction.
-        // Your drive() implementation uses local -Z as forward.
-        let forward =
-            rotation.act(
-                SIMD3<Float>(
-                    0,
-                    0,
-                    -1
-                )
-            )
-
-        // Place visible model relative to the logical robot pose.
+        // Place visible model at the logical robot pose.
         entity.position =
             pose.position
-            + forward
-            * Self.modelForwardOffset
 
         // Rotate around vertical Y axis.
         entity.orientation =
@@ -979,21 +958,8 @@ final class EduardOccluder {
                     )
             )
 
-        let forward =
-            rotation.act(
-                SIMD3<Float>(
-                    0,
-                    0,
-                    -1
-                )
-            )
-
         entity.position =
             pose.position
-            +
-            forward
-            *
-            EduardSimulation.modelForwardOffset
 
         entity.orientation =
             rotation

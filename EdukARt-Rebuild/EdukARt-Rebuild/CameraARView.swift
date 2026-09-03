@@ -5,22 +5,17 @@
 //  Created by Sina Steinmüller on 21.08.26.
 //  CameraARView provides the RealityKit-based augmented reality environment
 //  used during gameplay. It connects the SwiftUI game interface with an
-//  ARKit world-tracking session and manages the virtual Eduard robot.
+//  ARKit world-tracking session and hosts the AR map and robot entities.
 //
 //  The Coordinator continuously receives AR frames and uses SwiftAprilTag
 //  to detect AprilTags in the camera image. Detected tags are passed to
 //  AprilTagLocalization, which estimates their poses and transforms them
-//  into the ARKit world coordinate system. The resulting poses are forwarded
-//  to AprilTagMapBuilder to construct the two-dimensional map.
+//  into the ARKit world coordinate system. AprilTagLocalization calculates
+//  map-space poses, while the Coordinator establishes and stabilizes MapRoot.
 //
-//  The first successfully localized AprilTag is additionally used to place
-//  and orient the virtual Eduard model in the AR environment. A fixed model
-//  rotation offset aligns the coordinate system of the 3D model with the
-//  AprilTag coordinate system.
-//
-//  Joystick input controls the virtual robot relative to its own orientation,
-//  allowing forward and sideways movement to follow the robot's current
-//  heading instead of the global AR coordinate axes.
+//  RobotController owns logical robot state. EduardSimulation applies
+//  RobotPose to the visible AR representation, and EduardOccluder applies
+//  the measured physical RobotPose to occlusion geometry.
 //
 //  Sources:
 //  Apple ARKit:
@@ -664,45 +659,12 @@ struct CameraARView: UIViewRepresentable {
                         true
                 )
 
-            let visualCorrectionRoot =
-                Entity()
-
-            visualCorrectionRoot.addChild(
+            simulationRoot.addChild(
                 eduard
             )
-
-            simulationRoot.addChild(
-                visualCorrectionRoot
-            )
-            
-            // Debug AR Robot offset
-            let eduardBounds =
-                eduard.visualBounds(
-                    relativeTo:
-                        simulationRoot
-                )
-
-            print(
-                String(
-                    format:
-                        "# EDUARD MODEL BOUNDS | minY %.3f | maxY %.3f | centerY %.3f",
-                    eduardBounds.min.y,
-                    eduardBounds.max.y,
-                    eduardBounds.center.y
-                )
-            )
-
-            // Important:
-            // RobotPose already uses map floor y = 0.
-            // Do not move the visual model upward through visualBounds.
-            visualCorrectionRoot.position.y =
-                0
 
             context.coordinator.simulationRoot =
                 simulationRoot
-
-            context.coordinator.eduard =
-                eduard
 
             controller.eduardSimulation.show(
                 entity:
@@ -760,55 +722,12 @@ struct CameraARView: UIViewRepresentable {
         let root =
             Entity()
 
-        let visualCorrectionRoot =
-            Entity()
-
-        visualCorrectionRoot.orientation =
-            simd_quatf(
-                angle: 0,
-                axis:
-                    SIMD3<Float>(
-                        0,
-                        1,
-                        0
-                    )
-            )
-
-        visualCorrectionRoot.addChild(
+        root.addChild(
             model
         )
 
-        root.addChild(
-            visualCorrectionRoot
-        )
-        
-        let occluderBounds =
-            model.visualBounds(
-                relativeTo:
-                    root
-            )
-
-        print(
-            String(
-                format:
-                    "# OCCLUDER MODEL BOUNDS | minY %.3f | maxY %.3f | centerY %.3f",
-                occluderBounds.min.y,
-                occluderBounds.max.y,
-                occluderBounds.center.y
-            )
-        )
-
-        // Same vertical reference as the visible Eduard.
-        visualCorrectionRoot.position.y =
-            0
-
         return root
     }
-
-   
-
-    
-
     // MARK: - Update ARView
 
     func updateUIView(
@@ -984,7 +903,6 @@ struct CameraARView: UIViewRepresentable {
 
         var simulationRoot: Entity?
         var occlusionRoot: Entity?
-        var eduard: Entity?
         private let trackRenderer =
             ARTrackRenderer()
         var hasRenderedTrack =
@@ -2177,11 +2095,17 @@ struct CameraARView: UIViewRepresentable {
                     mapRoot
             )
 
-            // Attach the virtual robot to the
-            // localized map coordinate system.
-            attachSimulationToMap()
+            attach(
+                simulationRoot,
+                to:
+                    mapRoot
+            )
 
-            attachOccluderToMap()
+            attach(
+                occlusionRoot,
+                to:
+                    mapRoot
+            )
 
 
             print(
@@ -2730,48 +2654,30 @@ struct CameraARView: UIViewRepresentable {
         }
 
 
-        // MARK: - Update Simulation Entity
+        // MARK: - Attach Entity
 
-        func attachSimulationToMap() {
+        private func attach(
+            _ entity:
+                Entity?,
+
+            to parent:
+                Entity?
+        ) {
 
             guard
-                let mapRoot,
-                let simulationRoot
+                let entity,
+                let parent,
+                entity.parent !== parent
             else {
                 return
             }
 
 
-            if simulationRoot.parent !== mapRoot {
+            entity.removeFromParent()
 
-                simulationRoot.removeFromParent()
-
-                mapRoot.addChild(
-                    simulationRoot
-                )
-            }
-        }
-        
-        
-
-        func attachOccluderToMap() {
-
-            guard
-                let mapRoot,
-                let occlusionRoot
-            else {
-                return
-            }
-
-
-            if occlusionRoot.parent !== mapRoot {
-
-                occlusionRoot.removeFromParent()
-
-                mapRoot.addChild(
-                    occlusionRoot
-                )
-            }
+            parent.addChild(
+                entity
+            )
         }
         
 
