@@ -80,13 +80,16 @@ final class AprilTagLocalization {
     private let maximumReprojectionError:
         Float = 1.0
 
+    private let maximumReferenceReprojectionError:
+        Float = 0.35
+
 
     // --------------------------------------------------
     // Reference measurements
     // --------------------------------------------------
 
     private let requiredReferenceMeasurements =
-        10
+        20
 
     private(set) var referenceTagID:
         Int?
@@ -265,6 +268,66 @@ final class AprilTagLocalization {
             )
 
             return nil
+        }
+
+
+        // --------------------------------------------------
+        // Additional quality filtering for reference tag
+        // --------------------------------------------------
+        //
+        // The reference determines the complete orientation
+        // of the saved map.
+        //
+        // Therefore we only collect particularly clean
+        // measurements for the reference tag.
+        // --------------------------------------------------
+
+        if detection.id == referenceTagID {
+
+            guard pose.reprojectionError
+                    <= maximumReferenceReprojectionError
+            else {
+
+                print(
+                    String(
+                        format:
+                            "# MAP REFERENCE SKIPPED | reprojection %.3f",
+                        pose.reprojectionError
+                    )
+                )
+
+                return nil
+            }
+
+
+            let cameraTagPosition =
+                SIMD3<Float>(
+                    pose.transform.columns.3.x,
+                    pose.transform.columns.3.y,
+                    pose.transform.columns.3.z
+                )
+
+
+            let cameraDistance =
+                simd_length(
+                    cameraTagPosition
+                )
+
+
+            // Reference tag should not be too far away.
+            guard cameraDistance <= 1.20
+            else {
+
+                print(
+                    String(
+                        format:
+                            "# MAP REFERENCE SKIPPED | distance %.2f m",
+                        cameraDistance
+                    )
+                )
+
+                return nil
+            }
         }
 
 
@@ -542,7 +605,8 @@ final class AprilTagLocalization {
     // MARK: - Collect Reference Measurement
 
     private func collectReferenceMeasurement(
-        _ transform: simd_float4x4
+        _ transform:
+            simd_float4x4
     ) {
 
         // Once locked, the reference never changes.
@@ -552,8 +616,20 @@ final class AprilTagLocalization {
         }
 
 
+        // --------------------------------------------------
+        // Convert every individual measurement into a
+        // horizontal map transform BEFORE averaging.
+        // --------------------------------------------------
+
+        let flattenedTransform =
+            makeMapReferenceTransform(
+                from:
+                    transform
+            )
+
+
         referenceMeasurements.append(
-            transform
+            flattenedTransform
         )
 
 
@@ -562,7 +638,6 @@ final class AprilTagLocalization {
         )
 
 
-        // We need 10 valid measurements.
         guard referenceMeasurements.count
                 >= requiredReferenceMeasurements
 
@@ -571,18 +646,21 @@ final class AprilTagLocalization {
         }
 
 
+        // --------------------------------------------------
+        // Average position + horizontal rotation.
+        // --------------------------------------------------
+
         let averagedTransform =
             averageTransform(
                 referenceMeasurements
             )
 
         referenceTagWorldTransform =
-            makeMapReferenceTransform(
-                from: averagedTransform
-            )
+            averagedTransform
 
 
-        referenceMeasurements.removeAll()
+        referenceMeasurements
+            .removeAll()
 
 
         print(
@@ -594,9 +672,9 @@ final class AprilTagLocalization {
     // MARK: - Average Reference Transform
 
     private func averageTransform(
-        _ transforms: [simd_float4x4]
+        _ transforms:
+            [simd_float4x4]
     ) -> simd_float4x4 {
-
 
         // --------------------------------------------------
         // Average position
@@ -604,6 +682,17 @@ final class AprilTagLocalization {
 
         var position =
             SIMD3<Float>.zero
+
+
+        // --------------------------------------------------
+        // Circular average of horizontal rotation
+        // --------------------------------------------------
+
+        var sineSum:
+            Float = 0
+
+        var cosineSum:
+            Float = 0
 
 
         for transform in transforms {
@@ -614,6 +703,24 @@ final class AprilTagLocalization {
                     transform.columns.3.y,
                     transform.columns.3.z
                 )
+
+
+            let xAxis =
+                transform.columns.0
+
+
+            let yaw =
+                atan2(
+                    xAxis.z,
+                    xAxis.x
+                )
+
+
+            sineSum +=
+                sin(yaw)
+
+            cosineSum +=
+                cos(yaw)
         }
 
 
@@ -623,92 +730,74 @@ final class AprilTagLocalization {
             )
 
 
+        let yaw =
+            atan2(
+                sineSum,
+                cosineSum
+            )
+
+
         // --------------------------------------------------
-        // Average rotation
-        // --------------------------------------------------
-        //
-        // Rotations are represented as quaternions.
-        // Their components are averaged and normalized.
+        // Create perfectly horizontal transform
         // --------------------------------------------------
 
-        var rotationSum =
-            SIMD4<Float>.zero
+        let xAxis =
+            SIMD3<Float>(
+                cos(yaw),
+                0,
+                sin(yaw)
+            )
 
 
-        var firstQuaternion:
-            simd_quatf?
+        let yAxis =
+            SIMD3<Float>(
+                0,
+                1,
+                0
+            )
 
 
-        for transform in transforms {
-
-            var quaternion =
-                simd_quatf(
-                    transform
-                )
-
-
-            // q and -q describe the same rotation.
-            // Make all quaternions point in the same
-            // mathematical direction before averaging.
-            if let firstQuaternion {
-
-                if simd_dot(
-                    quaternion.vector,
-                    firstQuaternion.vector
-                ) < 0 {
-
-                    quaternion =
-                        simd_quatf(
-                            vector:
-                                -quaternion.vector
-                        )
-                }
-
-            } else {
-
-                firstQuaternion =
-                    quaternion
-            }
-
-
-            rotationSum +=
-                quaternion.vector
-        }
-
-
-        rotationSum =
+        let zAxis =
             simd_normalize(
-                rotationSum
+                simd_cross(
+                    xAxis,
+                    yAxis
+                )
             )
 
 
-        let rotation =
-            simd_quatf(
-                vector:
-                    rotationSum
+        return simd_float4x4(
+            columns: (
+
+                SIMD4<Float>(
+                    xAxis.x,
+                    xAxis.y,
+                    xAxis.z,
+                    0
+                ),
+
+                SIMD4<Float>(
+                    yAxis.x,
+                    yAxis.y,
+                    yAxis.z,
+                    0
+                ),
+
+                SIMD4<Float>(
+                    zAxis.x,
+                    zAxis.y,
+                    zAxis.z,
+                    0
+                ),
+
+                SIMD4<Float>(
+                    position.x,
+                    position.y,
+                    position.z,
+                    1
+                )
             )
-
-
-        // --------------------------------------------------
-        // Create final reference transform
-        // --------------------------------------------------
-
-        var result =
-            simd_float4x4(
-                rotation
-            )
-
-
-        result.columns.3 =
-            SIMD4<Float>(
-                position.x,
-                position.y,
-                position.z,
-                1
-            )
-
-
-        return result
+        )
     }
     
     // MARK: - Create Map Reference Transform
