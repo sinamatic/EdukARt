@@ -955,6 +955,12 @@ struct CameraARView: UIViewRepresentable {
         var mapObjectEntities:
             [UUID: Entity] = [:]
 
+        private let showsCollisionDebugCircles =
+            true // ToDo Debug Collissions
+
+        private var collisionDebugCircleEntities:
+            [String: Entity] = [:]
+
         var revealedTreeEntityIDs:
             Set<UUID> = []
 
@@ -2597,6 +2603,14 @@ struct CameraARView: UIViewRepresentable {
                     )
                 }
             }
+
+            updateCollisionDebugCircles(
+                for:
+                    activeObjects,
+
+                in:
+                    mapRoot
+            )
         }
 
 
@@ -2712,6 +2726,262 @@ struct CameraARView: UIViewRepresentable {
                 )
 
             return marker
+        }
+
+
+        // MARK: - Collision Debug Circles
+
+        private func updateCollisionDebugCircles(
+            for objects:
+                [PlacedMapObject],
+
+            in mapRoot:
+                Entity
+        ) {
+
+            guard showsCollisionDebugCircles
+            else {
+
+                clearCollisionDebugCircles()
+
+                return
+            }
+
+            var activeDebugIDs:
+                Set<String> = []
+
+            for object in objects {
+
+                if let triggerRadius =
+                    object.type.triggerRadius {
+
+                    let id =
+                        collisionDebugCircleID(
+                            object:
+                                object,
+
+                            kind:
+                                "trigger"
+                        )
+
+                    activeDebugIDs.insert(
+                        id
+                    )
+
+                    updateCollisionDebugCircle(
+                        id:
+                            id,
+
+                        object:
+                            object,
+
+                        radius:
+                            triggerRadius,
+
+                        yOffset:
+                            0.006,
+
+                        in:
+                            mapRoot
+                    )
+                }
+
+                if let blockingRadius =
+                    object.type.blockingRadius {
+
+                    let id =
+                        collisionDebugCircleID(
+                            object:
+                                object,
+
+                            kind:
+                                "blocking"
+                        )
+
+                    activeDebugIDs.insert(
+                        id
+                    )
+
+                    updateCollisionDebugCircle(
+                        id:
+                            id,
+
+                        object:
+                            object,
+
+                        radius:
+                            blockingRadius,
+
+                        yOffset:
+                            0.010,
+
+                        in:
+                            mapRoot
+                    )
+                }
+            }
+
+            for id in collisionDebugCircleEntities.keys
+                .filter({
+                    activeDebugIDs.contains(
+                        $0
+                    ) == false
+                }) {
+
+                collisionDebugCircleEntities[
+                    id
+                ]?
+                .removeFromParent()
+
+                collisionDebugCircleEntities[
+                    id
+                ] =
+                    nil
+            }
+        }
+
+
+        private func updateCollisionDebugCircle(
+            id:
+                String,
+
+            object:
+                PlacedMapObject,
+
+            radius:
+                Float,
+
+            yOffset:
+                Float,
+
+            in mapRoot:
+                Entity
+        ) {
+
+            if let entity =
+                collisionDebugCircleEntities[
+                    id
+                ] {
+
+                entity.position =
+                    collisionDebugCirclePosition(
+                        for:
+                            object,
+
+                        yOffset:
+                            yOffset
+                    )
+
+                return
+            }
+
+            let circle =
+                makeCollisionDebugCircle(
+                    radius:
+                        radius
+                )
+
+            circle.name =
+                id
+
+            circle.position =
+                collisionDebugCirclePosition(
+                    for:
+                        object,
+
+                    yOffset:
+                        yOffset
+                )
+
+            mapRoot.addChild(
+                circle
+            )
+
+            collisionDebugCircleEntities[
+                id
+            ] =
+                circle
+        }
+
+
+        private func makeCollisionDebugCircle(
+            radius:
+                Float
+        ) -> Entity {
+
+            let mesh =
+                MeshResource.generateCylinder(
+                    height:
+                        0.003,
+
+                    radius:
+                        radius
+                )
+
+            let material =
+                SimpleMaterial(
+                    color:
+                        UIColor.magenta.withAlphaComponent(
+                            0.42
+                        ),
+
+                    isMetallic:
+                        false
+                )
+
+            return ModelEntity(
+                mesh:
+                    mesh,
+
+                materials:
+                    [
+                        material
+                    ]
+            )
+        }
+
+
+        private func collisionDebugCirclePosition(
+            for object:
+                PlacedMapObject,
+
+            yOffset:
+                Float
+        ) -> SIMD3<Float> {
+
+            mapObjectPosition(
+                for:
+                    object
+            )
+            + SIMD3<Float>(
+                0,
+                yOffset,
+                0
+            )
+        }
+
+
+        private func collisionDebugCircleID(
+            object:
+                PlacedMapObject,
+
+            kind:
+                String
+        ) -> String {
+
+            "CollisionDebug-\(kind)-\(object.id.uuidString)"
+        }
+
+
+        private func clearCollisionDebugCircles() {
+
+            for entity in collisionDebugCircleEntities.values {
+
+                entity.removeFromParent()
+            }
+
+            collisionDebugCircleEntities
+                .removeAll()
         }
 
 
@@ -2892,6 +3162,8 @@ struct CameraARView: UIViewRepresentable {
 
             mapObjectEntities
                 .removeAll()
+
+            clearCollisionDebugCircles()
 
             revealedTreeEntityIDs
                 .removeAll()
