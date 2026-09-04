@@ -3074,6 +3074,28 @@ struct CameraARView: UIViewRepresentable {
                             continue
                         }
 
+                        if object.type == .water {
+
+                            object.entity.position =
+                                object.basePosition
+
+                            object.entity.orientation =
+                                simd_quatf(
+                                    angle:
+                                        time * 0.35,
+
+                                    axis:
+                                        SIMD3<Float>(
+                                            0,
+                                            1,
+                                            0
+                                        )
+                                )
+                                * object.baseOrientation
+
+                            continue
+                        }
+
 
                         let verticalOffset =
                             sin(time * 3.2)

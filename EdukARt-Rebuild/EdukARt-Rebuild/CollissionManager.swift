@@ -287,47 +287,6 @@ final class CollisionManager {
     }
 
 
-    // MARK: - Game Over Check
-
-    func isInsideGameOverZone(
-        robotPose:
-            RobotPose,
-
-        object:
-            PlacedMapObject
-    ) -> Bool {
-
-        guard let gameOverRadius =
-            object.type.gameOverRadius
-        else {
-            return false
-        }
-
-
-        let robotPosition =
-            SIMD2<Float>(
-                robotPose.position.x,
-                robotPose.position.z
-            )
-
-        let objectPosition =
-            SIMD2<Float>(
-                object.x,
-                object.z
-            )
-
-        let distance =
-            simd_distance(
-                robotPosition,
-                objectPosition
-            )
-
-        return distance
-            <= robotRadius
-            + gameOverRadius
-    }
-
-
     private func predictedPosition(
         from pose:
             RobotPose,

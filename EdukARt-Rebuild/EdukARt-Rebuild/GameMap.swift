@@ -372,7 +372,7 @@ enum MapObjectType:
             return 0.18 // ToDo: size
 
         case .water:
-            return 0.20 // ToDo: size
+            return 0.40 // ToDo: size
 
         case .rock:
             return nil
@@ -401,21 +401,6 @@ enum MapObjectType:
 
         case .tree:
             return 0.10 // ToDo: size
-
-        default:
-            return nil
-        }
-    }
-
-
-    // MARK: - Game Over Collision
-
-    var gameOverRadius: Float? {
-
-        switch self {
-
-        case .water:
-            return 0.05 // ToDo: size
 
         default:
             return nil

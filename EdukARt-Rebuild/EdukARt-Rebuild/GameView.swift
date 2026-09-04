@@ -921,11 +921,6 @@ struct GameView: View {
             )
         }
 
-        gameController.setGameOverHandler {
-
-            controller.stopForGameOver()
-        }
-
         syncBlockingObjects()
 
         prepareGameStartIfNeeded()
@@ -1261,11 +1256,6 @@ struct GameView: View {
             )
 
         } else if isNoDebugMode,
-                  gameController.isGameOver {
-
-            gameOverView
-
-        } else if isNoDebugMode,
                   gameController.isRaceFinished {
 
             finishView
@@ -1454,54 +1444,6 @@ struct GameView: View {
             .black.opacity(
                 0.35
             )
-        )
-    }
-
-
-    private var gameOverView: some View {
-
-        VStack(
-            spacing:
-                14
-        ) {
-
-            Text(
-                "Game Over"
-            )
-            .font(
-                .title.bold()
-            )
-
-            Text(
-                gameController.gameOverReason
-                ?? "Eduard sank in the water"
-            )
-            .font(
-                .headline
-            )
-        }
-        .foregroundStyle(
-            .white
-        )
-        .multilineTextAlignment(
-            .center
-        )
-        .padding(
-            24
-        )
-        .background(
-            .black.opacity(
-                0.76
-            )
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius:
-                    8
-            )
-        )
-        .padding(
-            32
         )
     }
 

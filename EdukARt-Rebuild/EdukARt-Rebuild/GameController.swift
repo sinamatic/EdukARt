@@ -144,14 +144,6 @@ final class GameController:
         Bool = false
 
     @Published private(set)
-    var isGameOver:
-        Bool = false
-
-    @Published private(set)
-    var gameOverReason:
-        String?
-
-    @Published private(set)
     var elapsedTime:
         TimeInterval = 0
 
@@ -219,9 +211,6 @@ final class GameController:
 
     private var onWaterModeChanged:
         ((Bool) -> Void)?
-
-    private var onGameOver:
-        (() -> Void)?
 
     private var latestRobotPoses:
         [CollisionActor: RobotPose] = [:]
@@ -375,15 +364,6 @@ final class GameController:
     }
 
 
-    func setGameOverHandler(
-        _ handler: @escaping () -> Void
-    ) {
-
-        onGameOver =
-            handler
-    }
-
-
     // ======================================================
     // MARK: - Robot Pose Update
     // ======================================================
@@ -407,11 +387,6 @@ final class GameController:
 
         latestRobotPoses[actor] =
             pose
-
-        guard isGameOver == false
-        else {
-            return
-        }
 
         switch actor {
 
@@ -478,30 +453,6 @@ final class GameController:
             )
         }
 
-        for object in activeMapObjects {
-
-            guard object.type == .water
-            else {
-                continue
-            }
-
-            if collisionManager.isInsideGameOverZone(
-                robotPose:
-                    pose,
-
-                object:
-                    object
-            ) {
-
-                triggerGameOver(
-                    reason:
-                        "Eduard sank in the water"
-                )
-
-                return
-            }
-        }
-
         collectCoins(
             robotPose:
                 pose,
@@ -541,12 +492,6 @@ final class GameController:
 
         isRaceFinished =
             false
-
-        isGameOver =
-            false
-
-        gameOverReason =
-            nil
 
         isRaceRunning =
             true
@@ -1332,47 +1277,6 @@ final class GameController:
     }
 
 
-    private func triggerGameOver(
-        reason:
-            String
-    ) {
-
-        guard isGameOver == false
-        else {
-            return
-        }
-
-
-        isGameOver =
-            true
-
-        gameOverReason =
-            reason
-
-        isRaceRunning =
-            false
-
-        statusText =
-            "Game Over"
-
-        timerTask?
-            .cancel()
-
-        timerTask =
-            nil
-
-        onWaterModeChanged?(
-            false
-        )
-
-        onGameOver?()
-
-        print(
-            "# GAME OVER | \(reason)"
-        )
-    }
-
-
     // ======================================================
     // MARK: - Rock
     // ======================================================
@@ -1505,12 +1409,6 @@ final class GameController:
 
         isRaceFinished =
             false
-
-        isGameOver =
-            false
-
-        gameOverReason =
-            nil
 
         raceStartDate =
             nil

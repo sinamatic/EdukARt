@@ -162,6 +162,12 @@ final class RobotController:
     private var waterStrokeTask:
         Task<Void, Never>?
 
+    private var waterPreviousLightMode:
+        Eduard.LightMode?
+
+    private var waterPreviousAllLightsColor:
+        (red: Int, green: Int, blue: Int)?
+
     private var blockingObjects:
         [PlacedMapObject] = []
 
@@ -633,6 +639,8 @@ final class RobotController:
         waterStrokeArmed =
             false
 
+        restoreWaterLights()
+
         isGameplayDriveLocked =
             false
 
@@ -690,6 +698,27 @@ final class RobotController:
 
         if active {
 
+            waterPreviousLightMode =
+                eduard.activeLightMode
+
+            waterPreviousAllLightsColor =
+                eduard.activeAllLightsColor
+
+            eduard.setLightMode(
+                .rotation
+            )
+
+            eduard.setAllLightsColor(
+                red:
+                    0,
+
+                green:
+                    80,
+
+                blue:
+                    255
+            )
+
             gameplayDriveCommand =
                 .stop
 
@@ -711,54 +740,43 @@ final class RobotController:
 
             waterStrokeArmed =
                 false
+
+            restoreWaterLights()
         }
     }
 
 
-    func stopForGameOver() {
+    private func restoreWaterLights() {
 
-        gameplayDriveTask?
-            .cancel()
+        if let color =
+            waterPreviousAllLightsColor {
 
-        gameplayDriveTask =
-            nil
+            eduard.setAllLightsColor(
+                red:
+                    color.red,
 
-        waterStrokeTask?
-            .cancel()
+                green:
+                    color.green,
 
-        waterStrokeTask =
-            nil
-
-        isWaterModeActive =
-            false
-
-        waterStrokeArmed =
-            false
-
-        isGameplayDriveLocked =
-            true
-
-        joystickInput =
-            (
-                x: 0,
-                y: 0
+                blue:
+                    color.blue
             )
+        }
 
-        mechanumRotationInput =
-            0
+        if let mode =
+            waterPreviousLightMode {
 
-        activeJoystickDirection =
-            .idle
+            eduard.setLightMode(
+                mode
+            )
+        }
 
-        gameplayDriveCommand =
-            .stop
+        waterPreviousLightMode =
+            nil
 
-        sendCurrentCommand()
-
-        gameplayDriveCommand =
+        waterPreviousAllLightsColor =
             nil
     }
-
 
     func stopJoystick() {
 
