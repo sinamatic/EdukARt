@@ -146,6 +146,12 @@ final class RobotController:
     private var gameplayDriveTask:
         Task<Void, Never>?
 
+    private var gameplaySpeedMultiplier:
+        Double = 1.0
+
+    private var pendingShitSpeedReductions:
+        Int = 0
+
 
     private var joystickInput =
         (
@@ -533,6 +539,42 @@ final class RobotController:
     }
 
 
+    func resetGameplayEffects() {
+
+        gameplayDriveTask?
+            .cancel()
+
+        gameplayDriveTask =
+            nil
+
+        gameplayDriveCommand =
+            nil
+
+        isGameplayDriveLocked =
+            false
+
+        gameplaySpeedMultiplier =
+            1.0
+
+        pendingShitSpeedReductions =
+            0
+
+        joystickInput =
+            (
+                x: 0,
+                y: 0
+            )
+
+        activeJoystickDirection =
+            .idle
+
+        mechanumRotationInput =
+            0
+
+        sendCurrentCommand()
+    }
+
+
     func stopJoystick() {
 
         guard isGameplayInputLocked == false,
@@ -644,7 +686,13 @@ final class RobotController:
     }
 
 
-    func startShitEffect() {
+    func startShitEffect(
+        duration:
+            TimeInterval
+    ) {
+
+        pendingShitSpeedReductions +=
+            1
 
         guard isGameplayDriveLocked == false
         else {
@@ -730,6 +778,12 @@ final class RobotController:
                         diagonalRight
                     ]
 
+                let segmentDuration =
+                    duration
+                    / Double(
+                        commands.count
+                    )
+
 
                 for command in commands {
 
@@ -741,25 +795,34 @@ final class RobotController:
                     try? await Task.sleep(
                         for:
                             .seconds(
-                                1
+                                segmentDuration
                             )
                     )
 
                     guard Task.isCancelled == false
                     else {
 
-                        finishShitEffect()
+                        finishShitEffect(
+                            reduceSpeed:
+                                false
+                        )
                         return
                     }
                 }
 
 
-                finishShitEffect()
+                finishShitEffect(
+                    reduceSpeed:
+                        true
+                )
             }
     }
 
 
-    private func finishShitEffect() {
+    private func finishShitEffect(
+        reduceSpeed:
+            Bool
+    ) {
 
         gameplayDriveCommand =
             .stop
@@ -769,6 +832,32 @@ final class RobotController:
 
         gameplayDriveCommand =
             nil
+
+        if reduceSpeed {
+
+            gameplaySpeedMultiplier =
+                max(
+                    0,
+                    gameplaySpeedMultiplier
+                    - (
+                        0.10
+                        * Double(
+                            pendingShitSpeedReductions
+                        )
+                    )
+                )
+
+            pendingShitSpeedReductions =
+                0
+
+            sendLightMode(
+                .dimmed
+            )
+        } else {
+
+            pendingShitSpeedReductions =
+                0
+        }
 
         isGameplayDriveLocked =
             false
@@ -1101,15 +1190,17 @@ final class RobotController:
 
         if driveMode == .mechanum {
 
-            rotation =
-                mechanumRotationInput
-                * maxAngularSpeed
+                rotation =
+                    mechanumRotationInput
+                    * maxAngularSpeed
+                    * gameplaySpeedMultiplier
 
         } else if driveMode == .offroad {
 
             rotation =
                 -joystickInput.x
                 * maxAngularSpeed
+                * gameplaySpeedMultiplier
 
         } else {
 
@@ -1147,6 +1238,7 @@ final class RobotController:
         let forward =
             -joystickInput.y
             * velocityScale
+            * gameplaySpeedMultiplier
 
 
         let sideways:
@@ -1158,6 +1250,7 @@ final class RobotController:
             sideways =
                 -joystickInput.x
                 * velocityScale
+                * gameplaySpeedMultiplier
 
         } else {
 

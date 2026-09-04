@@ -128,6 +128,8 @@ struct GameView: View {
             }
             .onAppear {
 
+                controller.resetGameplayEffects()
+
                 configureGameController()
             }
             .onDisappear {
@@ -888,9 +890,12 @@ struct GameView: View {
 
     private func configureGameController() {
 
-        gameController.setShitEffectHandler {
+        gameController.setShitEffectHandler { duration in
 
-            controller.startShitEffect()
+            controller.startShitEffect(
+                duration:
+                    duration
+            )
         }
 
         gameController.setOilEffectHandler { duration in

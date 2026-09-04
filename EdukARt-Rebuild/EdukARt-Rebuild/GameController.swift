@@ -197,8 +197,11 @@ final class GameController:
         [ShitDot] = []
 
 
+    private var shitEffectTask:
+        Task<Void, Never>?
+
     private var onShitEffectStarted:
-        (() -> Void)?
+        ((TimeInterval) -> Void)?
 
     private var onOilEffectStarted:
         ((TimeInterval) -> Void)?
@@ -208,6 +211,9 @@ final class GameController:
 
     private var latestRobotPoses:
         [CollisionActor: RobotPose] = [:]
+
+    private var shitEffectActor:
+        CollisionActor = .simulation
 
     private var carriedEggCount:
         Int {
@@ -224,6 +230,12 @@ final class GameController:
         }
         .count
     }
+
+    private let shitEffectDuration:
+        TimeInterval = 4
+
+    private let shitDotSpawnDistance:
+        Float = 0.14
 
     private var oilCooldownEndDates:
         [UUID: Date] = [:]
@@ -308,11 +320,13 @@ final class GameController:
         timerTask?
             .cancel()
 
+        shitEffectTask?
+            .cancel()
     }
 
 
     func setShitEffectHandler(
-        _ handler: @escaping () -> Void
+        _ handler: @escaping (TimeInterval) -> Void
     ) {
 
         onShitEffectStarted =
@@ -998,7 +1012,115 @@ final class GameController:
         )
 
 
-        onShitEffectStarted?()
+        startShitTrail(
+            actor:
+                actor
+        )
+
+        onShitEffectStarted?(
+            shitEffectDuration
+        )
+    }
+
+
+    // ======================================================
+    // MARK: - Shit Trail
+    // ======================================================
+
+    private func startShitTrail(
+        actor:
+            CollisionActor
+    ) {
+
+        shitEffectTask?
+            .cancel()
+
+        shitEffectActor =
+            actor
+
+        shitEffectTask =
+            Task { @MainActor in
+
+                let endDate =
+                    Date()
+                        .addingTimeInterval(
+                            shitEffectDuration
+                        )
+
+
+                while Date() < endDate {
+
+                    let delay =
+                        Double.random(
+                            in:
+                                0.04...0.12
+                        )
+
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                delay
+                            )
+                    )
+
+
+                    guard Task.isCancelled == false,
+                          Date() < endDate
+                    else {
+                        return
+                    }
+
+
+                    guard let pose =
+                        latestRobotPoses[
+                            shitEffectActor
+                        ]
+                    else {
+                        continue
+                    }
+
+
+                    shitDots.append(
+                        ShitDot(
+                            position:
+                                shitDotPosition(
+                                    behind:
+                                        pose
+                                ),
+                            radius:
+                                Float.random(
+                                    in:
+                                        0.015...0.05
+                                )
+                        )
+                    )
+                }
+
+
+                shitEffectTask =
+                    nil
+            }
+    }
+
+
+    private func shitDotPosition(
+        behind pose:
+            RobotPose
+    ) -> SIMD2<Float> {
+
+        SIMD2<Float>(
+            pose.position.x
+                + sin(
+                    pose.rotation
+                )
+                * shitDotSpawnDistance,
+
+            pose.position.z
+                + cos(
+                    pose.rotation
+                )
+                * shitDotSpawnDistance
+        )
     }
 
 
@@ -1289,6 +1411,12 @@ final class GameController:
                 from:
                     map.trackPoints
             )
+
+        shitEffectTask?
+            .cancel()
+
+        shitEffectTask =
+            nil
 
         shitDots
             .removeAll()
