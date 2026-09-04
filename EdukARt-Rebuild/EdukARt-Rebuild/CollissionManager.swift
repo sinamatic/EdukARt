@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import simd
 
 
 final class CollisionManager {
@@ -55,7 +56,8 @@ final class CollisionManager {
 
         for object in objects {
 
-            guard object.type.hasCollision
+            guard let triggerRadius =
+                object.type.triggerRadius
             else {
                 continue
             }
@@ -98,7 +100,7 @@ final class CollisionManager {
             let collisionDistance =
                 robotRadius
                 +
-                object.type.collisionRadius
+                triggerRadius
 
 
             let collisionDistanceSquared =
@@ -186,6 +188,217 @@ final class CollisionManager {
 
 
         return collisions
+    }
+
+
+    // MARK: - Blocking Check
+
+    func isMovementBlocked(
+        robotPose:
+            RobotPose,
+
+        command:
+            RobotDriveCommand,
+
+        objects:
+            [PlacedMapObject],
+
+        revealedTreeIDs:
+            Set<UUID>,
+
+        predictionTime:
+            Float = 0.10,
+
+        additionalSafetyMargin:
+            Float = 0
+    ) -> Bool {
+
+        let currentPosition =
+            SIMD2<Float>(
+                robotPose.position.x,
+                robotPose.position.z
+            )
+
+        let predictedPosition =
+            predictedPosition(
+                from:
+                    robotPose,
+
+                command:
+                    command,
+
+                predictionTime:
+                    predictionTime
+            )
+
+
+        for object in objects {
+
+            guard let blockingRadius =
+                object.type.blockingRadius
+            else {
+                continue
+            }
+
+            if object.type == .tree,
+               revealedTreeIDs.contains(
+                object.id
+               ) == false {
+
+                continue
+            }
+
+
+            let obstaclePosition =
+                blockingPosition(
+                    for:
+                        object
+                )
+
+            let minimumDistance =
+                robotRadius
+                +
+                blockingRadius
+                +
+                additionalSafetyMargin
+
+            let currentDistance =
+                simd_distance(
+                    currentPosition,
+                    obstaclePosition
+                )
+
+            let predictedDistance =
+                simd_distance(
+                    predictedPosition,
+                    obstaclePosition
+                )
+
+
+            if predictedDistance < minimumDistance,
+               predictedDistance < currentDistance {
+
+                return true
+            }
+        }
+
+
+        return false
+    }
+
+
+    // MARK: - Game Over Check
+
+    func isInsideGameOverZone(
+        robotPose:
+            RobotPose,
+
+        object:
+            PlacedMapObject
+    ) -> Bool {
+
+        guard let gameOverRadius =
+            object.type.gameOverRadius
+        else {
+            return false
+        }
+
+
+        let robotPosition =
+            SIMD2<Float>(
+                robotPose.position.x,
+                robotPose.position.z
+            )
+
+        let objectPosition =
+            SIMD2<Float>(
+                object.x,
+                object.z
+            )
+
+        let distance =
+            simd_distance(
+                robotPosition,
+                objectPosition
+            )
+
+        return distance
+            <= robotRadius
+            + gameOverRadius
+    }
+
+
+    private func predictedPosition(
+        from pose:
+            RobotPose,
+
+        command:
+            RobotDriveCommand,
+
+        predictionTime:
+            Float
+    ) -> SIMD2<Float> {
+
+        let yaw =
+            pose.rotation
+
+        let forward =
+            Float(
+                command.forward
+            )
+
+        let sideways =
+            -Float(
+                command.sideways
+            )
+
+        let sinRotation =
+            sin(
+                yaw
+            )
+
+        let cosRotation =
+            cos(
+                yaw
+            )
+
+        let worldX =
+            sideways
+            * cosRotation
+            +
+            forward
+            * -sinRotation
+
+        let worldZ =
+            forward
+            * -cosRotation
+            -
+            sideways
+            * sinRotation
+
+        return SIMD2<Float>(
+            pose.position.x
+            +
+            worldX
+            * predictionTime,
+
+            pose.position.z
+            +
+            worldZ
+            * predictionTime
+        )
+    }
+
+
+    private func blockingPosition(
+        for object:
+            PlacedMapObject
+    ) -> SIMD2<Float> {
+
+        SIMD2<Float>(
+            object.x,
+            object.z
+        )
     }
 
 

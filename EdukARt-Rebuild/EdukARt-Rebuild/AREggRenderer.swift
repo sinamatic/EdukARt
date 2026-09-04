@@ -30,7 +30,8 @@ final class AREggRenderer {
     private let eggHeight:
         Float = MapObjectType
             .eggs
-            .collisionRadius // ToDo: size
+            .triggerRadius
+            ?? 0.10 // ToDo: size
 
 
     private let eggCarryHeight:

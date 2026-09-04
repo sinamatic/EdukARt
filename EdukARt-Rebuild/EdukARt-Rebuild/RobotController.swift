@@ -152,6 +152,25 @@ final class RobotController:
     private var pendingShitSpeedReductions:
         Int = 0
 
+    @Published private(set)
+    var isWaterModeActive =
+        false
+
+    private var waterStrokeArmed =
+        false
+
+    private var waterStrokeTask:
+        Task<Void, Never>?
+
+    private var blockingObjects:
+        [PlacedMapObject] = []
+
+    private var blockingRevealedTreeIDs:
+        Set<UUID> = []
+
+    private let collisionManager =
+        CollisionManager()
+
 
     private var joystickInput =
         (
@@ -182,6 +201,12 @@ final class RobotController:
 
     private let maxAngularSpeed =
         Double.pi
+
+    private let waterStrokeDistance:
+        Double = 0.05
+
+    private let waterStrokeSpeed:
+        Double = 0.30
 
 
     // MARK: - Timer
@@ -239,6 +264,36 @@ final class RobotController:
     }
 
 
+    private var currentCollisionPose:
+        RobotPose? {
+
+        switch effectiveControlMode {
+
+        case .real,
+             .synchronized:
+            return realRobotPose
+
+        case .simulation:
+            return eduardSimulation.pose
+        }
+    }
+
+
+    private var blockingSafetyMargin:
+        Float {
+
+        switch effectiveControlMode {
+
+        case .simulation:
+            return 0.02
+
+        case .real,
+             .synchronized:
+            return 0.05
+        }
+    }
+
+
     // MARK: - Init
 
     init(
@@ -282,6 +337,9 @@ final class RobotController:
             .cancel()
 
         gameplayDriveTask?
+            .cancel()
+
+        waterStrokeTask?
             .cancel()
     }
 
@@ -488,6 +546,19 @@ final class RobotController:
             return
         }
 
+        if isWaterModeActive {
+
+            updateWaterJoystickInput(
+                x:
+                    x,
+
+                y:
+                    y
+            )
+
+            return
+        }
+
         joystickInput =
             normalizedJoystickInput(
                 x:
@@ -550,6 +621,18 @@ final class RobotController:
         gameplayDriveCommand =
             nil
 
+        waterStrokeTask?
+            .cancel()
+
+        waterStrokeTask =
+            nil
+
+        isWaterModeActive =
+            false
+
+        waterStrokeArmed =
+            false
+
         isGameplayDriveLocked =
             false
 
@@ -575,6 +658,108 @@ final class RobotController:
     }
 
 
+    func updateBlockingObjects(
+        _ objects:
+            [PlacedMapObject],
+
+        revealedTreeIDs:
+            Set<UUID>
+    ) {
+
+        blockingObjects =
+            objects
+
+        blockingRevealedTreeIDs =
+            revealedTreeIDs
+    }
+
+
+    func setWaterMode(
+        _ active:
+            Bool
+    ) {
+
+        guard isWaterModeActive != active
+        else {
+            return
+        }
+
+
+        isWaterModeActive =
+            active
+
+        if active {
+
+            gameplayDriveCommand =
+                .stop
+
+            sendCurrentCommand()
+
+            gameplayDriveCommand =
+                nil
+
+            waterStrokeArmed =
+                false
+
+        } else {
+
+            waterStrokeTask?
+                .cancel()
+
+            waterStrokeTask =
+                nil
+
+            waterStrokeArmed =
+                false
+        }
+    }
+
+
+    func stopForGameOver() {
+
+        gameplayDriveTask?
+            .cancel()
+
+        gameplayDriveTask =
+            nil
+
+        waterStrokeTask?
+            .cancel()
+
+        waterStrokeTask =
+            nil
+
+        isWaterModeActive =
+            false
+
+        waterStrokeArmed =
+            false
+
+        isGameplayDriveLocked =
+            true
+
+        joystickInput =
+            (
+                x: 0,
+                y: 0
+            )
+
+        mechanumRotationInput =
+            0
+
+        activeJoystickDirection =
+            .idle
+
+        gameplayDriveCommand =
+            .stop
+
+        sendCurrentCommand()
+
+        gameplayDriveCommand =
+            nil
+    }
+
+
     func stopJoystick() {
 
         guard isGameplayInputLocked == false,
@@ -591,6 +776,12 @@ final class RobotController:
 
         activeJoystickDirection =
             .idle
+
+        if isWaterModeActive {
+
+            waterStrokeArmed =
+                true
+        }
 
         sendCurrentCommand()
     }
@@ -642,6 +833,170 @@ final class RobotController:
             0
 
         sendCurrentCommand()
+    }
+
+
+    // ======================================================
+    // MARK: - Water Movement
+    // ======================================================
+
+    private func updateWaterJoystickInput(
+        x: Float,
+        y: Float
+    ) {
+
+        let input =
+            normalizedJoystickInput(
+                x:
+                    Double(x),
+
+                y:
+                    Double(y)
+            )
+
+        let magnitude =
+            sqrt(
+                input.x * input.x
+                +
+                input.y * input.y
+            )
+
+        if magnitude <= joystickDeadZone {
+
+            waterStrokeArmed =
+                true
+
+            activeJoystickDirection =
+                .idle
+
+            return
+        }
+
+
+        activeJoystickDirection =
+            joystickDirection(
+                x:
+                    input.x,
+
+                y:
+                    input.y
+            )
+
+        guard waterStrokeArmed
+        else {
+            return
+        }
+
+
+        waterStrokeArmed =
+            false
+
+        startWaterStroke(
+            x:
+                input.x,
+
+            y:
+                input.y
+        )
+    }
+
+
+    private func startWaterStroke(
+        x: Double,
+        y: Double
+    ) {
+
+        guard waterStrokeTask == nil
+        else {
+            return
+        }
+
+
+        let magnitude =
+            sqrt(
+                x * x
+                +
+                y * y
+            )
+
+        guard magnitude > joystickDeadZone
+        else {
+            return
+        }
+
+
+        let normalizedX =
+            x
+            / magnitude
+
+        let normalizedY =
+            y
+            / magnitude
+
+        let forward =
+            -normalizedY
+            * waterStrokeSpeed
+
+        let sideways =
+            driveMode == .mechanum
+            ? -normalizedX
+                * waterStrokeSpeed
+            : 0
+
+        let command =
+            RobotDriveCommand(
+                forward:
+                    forward,
+
+                sideways:
+                    sideways,
+
+                rotation:
+                    0
+            )
+
+        let duration =
+            waterStrokeDistance
+            / waterStrokeSpeed
+
+        waterStrokeTask =
+            Task { @MainActor [weak self] in
+
+                guard let self
+                else {
+                    return
+                }
+
+
+                gameplayDriveCommand =
+                    command
+
+                sendCurrentCommand()
+
+                try? await Task.sleep(
+                    for:
+                        .seconds(
+                            duration
+                        )
+                )
+
+                guard Task.isCancelled == false
+                else {
+                    return
+                }
+
+
+                gameplayDriveCommand =
+                    .stop
+
+                sendCurrentCommand()
+
+                gameplayDriveCommand =
+                    nil
+
+                waterStrokeTask =
+                    nil
+            }
     }
 
 
@@ -984,6 +1339,10 @@ final class RobotController:
         let previousAllLightsColor =
             eduard.activeAllLightsColor
 
+        eduard.setLightMode(
+            .rotation
+        )
+
         eduard.setAllLightsColor(
             red:
                 0,
@@ -995,12 +1354,8 @@ final class RobotController:
                 0
         )
 
-        eduard.setLightMode(
-            .solid
-        )
-
         print(
-            "# TREE LIGHTS | physical Eduard green"
+            "# TREE LIGHTS | physical Eduard green rotation"
         )
 
 
@@ -1118,9 +1473,49 @@ final class RobotController:
 
     private func sendCurrentCommand() {
 
-        let command =
-            gameplayDriveCommand
-            ?? currentDriveCommand()
+        var command: RobotDriveCommand
+
+        if let gameplayDriveCommand {
+
+            command =
+                gameplayDriveCommand
+
+        } else if isWaterModeActive {
+
+            command =
+                .stop
+
+        } else {
+
+            command =
+                currentDriveCommand()
+        }
+
+        if let pose =
+            currentCollisionPose,
+           collisionManager.isMovementBlocked(
+            robotPose:
+                pose,
+            command:
+                command,
+            objects:
+                blockingObjects,
+            revealedTreeIDs:
+                blockingRevealedTreeIDs,
+            additionalSafetyMargin:
+                blockingSafetyMargin
+           ) {
+
+            command =
+                RobotDriveCommand(
+                    forward:
+                        0,
+                    sideways:
+                        0,
+                    rotation:
+                        command.rotation
+                )
+        }
 
 
         switch effectiveControlMode {

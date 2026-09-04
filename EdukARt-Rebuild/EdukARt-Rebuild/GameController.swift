@@ -144,6 +144,14 @@ final class GameController:
         Bool = false
 
     @Published private(set)
+    var isGameOver:
+        Bool = false
+
+    @Published private(set)
+    var gameOverReason:
+        String?
+
+    @Published private(set)
     var elapsedTime:
         TimeInterval = 0
 
@@ -209,6 +217,12 @@ final class GameController:
     private var onTreeEffectStarted:
         ((TimeInterval) -> Void)?
 
+    private var onWaterModeChanged:
+        ((Bool) -> Void)?
+
+    private var onGameOver:
+        (() -> Void)?
+
     private var latestRobotPoses:
         [CollisionActor: RobotPose] = [:]
 
@@ -259,7 +273,7 @@ final class GameController:
         Float = 0.45
 
     private let treeLightEffectDuration:
-        TimeInterval = 1.0
+        TimeInterval = 3.0
 
     private let eggDeliveryScore:
         Int = 300
@@ -352,6 +366,24 @@ final class GameController:
     }
 
 
+    func setWaterModeHandler(
+        _ handler: @escaping (Bool) -> Void
+    ) {
+
+        onWaterModeChanged =
+            handler
+    }
+
+
+    func setGameOverHandler(
+        _ handler: @escaping () -> Void
+    ) {
+
+        onGameOver =
+            handler
+    }
+
+
     // ======================================================
     // MARK: - Robot Pose Update
     // ======================================================
@@ -375,6 +407,11 @@ final class GameController:
 
         latestRobotPoses[actor] =
             pose
+
+        guard isGameOver == false
+        else {
+            return
+        }
 
         switch actor {
 
@@ -441,6 +478,30 @@ final class GameController:
             )
         }
 
+        for object in activeMapObjects {
+
+            guard object.type == .water
+            else {
+                continue
+            }
+
+            if collisionManager.isInsideGameOverZone(
+                robotPose:
+                    pose,
+
+                object:
+                    object
+            ) {
+
+                triggerGameOver(
+                    reason:
+                        "Eduard sank in the water"
+                )
+
+                return
+            }
+        }
+
         collectCoins(
             robotPose:
                 pose,
@@ -480,6 +541,12 @@ final class GameController:
 
         isRaceFinished =
             false
+
+        isGameOver =
+            false
+
+        gameOverReason =
+            nil
 
         isRaceRunning =
             true
@@ -810,7 +877,24 @@ final class GameController:
             PlacedMapObject
     ) {
 
-        // No action required yet.
+        switch object.type {
+
+        case .water:
+
+            onWaterModeChanged?(
+                false
+            )
+
+            statusText =
+                ""
+
+            print(
+                "# GAME | Left water"
+            )
+
+        default:
+            break
+        }
     }
 
 
@@ -1234,25 +1318,58 @@ final class GameController:
 
     private func hitWater() {
 
-        score -= 2
+        statusText =
+            "Swimming"
+
+        onWaterModeChanged?(
+            true
+        )
+
+
+        print(
+            "# GAME | Entered water"
+        )
+    }
+
+
+    private func triggerGameOver(
+        reason:
+            String
+    ) {
+
+        guard isGameOver == false
+        else {
+            return
+        }
+
+
+        isGameOver =
+            true
+
+        gameOverReason =
+            reason
+
+        isRaceRunning =
+            false
 
         statusText =
-            "Water hit"
+            "Game Over"
 
+        timerTask?
+            .cancel()
 
-        print(
-            "# GAME | Water hit"
+        timerTask =
+            nil
+
+        onWaterModeChanged?(
+            false
         )
 
+        onGameOver?()
+
         print(
-            "# GAME | Score: \(score)"
+            "# GAME OVER | \(reason)"
         )
-
-
-        // Later:
-        //
-        // RobotController:
-        // temporarily reduce movement speed.
     }
 
 
@@ -1333,6 +1450,10 @@ final class GameController:
             tree.id
         )
 
+        onTreeEffectStarted?(
+            treeLightEffectDuration
+        )
+
         activeMapObjects.removeAll {
             $0.id == trigger.id
         }
@@ -1385,6 +1506,12 @@ final class GameController:
         isRaceFinished =
             false
 
+        isGameOver =
+            false
+
+        gameOverReason =
+            nil
+
         raceStartDate =
             nil
 
@@ -1402,6 +1529,10 @@ final class GameController:
 
         statusText =
             ""
+
+        onWaterModeChanged?(
+            false
+        )
 
         activeMapObjects =
             map.mapObjects

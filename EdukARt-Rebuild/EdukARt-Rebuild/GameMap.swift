@@ -353,55 +353,73 @@ enum MapObjectType:
         }
     }
     
-    // MARK: - Collision
-    
-    var hasCollision: Bool {
+    // MARK: - Trigger Collision
 
-        switch self {
-
-        case .eggCup,
-             .eggs,
-             .shit,
-             .oil,
-             .water,
-             .rock,
-             .tree,
-             .treeTrigger:
-
-            return true
-        } }
-        
-    var collisionRadius: Float {
+    var triggerRadius: Float? {
 
         switch self {
 
         case .eggCup:
-            return 0.1 // ToDo: size
+            return 0.10 // ToDo: size
 
         case .eggs:
-            return 0.1 // ToDo: size
+            return 0.10 // ToDo: size
 
         case .shit:
             return 0.12 // ToDo: size
 
         case .oil:
-            return 0.25 // ToDo: size
-
-        case .water:
-            return 0.15 // ToDo: size
-
-        case .rock:
             return 0.18 // ToDo: size
 
-        case .tree:
+        case .water:
             return 0.20 // ToDo: size
 
+        case .rock:
+            return nil
+
+        case .tree:
+            return 0.10 // ToDo: size
+
         case .treeTrigger:
-            return 0.12 // ToDo: size
+            return 0.18 // ToDo: size
 
         }
-   
-    
+    }
+
+
+    // MARK: - Blocking Collision
+
+    var blockingRadius: Float? {
+
+        switch self {
+
+        case .oil:
+            return 0.07 // ToDo: size
+
+        case .rock:
+            return 0.15 // ToDo: size
+
+        case .tree:
+            return 0.10 // ToDo: size
+
+        default:
+            return nil
+        }
+    }
+
+
+    // MARK: - Game Over Collision
+
+    var gameOverRadius: Float? {
+
+        switch self {
+
+        case .water:
+            return 0.05 // ToDo: size
+
+        default:
+            return nil
+        }
     }
 
 
@@ -417,6 +435,9 @@ enum MapObjectType:
 
         case .oil:
             return 0.15 // ToDo: size
+
+        case .water:
+            return 0.10 // ToDo: size
 
         default:
             return 0.3 // ToDo: size
@@ -447,10 +468,10 @@ enum MapObjectType:
         case .tree:
             "tree"
 
-        case .treeTrigger:
-            nil
+        case .water:
+            "water"
 
-        default:
+        case .treeTrigger:
             nil
         }
     }
