@@ -180,12 +180,6 @@ final class GameController:
         RobotPose?
 
 
-    /// Indicates whether Eduard currently leaves a shit trail.
-    @Published private(set)
-    var isLeavingShitTrail:
-        Bool = false
-
-
     /// Current gameplay status.
     ///
     /// Useful for debugging and later for UI messages.
@@ -203,11 +197,8 @@ final class GameController:
         [ShitDot] = []
 
 
-    private var shitEffectTask:
-        Task<Void, Never>?
-
     private var onShitEffectStarted:
-        ((TimeInterval) -> Void)?
+        (() -> Void)?
 
     private var onOilEffectStarted:
         ((TimeInterval) -> Void)?
@@ -217,10 +208,6 @@ final class GameController:
 
     private var latestRobotPoses:
         [CollisionActor: RobotPose] = [:]
-
-    private var shitEffectActor:
-        CollisionActor = .simulation
-
 
     private var carriedEggCount:
         Int {
@@ -237,12 +224,6 @@ final class GameController:
         }
         .count
     }
-
-    private let shitEffectDuration:
-        TimeInterval = 10
-
-    private let shitDotSpawnDistance:
-        Float = 0.14
 
     private var oilCooldownEndDates:
         [UUID: Date] = [:]
@@ -327,13 +308,11 @@ final class GameController:
         timerTask?
             .cancel()
 
-        shitEffectTask?
-            .cancel()
     }
 
 
     func setShitEffectHandler(
-        _ handler: @escaping (TimeInterval) -> Void
+        _ handler: @escaping () -> Void
     ) {
 
         onShitEffectStarted =
@@ -1019,159 +998,7 @@ final class GameController:
         )
 
 
-        startShitEffect(
-            actor:
-                actor
-        )
-    }
-
-
-    // ======================================================
-    // MARK: - Shit Effect
-    // ======================================================
-
-    private func startShitEffect(
-        actor:
-            CollisionActor
-    ) {
-
-        // Stop an already running effect.
-        shitEffectTask?
-            .cancel()
-
-
-        isLeavingShitTrail =
-            true
-
-        shitEffectActor =
-            actor
-
-        onShitEffectStarted?(
-            shitEffectDuration
-        )
-
-
-        shitEffectTask =
-            Task { @MainActor in
-
-                let endDate =
-                    Date()
-                        .addingTimeInterval(
-                            shitEffectDuration
-                        )
-
-
-                while Date() < endDate {
-
-                    // ------------------------------------------
-                    // Random delay: 0.04 - 0.12 seconds
-                    // ------------------------------------------
-
-                    let delay =
-                        Double.random(
-                            in:
-                                0.04...0.12
-                        )
-
-
-                    try? await Task.sleep(
-                        for:
-                            .seconds(
-                                delay
-                            )
-                    )
-
-
-                    guard Task.isCancelled == false
-                    else {
-                        return
-                    }
-
-
-                    guard Date() < endDate
-                    else {
-                        break
-                    }
-
-
-                    // ------------------------------------------
-                    // Current robot position
-                    // ------------------------------------------
-
-                    guard let pose =
-                        latestRobotPoses[shitEffectActor]
-                    else {
-                        continue
-                    }
-
-                    let dropPosition =
-                        shitDotPosition(
-                            behind:
-                                pose
-                        )
-
-
-                    // ------------------------------------------
-                    // Random size: 1.5 - 5 cm radius
-                    // ------------------------------------------
-
-                    let radius =
-                        Float.random(
-                            in:
-                                0.015...0.05
-                        )
-
-
-                    shitDots.append(
-                        ShitDot(
-                            position:
-                                dropPosition,
-
-                            radius:
-                                radius
-                        )
-                    )
-
-
-                    print(
-                        "# GAME | Shit dropped"
-                    )
-                }
-
-
-                isLeavingShitTrail =
-                    false
-
-
-                print(
-                    "# GAME | Shit effect ended"
-                )
-            }
-    }
-
-
-    private func shitDotPosition(
-        behind pose:
-            RobotPose
-    ) -> SIMD2<Float> {
-
-        // EduardSimulation defines forward as
-        // (-sin(rotation), -cos(rotation)).
-        // A negative forward offset therefore places the dot
-        // behind the robot in map X/Z coordinates.
-        return SIMD2<Float>(
-            pose.position.x
-                + sin(
-                    pose.rotation
-                )
-                * shitDotSpawnDistance,
-
-            pose.position.z
-                + cos(
-                    pose.rotation
-                )
-                * shitDotSpawnDistance
-        )
+        onShitEffectStarted?()
     }
 
 
@@ -1462,15 +1289,6 @@ final class GameController:
                 from:
                     map.trackPoints
             )
-
-        shitEffectTask?
-            .cancel()
-
-        shitEffectTask =
-            nil
-
-        isLeavingShitTrail =
-            false
 
         shitDots
             .removeAll()

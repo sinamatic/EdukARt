@@ -888,12 +888,9 @@ struct GameView: View {
 
     private func configureGameController() {
 
-        gameController.setShitEffectHandler { duration in
+        gameController.setShitEffectHandler {
 
-            controller.startShitEffect(
-                duration:
-                    duration
-            )
+            controller.startShitEffect()
         }
 
         gameController.setOilEffectHandler { duration in

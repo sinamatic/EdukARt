@@ -130,6 +130,23 @@ final class RobotController:
         JoystickDirection = .idle
 
 
+    // ======================================================
+    // MARK: - Gameplay Drive Override
+    // ======================================================
+
+    @Published private(set)
+    var isGameplayDriveLocked =
+        false
+
+
+    private var gameplayDriveCommand:
+        RobotDriveCommand?
+
+
+    private var gameplayDriveTask:
+        Task<Void, Never>?
+
+
     private var joystickInput =
         (
             x: 0.0,
@@ -168,9 +185,6 @@ final class RobotController:
 
     private var connectionTimer:
         Timer?
-
-    private var shitLightEffectTask:
-        Task<Void, Never>?
 
     private var oilEffectTask:
         Task<Void, Never>?
@@ -255,13 +269,13 @@ final class RobotController:
         connectionTimer?
             .invalidate()
 
-        shitLightEffectTask?
-            .cancel()
-
         oilEffectTask?
             .cancel()
 
         treeLightEffectTask?
+            .cancel()
+
+        gameplayDriveTask?
             .cancel()
     }
 
@@ -462,7 +476,8 @@ final class RobotController:
         y: Float
     ) {
 
-        guard isGameplayInputLocked == false
+        guard isGameplayInputLocked == false,
+              isGameplayDriveLocked == false
         else {
             return
         }
@@ -520,7 +535,8 @@ final class RobotController:
 
     func stopJoystick() {
 
-        guard isGameplayInputLocked == false
+        guard isGameplayInputLocked == false,
+              isGameplayDriveLocked == false
         else {
             return
         }
@@ -546,7 +562,8 @@ final class RobotController:
         x: Float
     ) {
 
-        guard isGameplayInputLocked == false
+        guard isGameplayInputLocked == false,
+              isGameplayDriveLocked == false
         else {
             return
         }
@@ -573,7 +590,8 @@ final class RobotController:
 
     func stopMechanumRotation() {
 
-        guard isGameplayInputLocked == false
+        guard isGameplayInputLocked == false,
+              isGameplayDriveLocked == false
         else {
             return
         }
@@ -626,80 +644,149 @@ final class RobotController:
     }
 
 
-    func startShitEffect(
-        duration: TimeInterval
-    ) {
+    func startShitEffect() {
 
-        shitLightEffectTask?
+        guard isGameplayDriveLocked == false
+        else {
+            return
+        }
+
+
+        gameplayDriveTask?
             .cancel()
 
 
-        eduardSimulation.startShitEffect(
-            duration:
-                duration
-        )
+        gameplayDriveTask =
+            Task { @MainActor [weak self] in
 
-
-        let previousLightMode =
-            eduard.activeLightMode
-
-        let previousAllLightsColor =
-            eduard.activeAllLightsColor
-
-
-        eduard.setAllLightsColor(
-            red:
-                117,
-
-            green:
-                76,
-
-            blue:
-                41
-        )
-
-        eduard.setLightMode(
-            .slowBlinking
-        )
-
-        print(
-            "# SHIT LIGHTS | physical Eduard brown"
-        )
-
-
-        shitLightEffectTask =
-            Task { [weak self] in
-
-                try? await Task.sleep(
-                    for:
-                        .seconds(
-                            duration
-                        )
-                )
-
-
-                guard Task.isCancelled == false,
-                      let self
+                guard let self
                 else {
                     return
                 }
 
 
-                self.eduard.setAllLightsColor(
+                isGameplayDriveLocked =
+                    true
+
+
+                joystickInput =
+                    (
+                        x: 0,
+                        y: 0
+                    )
+
+                activeJoystickDirection =
+                    .idle
+
+                mechanumRotationInput =
+                    0
+
+
+                sendLightMode(
+                    .rotation
+                )
+
+                eduard.setAllLightsColor(
                     red:
-                        previousAllLightsColor.red,
-
+                        255,
                     green:
-                        previousAllLightsColor.green,
-
+                        100,
                     blue:
-                        previousAllLightsColor.blue
+                        0
                 )
 
-                self.eduard.setLightMode(
-                    previousLightMode
-                )
+
+                let diagonalComponent =
+                    velocityScale
+                    * 0.10
+                    / sqrt(2.0)
+
+                let diagonalLeft =
+                    RobotDriveCommand(
+                        forward:
+                            diagonalComponent,
+                        sideways:
+                            diagonalComponent,
+                        rotation:
+                            0
+                    )
+
+                let diagonalRight =
+                    RobotDriveCommand(
+                        forward:
+                            diagonalComponent,
+                        sideways:
+                            -diagonalComponent,
+                        rotation:
+                            0
+                    )
+
+
+                let commands =
+                    [
+                        diagonalLeft,
+                        diagonalRight,
+                        diagonalLeft,
+                        diagonalRight
+                    ]
+
+
+                for command in commands {
+
+                    gameplayDriveCommand =
+                        command
+
+                    sendCurrentCommand()
+
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                1
+                            )
+                    )
+
+                    guard Task.isCancelled == false
+                    else {
+
+                        finishShitEffect()
+                        return
+                    }
+                }
+
+
+                finishShitEffect()
             }
+    }
+
+
+    private func finishShitEffect() {
+
+        gameplayDriveCommand =
+            .stop
+
+        sendCurrentCommand()
+
+
+        gameplayDriveCommand =
+            nil
+
+        isGameplayDriveLocked =
+            false
+
+        activeJoystickDirection =
+            .idle
+
+        joystickInput =
+            (
+                x: 0,
+                y: 0
+            )
+
+        mechanumRotationInput =
+            0
+
+        gameplayDriveTask =
+            nil
     }
 
 
@@ -943,7 +1030,8 @@ final class RobotController:
     private func sendCurrentCommand() {
 
         let command =
-            currentDriveCommand()
+            gameplayDriveCommand
+            ?? currentDriveCommand()
 
 
         switch effectiveControlMode {
