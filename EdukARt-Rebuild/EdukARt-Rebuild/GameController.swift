@@ -212,6 +212,9 @@ final class GameController:
     private var onOilEffectStarted:
         ((TimeInterval) -> Void)?
 
+    private var onTreeEffectStarted:
+        ((TimeInterval) -> Void)?
+
     private var latestRobotPoses:
         [CollisionActor: RobotPose] = [:]
 
@@ -262,11 +265,8 @@ final class GameController:
     private let startClearRadius:
         Float = 0.45
 
-    private let treeRevealRadius:
-        Float = 0.70 // ToDo: size
-
-    private let treeSpawnOffset:
-        Float = 0.50 // ToDo: position
+    private let treeLightEffectDuration:
+        TimeInterval = 1.0
 
     private let eggDeliveryScore:
         Int = 300
@@ -350,6 +350,15 @@ final class GameController:
     }
 
 
+    func setTreeEffectHandler(
+        _ handler: @escaping (TimeInterval) -> Void
+    ) {
+
+        onTreeEffectStarted =
+            handler
+    }
+
+
     // ======================================================
     // MARK: - Robot Pose Update
     // ======================================================
@@ -393,24 +402,26 @@ final class GameController:
 
         updateOilCooldowns()
 
-        updateTreeReveals(
-            robotPose:
-                pose
-        )
-
         let collidableObjects =
             activeMapObjects.filter { object in
 
-                object.type != .oil
-                    || oilCooldownEndDates[
-                        object.id
-                    ] == nil
-            }
-            .map {
-                collisionObject(
-                    for:
-                        $0
-                )
+                if object.type == .oil,
+                   oilCooldownEndDates[
+                    object.id
+                   ] != nil {
+
+                    return false
+                }
+
+                if object.type == .tree,
+                   revealedTreeIDs.contains(
+                    object.id
+                   ) == false {
+
+                    return false
+                }
+
+                return true
             }
 
         let collisions =
@@ -773,6 +784,17 @@ final class GameController:
         case .tree:
 
             hitTree()
+
+
+        // --------------------------------------------------
+        // Tree Trigger
+        // --------------------------------------------------
+
+        case .treeTrigger:
+
+            triggerTree(
+                object
+            )
 
 
         // --------------------------------------------------
@@ -1321,6 +1343,10 @@ final class GameController:
 
         score -= 5
 
+        onTreeEffectStarted?(
+            treeLightEffectDuration
+        )
+
         statusText =
             "Tree hit"
 
@@ -1331,6 +1357,39 @@ final class GameController:
 
         print(
             "# GAME | Score: \(score)"
+        )
+    }
+
+
+    // ======================================================
+    // MARK: - Trigger Tree
+    // ======================================================
+
+    private func triggerTree(
+        _ trigger:
+            PlacedMapObject
+    ) {
+
+        guard let tree =
+            nearestHiddenTree(
+                to:
+                    trigger
+            )
+        else {
+            return
+        }
+
+
+        revealedTreeIDs.insert(
+            tree.id
+        )
+
+        activeMapObjects.removeAll {
+            $0.id == trigger.id
+        }
+
+        print(
+            "# TREE | Triggered | tree \(tree.id) | trigger \(trigger.id)"
         )
     }
 
@@ -1629,87 +1688,61 @@ final class GameController:
     }
 
 
-    private func updateTreeReveals(
-        robotPose:
-            RobotPose
-    ) {
+    private func nearestHiddenTree(
+        to trigger:
+            PlacedMapObject
+    ) -> PlacedMapObject? {
 
-        for object in activeMapObjects
-        where object.type == .tree
-            && revealedTreeIDs.contains(object.id) == false {
+        activeMapObjects
+            .filter { object in
 
-            guard distance(
-                from:
-                    robotPose,
-
-                to:
-                    SIMD2<Float>(
-                        object.x,
-                        object.z
-                    )
-            ) <= treeRevealRadius
-            else {
-                continue
+                object.type == .tree
+                    && revealedTreeIDs.contains(
+                        object.id
+                    ) == false
             }
+            .min { first, second in
 
-            revealedTreeIDs.insert(
-                object.id
-            )
-
-            print(
-                "# TREE | Revealed | \(object.id)"
-            )
-        }
+                distance(
+                    from:
+                        first,
+                    to:
+                        trigger
+                )
+                <
+                distance(
+                    from:
+                        second,
+                    to:
+                        trigger
+                )
+            }
     }
 
 
-    private func treeSpawnPosition(
-        for object:
+    private func distance(
+        from first:
+            PlacedMapObject,
+
+        to second:
             PlacedMapObject
-    ) -> SIMD2<Float> {
+    ) -> Float {
 
-        SIMD2<Float>(
-            object.x
-            + sin(
-                object.rotation
-            )
-            * treeSpawnOffset,
+        let dx =
+            first.x
+            -
+            second.x
 
-            object.z
-            + cos(
-                object.rotation
-            )
-            * treeSpawnOffset
+        let dz =
+            first.z
+            -
+            second.z
+
+        return sqrt(
+            dx * dx
+            +
+            dz * dz
         )
-    }
-
-
-    private func collisionObject(
-        for object:
-            PlacedMapObject
-    ) -> PlacedMapObject {
-
-        guard object.type == .tree
-        else {
-            return object
-        }
-
-        let spawnPosition =
-            treeSpawnPosition(
-                for:
-                    object
-            )
-
-        var collisionObject =
-            object
-
-        collisionObject.x =
-            spawnPosition.x
-
-        collisionObject.z =
-            spawnPosition.y
-
-        return collisionObject
     }
 
 

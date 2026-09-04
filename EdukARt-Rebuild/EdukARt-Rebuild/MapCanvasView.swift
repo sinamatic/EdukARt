@@ -122,6 +122,18 @@ struct MapCanvasView: View {
     private let meaningfulExtentThreshold:
         Float = 1.0
 
+    /// Minimum distance from the reference tag
+    /// to the upper edge while drawing a course.
+    private let minimumForwardDrawingDistance:
+        Float = 3.0
+
+    /// Small amount of space behind the reference tag.
+    ///
+    /// The map must not grow further in this direction
+    /// when the user draws the course.
+    private let drawingBackMargin:
+        Float = 0.30
+
     private let tagSize:
         CGFloat = 24
 
@@ -179,6 +191,12 @@ struct MapCanvasView: View {
                         singleTagForwardExtent,
                     meaningfulExtentThreshold:
                         meaningfulExtentThreshold,
+                    allowsCourseDrawing:
+                        allowsCourseDrawing,
+                    minimumForwardDrawingDistance:
+                        minimumForwardDrawingDistance,
+                    drawingBackMargin:
+                        drawingBackMargin,
                     designCanvasSize:
                         designCanvasSize
                 )
@@ -625,70 +643,105 @@ struct MapCanvasView: View {
     }
 
 
+    @ViewBuilder
     private func mapObjectView(
         _ object: PlacedMapObject,
         layout: MapCanvasLayout
     ) -> some View {
 
-        Text(
-            object.type.symbol
-        )
-        .font(
-            .system(
-                size:
-                    objectSymbolSize
-                    * layout.visualScale
-            )
-        )
-        .frame(
-            width:
-                objectFrameSize
-                * layout.visualScale,
-            height:
-                objectFrameSize
-                * layout.visualScale
-        )
-        .background(
-            object.type.isObstacle
-            ? Color.red.opacity(0.72)
-            : Color.green.opacity(0.72)
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius:
-                    objectCornerRadius
-                    * layout.visualScale,
-                style:
-                    .continuous
-            )
-        )
-        .overlay {
+        if object.type == .tree {
 
-            RoundedRectangle(
-                cornerRadius:
-                    objectCornerRadius
-                    * layout.visualScale,
-                style:
-                    .continuous
+            Circle()
+                .fill(
+                    Color.green
+                )
+                .frame(
+                    width:
+                        tagSize
+                        * 0.5
+                        * layout.visualScale,
+                    height:
+                        tagSize
+                        * 0.5
+                        * layout.visualScale
+                )
+                .overlay {
+
+                    Circle()
+                        .stroke(
+                            .white.opacity(
+                                0.55
+                            ),
+                            lineWidth:
+                                max(
+                                    1,
+                                    layout.visualScale
+                                )
+                        )
+                }
+
+        } else {
+
+            Text(
+                object.type.symbol
             )
-            .stroke(
-                .white.opacity(
-                    0.42
-                ),
-                lineWidth:
-                    max(
-                        1,
-                        layout.visualScale
-                    )
-            )
-        }
-        .rotationEffect(
-            .radians(
-                Double(
-                    object.rotation
+            .font(
+                .system(
+                    size:
+                        objectSymbolSize
+                        * layout.visualScale
                 )
             )
-        )
+            .frame(
+                width:
+                    objectFrameSize
+                    * layout.visualScale,
+                height:
+                    objectFrameSize
+                    * layout.visualScale
+            )
+            .background(
+                object.type.isObstacle
+                ? Color.red.opacity(0.72)
+                : Color.green.opacity(0.72)
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        objectCornerRadius
+                        * layout.visualScale,
+                    style:
+                        .continuous
+                )
+            )
+            .overlay {
+
+                RoundedRectangle(
+                    cornerRadius:
+                        objectCornerRadius
+                        * layout.visualScale,
+                    style:
+                        .continuous
+                )
+                .stroke(
+                    .white.opacity(
+                        0.42
+                    ),
+                    lineWidth:
+                        max(
+                            1,
+                            layout.visualScale
+                        )
+                )
+            }
+            .rotationEffect(
+                .radians(
+                    Double(
+                        object.rotation
+                    )
+                )
+            )
+        }
     }
 
 
@@ -899,6 +952,9 @@ struct MapCanvasLayout {
         minimumExtent: Float,
         singleTagForwardExtent: Float,
         meaningfulExtentThreshold: Float,
+        allowsCourseDrawing: Bool,
+        minimumForwardDrawingDistance: Float,
+        drawingBackMargin: Float,
         designCanvasSize: CGFloat
     ) {
 
@@ -913,7 +969,13 @@ struct MapCanvasLayout {
                 singleTagForwardExtent:
                     singleTagForwardExtent,
                 meaningfulExtentThreshold:
-                    meaningfulExtentThreshold
+                    meaningfulExtentThreshold,
+                allowsCourseDrawing:
+                    allowsCourseDrawing,
+                minimumForwardDrawingDistance:
+                    minimumForwardDrawingDistance,
+                drawingBackMargin:
+                    drawingBackMargin
             )
 
 
@@ -1094,7 +1156,10 @@ struct MapCanvasLayout {
         mapWorldPadding: Float,
         minimumExtent: Float,
         singleTagForwardExtent: Float,
-        meaningfulExtentThreshold: Float
+        meaningfulExtentThreshold: Float,
+        allowsCourseDrawing: Bool,
+        minimumForwardDrawingDistance: Float,
+        drawingBackMargin: Float
     ) -> MapCanvasBounds {
 
         let persistentPoints =
@@ -1118,6 +1183,106 @@ struct MapCanvasLayout {
                     minimumExtent / 2,
                 padding:
                     mapWorldPadding
+            )
+        }
+
+
+        let tagPoints =
+            data.aprilTags.map {
+                SIMD2<Float>(
+                    $0.x,
+                    $0.z
+                )
+            }
+
+
+        let realMinTagX =
+            tagPoints
+                .map { $0.x }
+                .min()
+            ?? 0
+
+        let realMaxTagX =
+            tagPoints
+                .map { $0.x }
+                .max()
+            ?? 0
+
+        let realMinTagZ =
+            tagPoints
+                .map { $0.y }
+                .min()
+            ?? 0
+
+        let realMaxTagZ =
+            tagPoints
+                .map { $0.y }
+                .max()
+            ?? 0
+
+
+        if allowsCourseDrawing {
+
+            let realWidth =
+                realMaxTagX
+                - realMinTagX
+
+            let width =
+                max(
+                    realWidth,
+                    minimumExtent
+                )
+
+            let extraX =
+                (
+                    width
+                    - realWidth
+                )
+                / 2
+
+            let minX =
+                realMinTagX
+                - extraX
+                - mapWorldPadding
+
+            let maxX =
+                realMaxTagX
+                + extraX
+                + mapWorldPadding
+
+            let drawnMinZ =
+                data.rawTrackPoints
+                    .map { $0.y }
+                    .min()
+                ??
+                data.trackPoints
+                    .map { $0.y }
+                    .min()
+                ??
+                0
+
+            let upperZ =
+                min(
+                    -minimumForwardDrawingDistance,
+                    drawnMinZ,
+                    realMinTagZ
+                )
+
+            let lowerZ =
+                max(
+                    drawingBackMargin,
+                    realMaxTagZ
+                )
+
+            return MapCanvasBounds(
+                minX:
+                    minX,
+                maxX:
+                    maxX,
+                minZ:
+                    upperZ,
+                maxZ:
+                    lowerZ
             )
         }
 

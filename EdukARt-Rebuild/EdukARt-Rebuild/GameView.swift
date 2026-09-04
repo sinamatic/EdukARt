@@ -904,6 +904,14 @@ struct GameView: View {
             )
         }
 
+        gameController.setTreeEffectHandler { duration in
+
+            controller.startTreeEffect(
+                duration:
+                    duration
+            )
+        }
+
         prepareGameStartIfNeeded()
     }
 

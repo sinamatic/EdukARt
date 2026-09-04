@@ -958,6 +958,9 @@ struct CameraARView: UIViewRepresentable {
         var revealedTreeEntityIDs:
             Set<UUID> = []
 
+        private var growingTrees:
+            [UUID: GrowingTree] = [:]
+
         var shitDotEntities:
             [UUID: Entity] = [:]
 
@@ -966,15 +969,6 @@ struct CameraARView: UIViewRepresentable {
 
         let eggRenderer =
             AREggRenderer()
-
-        private let treeHiddenDepth:
-            Float = -0.80 // ToDo: position
-
-        private let treeSpawnOffset:
-            Float = 0.50 // ToDo: position
-
-        private let treeRevealDuration:
-            TimeInterval = 1.0
 
         var lastLocalizationResetID:
             Int = 0
@@ -1076,6 +1070,22 @@ struct CameraARView: UIViewRepresentable {
 
             let phase:
                 Float
+        }
+
+
+        struct GrowingTree {
+
+            let entity:
+                Entity
+
+            let finalScale:
+                SIMD3<Float>
+
+            let baseOrientation:
+                simd_quatf
+
+            var elapsed:
+                Float = 0
         }
 
         // --------------------------------------------------
@@ -1233,12 +1243,24 @@ struct CameraARView: UIViewRepresentable {
                 }
                 
                 // --------------------------------------------------
-                // Give reference ID to map builder
+                // Publish finished reference tag to 2D map
+                // --------------------------------------------------
+                //
+                // Selecting a reference ID is NOT sufficient.
+                //
+                // AprilTagLocalization first collects valid
+                // measurements. Only once mapReferenceWorldTransform
+                // exists is the reference actually finished.
+                //
+                // Until then the reference AprilTag must not appear
+                // in the mini map.
                 // --------------------------------------------------
 
-                
                 if let referenceID =
-                    aprilTagLocalization.referenceTagID {
+                    aprilTagLocalization.referenceTagID,
+                   aprilTagLocalization
+                    .mapReferenceWorldTransform
+                    != nil {
 
                     DispatchQueue.main.async {
 
@@ -2395,6 +2417,31 @@ struct CameraARView: UIViewRepresentable {
                 }
 
 
+                if object.type == .treeTrigger {
+
+                    let marker =
+                        makeTreeTriggerMarker(
+                            for:
+                                object
+                        )
+
+                    mapRoot.addChild(
+                        marker
+                    )
+
+                    mapObjectEntities[
+                        object.id
+                    ] =
+                        marker
+
+                    print(
+                        "# AR OBJECT ADDED | \(object.type.name)"
+                    )
+
+                    continue
+                }
+
+
                 guard let modelName =
                     object.type.modelName
                 else {
@@ -2431,11 +2478,6 @@ struct CameraARView: UIViewRepresentable {
 
                         objectRoot.position =
                             basePosition
-                            - SIMD3<Float>(
-                                0,
-                                treeHiddenDepth,
-                                0
-                            )
 
                         objectRoot.isEnabled =
                             false
@@ -2588,34 +2630,26 @@ struct CameraARView: UIViewRepresentable {
             entity.isEnabled =
                 true
 
-            let target =
-                Transform(
-                    scale:
-                        entity.transform.scale,
+            let finalScale =
+                entity.scale
 
-                    rotation:
-                        entity.transform.rotation,
+            entity.scale =
+                finalScale
+                * 0.05
 
-                    translation:
-                        mapObjectPosition(
-                            for:
-                                object
-                        )
+            growingTrees[
+                object.id
+            ] =
+                GrowingTree(
+                    entity:
+                        entity,
+                    finalScale:
+                        finalScale,
+                    baseOrientation:
+                        entity.orientation
                 )
 
-            entity.move(
-                to:
-                    target,
-
-                relativeTo:
-                    entity.parent,
-
-                duration:
-                    treeRevealDuration,
-
-                timingFunction:
-                    .easeOut
-            )
+            startMapObjectAnimationIfNeeded()
         }
 
 
@@ -2624,31 +2658,60 @@ struct CameraARView: UIViewRepresentable {
                 PlacedMapObject
         ) -> SIMD3<Float> {
 
-            guard object.type == .tree
-            else {
-
-                return SIMD3<Float>(
-                    object.x,
-                    0,
-                    object.z
-                )
-            }
-
-            return SIMD3<Float>(
-                object.x
-                + sin(
-                    object.rotation
-                )
-                * treeSpawnOffset,
-
+            SIMD3<Float>(
+                object.x,
                 0,
-
                 object.z
-                + cos(
-                    object.rotation
-                )
-                * treeSpawnOffset
             )
+        }
+
+
+        private func makeTreeTriggerMarker(
+            for object:
+                PlacedMapObject
+        ) -> Entity {
+
+            let mesh =
+                MeshResource.generateCylinder(
+                    height:
+                        0.004,
+                    radius:
+                        0.06
+                )
+
+            let material =
+                SimpleMaterial(
+                    color:
+                        .green,
+                    isMetallic:
+                        false
+                )
+
+            let marker =
+                ModelEntity(
+                    mesh:
+                        mesh,
+                    materials:
+                        [
+                            material
+                        ]
+                )
+
+            marker.name =
+                "ARMapObject-\(object.id)"
+
+            marker.position =
+                mapObjectPosition(
+                    for:
+                        object
+                )
+                + SIMD3<Float>(
+                    0,
+                    0.002,
+                    0
+                )
+
+            return marker
         }
 
 
@@ -2833,6 +2896,9 @@ struct CameraARView: UIViewRepresentable {
             revealedTreeEntityIDs
                 .removeAll()
 
+            growingTrees
+                .removeAll()
+
             for entity in shitDotEntities.values {
 
                 entity.removeFromParent()
@@ -2874,6 +2940,108 @@ struct CameraARView: UIViewRepresentable {
                         Float(
                             event.deltaTime
                         )
+
+
+                    let treeIDs =
+                        Array(
+                            self.growingTrees.keys
+                        )
+
+                    for id in treeIDs {
+
+                        guard var tree =
+                            self.growingTrees[
+                                id
+                            ]
+                        else {
+                            continue
+                        }
+
+                        tree.elapsed +=
+                            Float(
+                                event.deltaTime
+                            )
+
+                        let duration:
+                            Float = 1.0
+
+                        let progress =
+                            min(
+                                tree.elapsed
+                                / duration,
+                                1
+                            )
+
+                        let growth =
+                            1
+                            - pow(
+                                1 - progress,
+                                3
+                            )
+
+                        let bounce =
+                            sin(
+                                progress
+                                * .pi
+                                * 3
+                            )
+                            * (1 - progress)
+                            * 0.12
+
+                        let scale =
+                            max(
+                                0.05,
+                                growth
+                                + bounce
+                            )
+
+                        tree.entity.scale =
+                            tree.finalScale
+                            * scale
+
+                        let wiggle =
+                            sin(
+                                progress
+                                * .pi
+                                * 6
+                            )
+                            * (1 - progress)
+                            * 0.12
+
+                        tree.entity.orientation =
+                            simd_quatf(
+                                angle:
+                                    wiggle,
+                                axis:
+                                    SIMD3<Float>(
+                                        0,
+                                        0,
+                                        1
+                                    )
+                            )
+                            * tree.baseOrientation
+
+                        if progress >= 1 {
+
+                            tree.entity.scale =
+                                tree.finalScale
+
+                            tree.entity.orientation =
+                                tree.baseOrientation
+
+                            self.growingTrees[
+                                id
+                            ] =
+                                nil
+
+                        } else {
+
+                            self.growingTrees[
+                                id
+                            ] =
+                                tree
+                        }
+                    }
 
 
                     for object in self.animatedMapObjects {

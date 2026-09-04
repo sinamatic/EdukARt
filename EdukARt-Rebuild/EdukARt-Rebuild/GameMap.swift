@@ -214,6 +214,7 @@ enum MapObjectType:
     case water
     case rock
     case tree
+    case treeTrigger
 
 
     init(
@@ -295,6 +296,9 @@ enum MapObjectType:
         case .tree:
             "🌳"
 
+        case .treeTrigger:
+            "🌳"
+
         }
     }
 
@@ -324,6 +328,9 @@ enum MapObjectType:
         case .tree:
             "Tree"
 
+        case .treeTrigger:
+            "Tree Trigger"
+
         }
     }
     
@@ -337,7 +344,8 @@ enum MapObjectType:
         case .oil,
              .water,
              .rock,
-             .tree:
+             .tree,
+             .treeTrigger:
             true
 
         default:
@@ -357,7 +365,8 @@ enum MapObjectType:
              .oil,
              .water,
              .rock,
-             .tree:
+             .tree,
+             .treeTrigger:
 
             return true
         } }
@@ -386,6 +395,9 @@ enum MapObjectType:
 
         case .tree:
             return 0.20 // ToDo: size
+
+        case .treeTrigger:
+            return 0.12 // ToDo: size
 
         }
    
@@ -434,6 +446,9 @@ enum MapObjectType:
 
         case .tree:
             "tree"
+
+        case .treeTrigger:
+            nil
 
         default:
             nil

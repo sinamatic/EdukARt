@@ -175,6 +175,9 @@ final class RobotController:
     private var oilEffectTask:
         Task<Void, Never>?
 
+    private var treeLightEffectTask:
+        Task<Void, Never>?
+
     private var isGameplayInputLocked =
         false
 
@@ -256,6 +259,9 @@ final class RobotController:
             .cancel()
 
         oilEffectTask?
+            .cancel()
+
+        treeLightEffectTask?
             .cancel()
     }
 
@@ -784,6 +790,74 @@ final class RobotController:
 
                 self.eduard.setLightMode(
                     .enabled
+                )
+            }
+    }
+
+
+    func startTreeEffect(
+        duration: TimeInterval
+    ) {
+
+        treeLightEffectTask?
+            .cancel()
+
+        let previousLightMode =
+            eduard.activeLightMode
+
+        let previousAllLightsColor =
+            eduard.activeAllLightsColor
+
+        eduard.setAllLightsColor(
+            red:
+                0,
+
+            green:
+                255,
+
+            blue:
+                0
+        )
+
+        eduard.setLightMode(
+            .solid
+        )
+
+        print(
+            "# TREE LIGHTS | physical Eduard green"
+        )
+
+
+        treeLightEffectTask =
+            Task { [weak self] in
+
+                try? await Task.sleep(
+                    for:
+                        .seconds(
+                            duration
+                        )
+                )
+
+
+                guard Task.isCancelled == false,
+                      let self
+                else {
+                    return
+                }
+
+                self.eduard.setAllLightsColor(
+                    red:
+                        previousAllLightsColor.red,
+
+                    green:
+                        previousAllLightsColor.green,
+
+                    blue:
+                        previousAllLightsColor.blue
+                )
+
+                self.eduard.setLightMode(
+                    previousLightMode
                 )
             }
     }

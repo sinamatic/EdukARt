@@ -50,6 +50,9 @@ struct GameMapView: View {
     var borderLineWidth:
         CGFloat = 1
 
+    private let treeSpawnOffset:
+        Float = 1.0 // ToDo: position
+
 
     // MARK: - Body
 
@@ -183,6 +186,45 @@ struct GameMapView: View {
 
         guard allowsObjectPlacement
         else {
+            return
+        }
+
+
+        if type == .tree {
+
+            let trigger =
+                PlacedMapObject(
+                    type:
+                        .treeTrigger,
+                    x:
+                        point.x,
+                    z:
+                        point.y
+                )
+
+            let tree =
+                PlacedMapObject(
+                    type:
+                        .tree,
+                    x:
+                        point.x,
+                    z:
+                        point.y
+                        - treeSpawnOffset
+                )
+
+            mapObjects.append(
+                trigger
+            )
+
+            mapObjects.append(
+                tree
+            )
+
+            print(
+                "# MAP OBJECT ADDED | Tree Trigger x \(point.x) | z \(point.y) | Tree x \(tree.x) | z \(tree.z)"
+            )
+
             return
         }
 
