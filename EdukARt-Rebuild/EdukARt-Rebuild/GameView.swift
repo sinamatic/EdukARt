@@ -61,6 +61,9 @@ struct GameView: View {
     @State private var didDisableEduardAfterFinish =
         false
 
+    @State private var showStartNewGameMenu =
+        false
+
     private let collisionTimer =
         Timer.publish(
             every:
@@ -153,10 +156,16 @@ struct GameView: View {
                 .allowsHitTesting(false)
             preRaceGuidance
             arRobotControl
+            startNewGameButton
             joystickControl
             timerDisplay
                 .allowsHitTesting(false)
             gameplayOverlay
+
+            if showStartNewGameMenu {
+
+                startNewGameOverlay
+            }
         }
     }
 
@@ -765,6 +774,53 @@ struct GameView: View {
     }
 
 
+    @ViewBuilder
+    private var startNewGameButton: some View {
+
+        if isMapLocalized,
+           countdownText == nil {
+
+            Button {
+
+                showStartNewGameMenu =
+                    true
+
+            } label: {
+
+                Label(
+                    "Start New Game",
+                    systemImage:
+                        "arrow.counterclockwise"
+                )
+                .font(
+                    .caption.bold()
+                )
+            }
+            .buttonStyle(
+                .borderedProminent
+            )
+            .frame(
+                maxWidth:
+                    .infinity,
+
+                maxHeight:
+                    .infinity,
+
+                alignment:
+                    .topLeading
+            )
+            .padding(
+                .top,
+                90
+            )
+            .padding(
+                .leading,
+                21
+            )
+        }
+    }
+
+
     // MARK: - Joystick
 
     @ViewBuilder
@@ -840,7 +896,7 @@ struct GameView: View {
     ) {
 
         guard isCountdownRunning == false,
-              gameController.isRaceFinished == false
+              gameController.phase != .finished
         else {
             return
         }
@@ -864,7 +920,7 @@ struct GameView: View {
     ) {
 
         guard isCountdownRunning == false,
-              gameController.isRaceFinished == false
+              gameController.phase != .finished
         else {
             return
         }
@@ -1022,11 +1078,59 @@ struct GameView: View {
     }
 
 
+    private func startNewRace() {
+
+        if controller.isEnabled {
+
+            controller
+                .sendDisable()
+        }
+
+        controller
+            .resetGameplayEffects()
+
+        gameController
+            .reset(
+                map:
+                    map
+            )
+
+        syncBlockingObjects()
+
+        hasSavedFinishedResult =
+            false
+
+        playerName =
+            ""
+
+        didDisableEduardAfterFinish =
+            false
+
+        hasStartedGameplay =
+            false
+
+        countdownText =
+            nil
+
+        isCountdownRunning =
+            false
+
+        showStartNewGameMenu =
+            false
+
+        startCountdown()
+
+        print(
+            "# GAME | New race started without relocalization"
+        )
+    }
+
+
     private func updateGameCollision() {
 
         guard isNoDebugMode,
               hasStartedGameplay,
-              gameController.isRaceFinished == false
+              gameController.phase != .finished
         else {
             return
         }
@@ -1082,7 +1186,7 @@ struct GameView: View {
 
         syncBlockingObjects()
 
-        if gameController.isRaceFinished {
+        if gameController.phase == .finished {
 
             controller.setGameplayInputLocked(
                 true
@@ -1189,7 +1293,7 @@ struct GameView: View {
 
         if isNoDebugMode,
            hasStartedGameplay,
-           gameController.isRaceFinished == false {
+           gameController.phase == .racing {
 
             Text(
                 formattedTime(
@@ -1256,9 +1360,99 @@ struct GameView: View {
             )
 
         } else if isNoDebugMode,
-                  gameController.isRaceFinished {
+                  gameController.phase == .finished {
 
             finishView
+        }
+    }
+
+
+    private var startNewGameOverlay: some View {
+
+        ZStack {
+
+            Color.black
+                .opacity(
+                    0.65
+                )
+                .ignoresSafeArea()
+
+            VStack(
+                spacing:
+                    18
+            ) {
+
+                Text(
+                    "Start New Game"
+                )
+                .font(
+                    .title.bold()
+                )
+
+                Button {
+
+                    startNewRace()
+
+                } label: {
+
+                    Label(
+                        "Start",
+                        systemImage:
+                            "play.fill"
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+
+                Button {
+
+                    showStartNewGameMenu =
+                        false
+
+                } label: {
+
+                    Text(
+                        "Cancel"
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(
+                    .bordered
+                )
+            }
+            .foregroundStyle(
+                .white
+            )
+            .padding(
+                24
+            )
+            .frame(
+                maxWidth:
+                    320
+            )
+            .background(
+                .ultraThinMaterial
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        8,
+
+                    style:
+                        .continuous
+                )
+            )
+            .padding(
+                24
+            )
         }
     }
 
@@ -1390,6 +1584,13 @@ struct GameView: View {
 
                     hasSavedFinishedResult =
                         true
+
+                    gameController
+                        .continueAfterFinish()
+
+                    controller.setGameplayInputLocked(
+                        false
+                    )
 
                 } label: {
 

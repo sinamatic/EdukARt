@@ -20,6 +20,18 @@ import Combine
 import UIKit
 
 
+// ======================================================
+// MARK: - Game Phase
+// ======================================================
+
+enum GamePhase {
+
+    case racing
+    case finished
+    case freeDrive
+}
+
+
 // MARK: - Shit Dot
 
 struct ShitDot:
@@ -99,6 +111,10 @@ final class GameController:
     @Published private(set)
     var score:
         Int = 0
+
+    @Published private(set)
+    var phase:
+        GamePhase = .racing
 
 
     /// Number of collected eggs.
@@ -470,7 +486,8 @@ final class GameController:
 
     func startRace() {
 
-        guard isRaceRunning == false
+        guard isRaceRunning == false,
+              phase == .racing
         else {
             return
         }
@@ -480,6 +497,9 @@ final class GameController:
 
         elapsedTime =
             0
+
+        phase =
+            .racing
 
         raceStartDate =
             Date()
@@ -522,7 +542,7 @@ final class GameController:
             String
     ) {
 
-        guard isRaceFinished
+        guard phase == .finished
         else {
             return
         }
@@ -587,6 +607,35 @@ final class GameController:
     }
 
 
+    func continueAfterFinish() {
+
+        guard phase == .finished
+        else {
+            return
+        }
+
+
+        phase =
+            .freeDrive
+
+        isRaceRunning =
+            false
+
+        isRaceFinished =
+            false
+
+        statusText =
+            ""
+
+        collisionManager
+            .reset()
+
+        print(
+            "# GAME | Free drive"
+        )
+    }
+
+
     private func collectCoins(
         robotPose:
             RobotPose,
@@ -647,10 +696,13 @@ final class GameController:
         collectedCoins +=
             collectedIDs.count
 
-        score +=
-            collectedIDs.count
-            *
-            100
+        if isScoringEnabled {
+
+            score +=
+                collectedIDs.count
+                *
+                100
+        }
 
         triggerGameplayFeedback(
             .success
@@ -710,6 +762,18 @@ final class GameController:
                     collision.object
             )
         }
+    }
+
+
+    var isScoringEnabled: Bool {
+
+        phase == .racing
+    }
+
+
+    var isRaceActive: Bool {
+
+        phase == .racing
     }
 
 
@@ -968,9 +1032,12 @@ final class GameController:
         // Score
         // --------------------------------------------------
 
-        score +=
-            deliveredNow
-            * eggDeliveryScore
+        if isScoringEnabled {
+
+            score +=
+                deliveredNow
+                * eggDeliveryScore
+        }
 
 
         deliveredEggs +=
@@ -1016,7 +1083,10 @@ final class GameController:
 
         shitHits += 1
 
-        score -= 50
+        if isScoringEnabled {
+
+            score -= 50
+        }
 
         triggerGameplayFeedback(
             .warning
@@ -1283,7 +1353,10 @@ final class GameController:
 
     private func hitRock() {
 
-        score -= 5
+        if isScoringEnabled {
+
+            score -= 5
+        }
 
         statusText =
             "Rock hit"
@@ -1311,7 +1384,10 @@ final class GameController:
 
     private func hitTree() {
 
-        score -= 5
+        if isScoringEnabled {
+
+            score -= 5
+        }
 
         onTreeEffectStarted?(
             treeLightEffectDuration
@@ -1376,6 +1452,9 @@ final class GameController:
         map:
             GameMap
     ) {
+
+        phase =
+            .racing
 
         score =
             0
@@ -1490,7 +1569,8 @@ final class GameController:
             RobotPose
     ) {
 
-        guard isRaceRunning,
+        guard phase == .racing,
+              isRaceRunning,
               isRaceFinished == false,
               let startPoint =
                 map.trackPoints.first,
@@ -1538,7 +1618,15 @@ final class GameController:
 
     private func finishRace() {
 
+        guard phase == .racing
+        else {
+            return
+        }
+
         updateElapsedTime()
+
+        phase =
+            .finished
 
         isRaceRunning =
             false
