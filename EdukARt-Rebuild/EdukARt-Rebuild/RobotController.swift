@@ -190,6 +190,12 @@ final class RobotController:
     private var blockingRevealedTreeIDs:
         Set<UUID> = []
 
+    private var safetyTrackPoints:
+        [StoredTrackPoint] = []
+
+    private var blockingLines:
+        [BlockingLine] = []
+
     private let collisionManager =
         CollisionManager()
 
@@ -244,6 +250,9 @@ final class RobotController:
 
     private let obstacleDamageCooldownDuration:
         TimeInterval = 10
+
+    private var offRoadStartedAt:
+        Date?
 
     private(set) var minSpeedPercent:
         Int = 80
@@ -894,6 +903,8 @@ final class RobotController:
         obstacleDamageCooldownEndDates
             .removeAll()
 
+        resetOffRoadState()
+
         joystickInput =
             (
                 x: 0,
@@ -923,6 +934,34 @@ final class RobotController:
 
         blockingRevealedTreeIDs =
             revealedTreeIDs
+    }
+
+
+    func updateMapMovementSafety(
+        trackPoints:
+            [StoredTrackPoint],
+
+        blockingLines:
+            [BlockingLine]
+    ) {
+
+        safetyTrackPoints =
+            trackPoints
+
+        self.blockingLines =
+            blockingLines
+
+        resetOffRoadState()
+    }
+
+
+    func clearMapMovementSafety() {
+
+        safetyTrackPoints.removeAll()
+
+        blockingLines.removeAll()
+
+        resetOffRoadState()
     }
 
 
@@ -1732,64 +1771,114 @@ final class RobotController:
         }
 
         if let pose =
-            currentCollisionPose,
-           let blockedObject =
-            collisionManager.blockingObject(
-                robotPose:
-                    pose,
+            currentCollisionPose {
 
-                command:
-                    command,
-
-                objects:
-                    blockingObjects,
-
-                revealedTreeIDs:
-                    blockingRevealedTreeIDs,
-
-                additionalSafetyMargin:
-                    blockingSafetyMargin
-            ) {
-
-            if hasLinearMovement(
-                command
-            ),
-               isMovementCurrentlyBlocked == false,
-               canApplyObstacleDamage(
-                for:
-                    blockedObject.id
-               ) {
-
-                isMovementCurrentlyBlocked =
-                    true
-
-                startObstacleDamageCooldown(
+            let speedScale =
+                offRoadSpeedScale(
                     for:
-                        blockedObject.id
+                        pose
                 )
-
-                applyObstacleDamage()
-
-                onObstacleDamage?(
-                    blockedObject.type
-                )
-            } else if hasLinearMovement(
-                command
-            ) {
-
-                isMovementCurrentlyBlocked =
-                    true
-            }
 
             command =
-                RobotDriveCommand(
-                    forward:
-                        0,
-                    sideways:
-                        0,
-                    rotation:
-                        command.rotation
+                applyingSpeedScale(
+                    speedScale,
+                    to:
+                        command
                 )
+
+            if let blockedObject =
+                collisionManager.blockingObject(
+                    robotPose:
+                        pose,
+
+                    command:
+                        command,
+
+                    objects:
+                        blockingObjects,
+
+                    revealedTreeIDs:
+                        blockingRevealedTreeIDs,
+
+                    additionalSafetyMargin:
+                        blockingSafetyMargin
+                ) {
+
+                if hasLinearMovement(
+                    command
+                ),
+                   isMovementCurrentlyBlocked == false,
+                   canApplyObstacleDamage(
+                    for:
+                        blockedObject.id
+                   ) {
+
+                    isMovementCurrentlyBlocked =
+                        true
+
+                    startObstacleDamageCooldown(
+                        for:
+                            blockedObject.id
+                    )
+
+                    applyObstacleDamage()
+
+                    onObstacleDamage?(
+                        blockedObject.type
+                    )
+                } else if hasLinearMovement(
+                    command
+                ) {
+
+                    isMovementCurrentlyBlocked =
+                        true
+                }
+
+                command =
+                    RobotDriveCommand(
+                        forward:
+                            0,
+                        sideways:
+                            0,
+                        rotation:
+                            command.rotation
+                    )
+
+            } else if collisionManager
+                .isMovementBlockedByBlockingLines(
+                    robotPose:
+                        pose,
+
+                    command:
+                        command,
+
+                    blockingLines:
+                        blockingLines,
+
+                    additionalSafetyMargin:
+                        blockingSafetyMargin
+                ) {
+
+                isMovementCurrentlyBlocked =
+                    hasLinearMovement(
+                        command
+                    )
+
+                command =
+                    RobotDriveCommand(
+                        forward:
+                            0,
+                        sideways:
+                            0,
+                        rotation:
+                            command.rotation
+                    )
+
+            } else {
+
+                isMovementCurrentlyBlocked =
+                    false
+            }
 
         } else {
 
@@ -1857,6 +1946,117 @@ final class RobotController:
             command.sideways
         )
         > 0.001
+    }
+
+
+    private func resetOffRoadState() {
+
+        offRoadStartedAt =
+            nil
+    }
+
+
+    private func offRoadSpeedScale(
+        for pose:
+            RobotPose
+    ) -> Double {
+
+        guard safetyTrackPoints.count >= 2
+        else {
+
+            offRoadStartedAt =
+                nil
+
+            return 1.0
+        }
+
+
+        let isOnRoad =
+            collisionManager
+                .isRobotOnRoad(
+                    robotPose:
+                        pose,
+
+                    trackPoints:
+                        safetyTrackPoints
+                )
+
+        if isOnRoad {
+
+            offRoadStartedAt =
+                nil
+
+            return 1.0
+        }
+
+
+        if offRoadStartedAt == nil {
+
+            offRoadStartedAt =
+                Date()
+        }
+
+
+        guard let offRoadStartedAt
+        else {
+
+            return TrackRules
+                .offRoadInitialSpeedScale
+        }
+
+
+        let duration =
+            Date()
+                .timeIntervalSince(
+                    offRoadStartedAt
+                )
+
+        let completeSeconds =
+            floor(
+                duration
+            )
+
+        let loss =
+            completeSeconds
+            *
+            TrackRules
+                .offRoadSpeedLossPerSecond
+
+
+        return max(
+            TrackRules
+                .minimumOffRoadSpeedScale,
+
+            TrackRules
+                .offRoadInitialSpeedScale
+            -
+            loss
+        )
+    }
+
+
+    private func applyingSpeedScale(
+        _ scale:
+            Double,
+
+        to command:
+            RobotDriveCommand
+    ) -> RobotDriveCommand {
+
+        RobotDriveCommand(
+            forward:
+                command.forward
+                *
+                scale,
+
+            sideways:
+                command.sideways
+                *
+                scale,
+
+            rotation:
+                command.rotation
+        )
     }
 
 

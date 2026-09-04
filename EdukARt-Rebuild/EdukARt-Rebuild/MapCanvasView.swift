@@ -25,6 +25,12 @@ struct MapDisplayData {
     var trackPoints:
         [SIMD2<Float>] = []
 
+    var blockingLines:
+        [BlockingLine] = []
+
+    var currentBlockingLine:
+        [SIMD2<Float>] = []
+
     var mapObjects:
         [PlacedMapObject] = []
 
@@ -74,6 +80,9 @@ struct MapCanvasView: View {
     var allowsObjectPlacement:
         Bool = false
 
+    var allowsBlockingLineDrawing:
+        Bool = false
+
     var backgroundColor:
         Color = .black.opacity(0.35)
 
@@ -94,6 +103,12 @@ struct MapCanvasView: View {
 
     var onAddObject:
         ((MapObjectType, SIMD2<Float>) -> Void)?
+
+    var onAddBlockingLinePoint:
+        ((SIMD2<Float>) -> Void)?
+
+    var onFinishBlockingLineDrawing:
+        (() -> Void)?
 
 
     // MARK: - Settings
@@ -233,6 +248,7 @@ struct MapCanvasView: View {
             )
             .gesture(
                 allowsCourseDrawing
+                || allowsBlockingLineDrawing
                 ? drawingGesture(
                     layout:
                         layout
@@ -307,6 +323,11 @@ struct MapCanvasView: View {
             )
 
             finalTrackLayer(
+                layout:
+                    layout
+            )
+
+            blockingLinesLayer(
                 layout:
                     layout
             )
@@ -514,6 +535,97 @@ struct MapCanvasView: View {
             blue:
                 0
         )
+    }
+
+
+    // MARK: - Blocking Lines
+
+    @ViewBuilder
+    private func blockingLinesLayer(
+        layout: MapCanvasLayout
+    ) -> some View {
+
+        ForEach(
+            data.blockingLines
+        ) { line in
+
+            blockingLinePath(
+                line.points.map {
+                    SIMD2<Float>(
+                        $0.x,
+                        $0.z
+                    )
+                },
+                layout:
+                    layout
+            )
+        }
+
+        blockingLinePath(
+            data.currentBlockingLine,
+            layout:
+                layout
+        )
+    }
+
+
+    @ViewBuilder
+    private func blockingLinePath(
+        _ points: [SIMD2<Float>],
+        layout: MapCanvasLayout
+    ) -> some View {
+
+        if points.count >= 2 {
+
+            Path { path in
+
+                guard let first =
+                    points.first
+                else {
+                    return
+                }
+
+
+                path.move(
+                    to:
+                        layout.mapToScreen(
+                            first
+                        )
+                )
+
+
+                for point in
+                    points.dropFirst() {
+
+                    path.addLine(
+                        to:
+                            layout.mapToScreen(
+                                point
+                            )
+                    )
+                }
+            }
+            .stroke(
+                Color.red.opacity(
+                    0.8
+                ),
+                style:
+                    StrokeStyle(
+                        lineWidth:
+                            3
+                            * layout.visualScale,
+                        lineCap:
+                            .round,
+                        lineJoin:
+                            .round,
+                        dash:
+                            [
+                                8,
+                                6
+                            ]
+                    )
+            )
+        }
     }
 
 
@@ -901,13 +1013,29 @@ struct MapCanvasView: View {
                 )
 
 
-            onAddRawPoint?(
-                mapPoint
-            )
+            if allowsBlockingLineDrawing {
+
+                onAddBlockingLinePoint?(
+                    mapPoint
+                )
+
+            } else {
+
+                onAddRawPoint?(
+                    mapPoint
+                )
+            }
         }
         .onEnded { _ in
 
-            onFinishDrawing?()
+            if allowsBlockingLineDrawing {
+
+                onFinishBlockingLineDrawing?()
+
+            } else {
+
+                onFinishDrawing?()
+            }
         }
     }
 }
@@ -1420,6 +1548,24 @@ struct MapCanvasLayout {
         points.append(
             contentsOf:
                 data.trackPoints
+        )
+
+        for line in data.blockingLines {
+
+            points.append(
+                contentsOf:
+                    line.points.map {
+                        SIMD2<Float>(
+                            $0.x,
+                            $0.z
+                        )
+                    }
+            )
+        }
+
+        points.append(
+            contentsOf:
+                data.currentBlockingLine
         )
 
         points.append(

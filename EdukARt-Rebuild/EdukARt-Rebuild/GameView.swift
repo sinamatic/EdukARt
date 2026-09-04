@@ -137,6 +137,8 @@ struct GameView: View {
                 controller.setGameplayInputLocked(
                     false
                 )
+
+                controller.clearMapMovementSafety()
             }
     }
 
@@ -1131,6 +1133,14 @@ struct GameView: View {
                     type
             )
         }
+
+        controller.updateMapMovementSafety(
+            trackPoints:
+                map.trackPoints,
+
+            blockingLines:
+                map.blockingLines
+        )
 
         syncBlockingObjects()
 

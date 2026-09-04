@@ -62,6 +62,12 @@ struct CreateMapView: View {
         )
     
     @State private var placedMapObjects: [PlacedMapObject] = []
+
+    @State private var blockingLines:
+        [BlockingLine] = []
+
+    @State private var isDrawingBlockingLines =
+        false
     
     // AprilTag geometry is frozen when Step 1 is completed.
     // Steps 2 and 3 no longer depend on live measurements.
@@ -218,9 +224,17 @@ struct CreateMapView: View {
                         
                         mapObjects:
                                 $placedMapObjects,
+
+                        blockingLines:
+                                $blockingLines,
                       
                         allowsObjectPlacement:
-                                creationStep == .itemsObstacles,
+                                creationStep == .itemsObstacles
+                                && isDrawingBlockingLines == false,
+
+                        allowsBlockingLineDrawing:
+                                creationStep == .itemsObstacles
+                                && isDrawingBlockingLines,
 
                         backgroundColor:
                             .black,
@@ -344,6 +358,9 @@ struct CreateMapView: View {
             placedMapObjects =
                 editingMap.mapObjects
 
+            blockingLines =
+                editingMap.blockingLines
+
             mapName =
                 editingMap.name
 
@@ -366,6 +383,11 @@ struct CreateMapView: View {
                 .createMap
 
             placedMapObjects.removeAll()
+
+            blockingLines.removeAll()
+
+            isDrawingBlockingLines =
+                false
         }
     }
 
@@ -568,6 +590,9 @@ struct CreateMapView: View {
 
         case .itemsObstacles:
             placedMapObjects.removeAll()
+            blockingLines.removeAll()
+            isDrawingBlockingLines =
+                false
         }
     }
 
@@ -615,10 +640,94 @@ struct CreateMapView: View {
             HStack(alignment: .top, spacing: 18) {
                 paletteSection(title: "Items", options: items)
                 paletteSection(title: "Obstacles", options: obstacles)
+                blockingLineTool
             }
             .padding(.horizontal, 2)
         }
         .frame(height: 118)
+    }
+
+
+    private var blockingLineTool: some View {
+
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                8
+        ) {
+
+            Text("Safety")
+                .font(.caption.bold())
+                .foregroundStyle(
+                    .white.opacity(0.75)
+                )
+
+            Button {
+
+                isDrawingBlockingLines.toggle()
+
+            } label: {
+
+                VStack(spacing: 6) {
+
+                    Image(
+                        systemName:
+                            "line.diagonal"
+                    )
+                    .font(
+                        .system(
+                            size:
+                                28,
+                            weight:
+                                .bold
+                        )
+                    )
+
+                    Text("Block Line")
+                        .font(
+                            .caption2.bold()
+                        )
+                }
+                .foregroundStyle(
+                    .white
+                )
+                .frame(
+                    width:
+                        92,
+                    height:
+                        78
+                )
+                .background(
+                    isDrawingBlockingLines
+                    ? Color.red.opacity(0.68)
+                    : Color.black.opacity(0.55)
+                )
+                .overlay {
+
+                    RoundedRectangle(
+                        cornerRadius:
+                            12
+                    )
+                    .stroke(
+                        Color.white.opacity(
+                            0.28
+                        ),
+                        lineWidth:
+                            1
+                    )
+                }
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            12
+                    )
+                )
+            }
+            .buttonStyle(
+                .plain
+            )
+        }
     }
 
     private func paletteSection(
@@ -768,6 +877,9 @@ struct CreateMapView: View {
 
                 trackPoints:
                     course.storedTrackPoints(),
+
+                blockingLines:
+                    blockingLines,
                 
                 mapObjects:
                            placedMapObjects

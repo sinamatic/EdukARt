@@ -203,6 +203,9 @@ final class CollisionManager {
         objects:
             [PlacedMapObject],
 
+        blockingLines:
+            [BlockingLine] = [],
+
         revealedTreeIDs:
             Set<UUID>,
 
@@ -232,6 +235,184 @@ final class CollisionManager {
             additionalSafetyMargin:
                 additionalSafetyMargin
         ) != nil
+        ||
+        isMovementBlockedByBlockingLines(
+            robotPose:
+                robotPose,
+
+            command:
+                command,
+
+            blockingLines:
+                blockingLines,
+
+            predictionTime:
+                predictionTime,
+
+            additionalSafetyMargin:
+                additionalSafetyMargin
+        )
+    }
+
+
+    func distanceToTrack(
+        robotPose:
+            RobotPose,
+
+        trackPoints:
+            [StoredTrackPoint]
+    ) -> Float {
+
+        guard trackPoints.count >= 2
+        else {
+            return 0
+        }
+
+
+        let robotPosition =
+            SIMD2<Float>(
+                robotPose.position.x,
+                robotPose.position.z
+            )
+
+        var minimumDistance =
+            Float.greatestFiniteMagnitude
+
+
+        for index in
+            0..<(trackPoints.count - 1) {
+
+            let start =
+                SIMD2<Float>(
+                    trackPoints[index].x,
+                    trackPoints[index].z
+                )
+
+            let end =
+                SIMD2<Float>(
+                    trackPoints[index + 1].x,
+                    trackPoints[index + 1].z
+                )
+
+            let segmentDistance =
+                distance(
+                    from:
+                        robotPosition,
+
+                    toSegmentFrom:
+                        start,
+
+                    to:
+                        end
+                )
+
+            minimumDistance =
+                min(
+                    minimumDistance,
+                    segmentDistance
+                )
+        }
+
+
+        return minimumDistance
+    }
+
+
+    func isRobotOnRoad(
+        robotPose:
+            RobotPose,
+
+        trackPoints:
+            [StoredTrackPoint]
+    ) -> Bool {
+
+        distanceToTrack(
+            robotPose:
+                robotPose,
+
+            trackPoints:
+                trackPoints
+        )
+        <= TrackRules.roadHalfWidth
+    }
+
+
+    func isMovementBlockedByBlockingLines(
+        robotPose:
+            RobotPose,
+
+        command:
+            RobotDriveCommand,
+
+        blockingLines:
+            [BlockingLine],
+
+        predictionTime:
+            Float = 0.10,
+
+        additionalSafetyMargin:
+            Float = 0
+    ) -> Bool {
+
+        guard blockingLines.isEmpty == false
+        else {
+            return false
+        }
+
+
+        let currentPosition =
+            SIMD2<Float>(
+                robotPose.position.x,
+                robotPose.position.z
+            )
+
+        let predicted =
+            predictedPosition(
+                from:
+                    robotPose,
+
+                command:
+                    command,
+
+                predictionTime:
+                    predictionTime
+            )
+
+        let minimumLineDistance =
+            robotRadius
+            +
+            additionalSafetyMargin
+
+
+        for line in blockingLines {
+
+            let currentDistance =
+                distanceToBlockingLine(
+                    point:
+                        currentPosition,
+
+                    line:
+                        line
+                )
+
+            let predictedDistance =
+                distanceToBlockingLine(
+                    point:
+                        predicted,
+
+                    line:
+                        line
+                )
+
+            if predictedDistance < minimumLineDistance,
+               predictedDistance < currentDistance {
+
+                return true
+            }
+        }
+
+
+        return false
     }
 
 
@@ -399,6 +580,122 @@ final class CollisionManager {
         SIMD2<Float>(
             object.x,
             object.z
+        )
+    }
+
+
+    private func distanceToBlockingLine(
+        point:
+            SIMD2<Float>,
+
+        line:
+            BlockingLine
+    ) -> Float {
+
+        guard line.points.count >= 2
+        else {
+            return .greatestFiniteMagnitude
+        }
+
+
+        var minimumDistance =
+            Float.greatestFiniteMagnitude
+
+
+        for index in
+            0..<(line.points.count - 1) {
+
+            let start =
+                SIMD2<Float>(
+                    line.points[index].x,
+                    line.points[index].z
+                )
+
+            let end =
+                SIMD2<Float>(
+                    line.points[index + 1].x,
+                    line.points[index + 1].z
+                )
+
+            minimumDistance =
+                min(
+                    minimumDistance,
+                    distance(
+                        from:
+                            point,
+
+                        toSegmentFrom:
+                            start,
+
+                        to:
+                            end
+                    )
+                )
+        }
+
+
+        return minimumDistance
+    }
+
+
+    private func distance(
+        from point:
+            SIMD2<Float>,
+
+        toSegmentFrom start:
+            SIMD2<Float>,
+
+        to end:
+            SIMD2<Float>
+    ) -> Float {
+
+        let segment =
+            end
+            -
+            start
+
+        let lengthSquared =
+            simd_length_squared(
+                segment
+            )
+
+        guard lengthSquared > 0
+        else {
+
+            return simd_distance(
+                point,
+                start
+            )
+        }
+
+
+        let t =
+            max(
+                0,
+                min(
+                    1,
+                    simd_dot(
+                        point
+                        -
+                        start,
+                        segment
+                    )
+                    /
+                    lengthSquared
+                )
+            )
+
+        let nearest =
+            start
+            +
+            segment
+            *
+            t
+
+
+        return simd_distance(
+            point,
+            nearest
         )
     }
 

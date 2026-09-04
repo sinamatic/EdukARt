@@ -41,6 +41,9 @@ struct GameMap:
     // These are NOT the raw finger input points.
     var trackPoints:
         [StoredTrackPoint]
+
+    var blockingLines:
+        [BlockingLine]
     
     
 
@@ -53,6 +56,7 @@ struct GameMap:
         referenceTagID: Int,
         aprilTags: [StoredAprilTag],
         trackPoints: [StoredTrackPoint] = [],
+        blockingLines: [BlockingLine] = [],
         mapObjects: [PlacedMapObject] = []
     ) {
 
@@ -73,6 +77,9 @@ struct GameMap:
 
         self.trackPoints =
             trackPoints
+
+        self.blockingLines =
+            blockingLines
         
         self.mapObjects =
                 mapObjects
@@ -91,6 +98,7 @@ struct GameMap:
         case referenceTagID
         case aprilTags
         case trackPoints
+        case blockingLines
         case mapObjects
     }
 
@@ -149,6 +157,14 @@ struct GameMap:
                 [StoredTrackPoint].self,
                 forKey:
                     .trackPoints
+            )
+            ?? []
+
+        blockingLines =
+            try container.decodeIfPresent(
+                [BlockingLine].self,
+                forKey:
+                    .blockingLines
             )
             ?? []
         

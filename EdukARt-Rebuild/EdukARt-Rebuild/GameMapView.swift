@@ -29,10 +29,16 @@ struct GameMapView: View {
     @Binding var mapObjects:
         [PlacedMapObject]
 
+    @Binding var blockingLines:
+        [BlockingLine]
+
     var shitDots:
         [ShitDot] = []
 
     var allowsObjectPlacement:
+        Bool = false
+
+    var allowsBlockingLineDrawing:
         Bool = false
 
     var robotPose:
@@ -53,6 +59,9 @@ struct GameMapView: View {
     private let treeSpawnOffset:
         Float = 1.0 // ToDo: position
 
+    @State private var currentBlockingLine:
+        [SIMD2<Float>] = []
+
 
     // MARK: - Body
 
@@ -67,6 +76,9 @@ struct GameMapView: View {
 
             allowsObjectPlacement:
                 allowsObjectPlacement,
+
+            allowsBlockingLineDrawing:
+                allowsBlockingLineDrawing,
 
             backgroundColor:
                 backgroundColor,
@@ -84,7 +96,13 @@ struct GameMapView: View {
                 finishDrawing,
 
             onAddObject:
-                addObject
+                addObject,
+
+            onAddBlockingLinePoint:
+                addBlockingLinePoint,
+
+            onFinishBlockingLineDrawing:
+                finishBlockingLine
         )
     }
 
@@ -122,6 +140,12 @@ struct GameMapView: View {
 
             trackPoints:
                 course.trackPoints,
+
+            blockingLines:
+                blockingLines,
+
+            currentBlockingLine:
+                currentBlockingLine,
 
             mapObjects:
                 mapObjects,
@@ -249,6 +273,81 @@ struct GameMapView: View {
             "# MAP OBJECT ADDED | \(type.name) | x \(point.x) | z \(point.y)"
         )
     }
+
+
+    // MARK: - Blocking Lines
+
+    private func addBlockingLinePoint(
+        _ point: SIMD2<Float>
+    ) {
+
+        guard allowsBlockingLineDrawing
+        else {
+            return
+        }
+
+
+        guard let last =
+            currentBlockingLine.last
+        else {
+
+            currentBlockingLine.append(
+                point
+            )
+
+            return
+        }
+
+
+        guard simd_distance(
+            last,
+            point
+        ) >= 0.03
+        else {
+            return
+        }
+
+
+        currentBlockingLine.append(
+            point
+        )
+    }
+
+
+    private func finishBlockingLine() {
+
+        guard currentBlockingLine.count >= 2
+        else {
+
+            currentBlockingLine.removeAll()
+
+            return
+        }
+
+
+        let points =
+            currentBlockingLine.map { point in
+
+                BlockingLinePoint(
+                    x:
+                        point.x,
+
+                    z:
+                        point.y
+                )
+            }
+
+
+        blockingLines.append(
+            BlockingLine(
+                points:
+                    points
+            )
+        )
+
+
+        currentBlockingLine.removeAll()
+    }
 }
 
 
@@ -286,6 +385,9 @@ struct StoredGameMapView: View {
     @State private var mapObjects:
         [PlacedMapObject] = []
 
+    @State private var blockingLines:
+        [BlockingLine] = []
+
     var body: some View {
 
         GameMapView(
@@ -313,6 +415,9 @@ struct StoredGameMapView: View {
                             newValue
                     }
                 ),
+
+            blockingLines:
+                $blockingLines,
 
             shitDots:
                 shitDots,
@@ -370,8 +475,24 @@ struct StoredGameMapView: View {
                     "|"
             )
 
+        let blockingLineFingerprint =
+            map.blockingLines.map { line in
 
-        return "\(map.id)-\(trackFingerprint)-\(objectFingerprint)"
+                line.points.map {
+                    "\($0.x):\($0.z)"
+                }
+                .joined(
+                    separator:
+                        ","
+                )
+            }
+            .joined(
+                separator:
+                    "|"
+            )
+
+
+        return "\(map.id)-\(trackFingerprint)-\(objectFingerprint)-\(blockingLineFingerprint)"
     }
 
 
@@ -386,5 +507,8 @@ struct StoredGameMapView: View {
 
         mapObjects =
             map.mapObjects
+
+        blockingLines =
+            map.blockingLines
     }
 }

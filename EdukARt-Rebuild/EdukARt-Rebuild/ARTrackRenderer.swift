@@ -39,8 +39,11 @@ final class ARTrackRenderer {
     // ======================================================
 
     /// Complete road width.
-    private let roadWidth:
-        Float = 0.70
+    private var roadWidth:
+        Float {
+
+        TrackRules.roadWidth
+    }
 
     /// Distance from center to road boundary.
     private var roadHalfWidth:
