@@ -57,49 +57,35 @@ struct MainMenuView: View {
                     SettingsView()
                 } label: {Text("Settings")}
                     .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
-                
-                
-                if let selectedMap =
-                    gameMapStore.maps.first {
 
-                    NavigationLink {
-                        GameView(
-                                map:
-                                    selectedMap,
+                NavigationLink {
 
-                                eduardModelStore:
-                                    eduardModelStore,
+                    ScoresView(
+                        gameMapStore:
+                            gameMapStore
+                    )
 
-                                controller:
-                                    controller
-                            )
+                } label: {
 
-                    } label: {
-                        Text("AR Test")
-                    }
-
-                    .disabled(eduardModelStore.model == nil)
+                    Text(
+                        "Scores"
+                    )
                 }
-                
-                
-                
-//                NavigationLink {
-//                    CameraARView(
-//                        
-//                        eduardModelStore: eduardModelStore
-//                    )
-//                    .ignoresSafeArea()
-//                } label: {
-//                    Text(
-//                        eduardModelStore.model == nil
-//                            ? "Loading Eduard..."
-//                            : "AR Test"
-//                    )
-//                }
-//                .disabled(eduardModelStore.model == nil)
-//
-//                .onChange(of: eduardModelStore.model == nil) { _, isNil in
-//                    print("MENU model is nil:", isNil)
+                .buttonStyle(
+                    MenuButtonStyle(
+                        color:
+                            Color(
+                                "BlackOverlay"
+                            )
+                            .opacity(
+                                0.72
+                            )
+                    )
+                )
+                .padding(
+                    .top,
+                    18
+                )
                 }
             .padding(30)
 

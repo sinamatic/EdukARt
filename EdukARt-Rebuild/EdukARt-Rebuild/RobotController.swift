@@ -146,11 +146,27 @@ final class RobotController:
     private var gameplayDriveTask:
         Task<Void, Never>?
 
-    private var gameplaySpeedMultiplier:
-        Double = 1.0
+    @Published private(set)
+    var gameplaySpeedMultiplier:
+        Double = 0.80
 
-    private var pendingShitSpeedReductions:
-        Int = 0
+    private var normalGameplaySpeedMultiplier:
+        Double = 0.80
+
+    private var coinBoostEndDate:
+        Date?
+
+    private var coinBoostTask:
+        Task<Void, Never>?
+
+    private var isMovementCurrentlyBlocked =
+        false
+
+    private var obstacleDamageCooldownEndDates:
+        [UUID: Date] = [:]
+
+    private var onObstacleDamage:
+        ((MapObjectType) -> Void)?
 
     @Published private(set)
     var isWaterModeActive =
@@ -214,6 +230,27 @@ final class RobotController:
     private let waterStrokeSpeed:
         Double = 0.30
 
+    private let baseGameplaySpeedMultiplier:
+        Double = 0.80
+
+    private let coinBoostGameplaySpeedMultiplier:
+        Double = 0.90
+
+    private let coinBoostDuration:
+        TimeInterval = 2.0
+
+    private let obstacleDamageStep:
+        Double = 0.10
+
+    private let obstacleDamageCooldownDuration:
+        TimeInterval = 10
+
+    private(set) var minSpeedPercent:
+        Int = 80
+
+    private(set) var maxSpeedPercent:
+        Int = 80
+
 
     // MARK: - Timer
 
@@ -250,6 +287,18 @@ final class RobotController:
         }
 
         return .disconnected
+    }
+
+
+    var currentSpeedPercent:
+        Int {
+
+        Int(
+            round(
+                gameplaySpeedMultiplier
+                * 100
+            )
+        )
     }
 
 
@@ -300,6 +349,18 @@ final class RobotController:
     }
 
 
+    private var isCoinBoostActive:
+        Bool {
+
+        guard let coinBoostEndDate
+        else {
+            return false
+        }
+
+        return Date() < coinBoostEndDate
+    }
+
+
     // MARK: - Init
 
     init(
@@ -345,8 +406,170 @@ final class RobotController:
         gameplayDriveTask?
             .cancel()
 
+        coinBoostTask?
+            .cancel()
+
         waterStrokeTask?
             .cancel()
+    }
+
+
+    // ======================================================
+    // MARK: - Gameplay Speed
+    // ======================================================
+
+    func setObstacleDamageHandler(
+        _ handler: @escaping (MapObjectType) -> Void
+    ) {
+
+        onObstacleDamage =
+            handler
+    }
+
+
+    func applyCoinSpeedBoost() {
+
+        let now =
+            Date()
+
+        let startDate =
+            max(
+                coinBoostEndDate ?? now,
+                now
+            )
+
+        coinBoostEndDate =
+            startDate
+                .addingTimeInterval(
+                    coinBoostDuration
+                )
+
+        updateEffectiveGameplaySpeed()
+        scheduleCoinBoostEndCheck()
+    }
+
+
+    func repairObstacleDamage() {
+
+        normalGameplaySpeedMultiplier =
+            baseGameplaySpeedMultiplier
+
+        updateEffectiveGameplaySpeed()
+    }
+
+
+    private func applyObstacleDamage() {
+
+        normalGameplaySpeedMultiplier =
+            max(
+                0,
+                normalGameplaySpeedMultiplier
+                - obstacleDamageStep
+            )
+
+        updateEffectiveGameplaySpeed()
+    }
+
+
+    private func canApplyObstacleDamage(
+        for objectID:
+            UUID
+    ) -> Bool {
+
+        guard let cooldownEndDate =
+            obstacleDamageCooldownEndDates[
+                objectID
+            ]
+        else {
+            return true
+        }
+
+        return Date() >= cooldownEndDate
+    }
+
+
+    private func startObstacleDamageCooldown(
+        for objectID:
+            UUID
+    ) {
+
+        obstacleDamageCooldownEndDates[
+            objectID
+        ] =
+            Date()
+                .addingTimeInterval(
+                    obstacleDamageCooldownDuration
+                )
+    }
+
+
+    private func updateEffectiveGameplaySpeed() {
+
+        gameplaySpeedMultiplier =
+            isCoinBoostActive
+            ? coinBoostGameplaySpeedMultiplier
+            : normalGameplaySpeedMultiplier
+
+        let percent =
+            currentSpeedPercent
+
+        minSpeedPercent =
+            min(
+                minSpeedPercent,
+                percent
+            )
+
+        maxSpeedPercent =
+            max(
+                maxSpeedPercent,
+                percent
+            )
+    }
+
+
+    private func scheduleCoinBoostEndCheck() {
+
+        coinBoostTask?
+            .cancel()
+
+        guard let coinBoostEndDate
+        else {
+            return
+        }
+
+        let delay =
+            max(
+                coinBoostEndDate.timeIntervalSinceNow,
+                0
+            )
+
+        coinBoostTask =
+            Task { @MainActor [weak self] in
+
+                try? await Task.sleep(
+                    for:
+                        .seconds(
+                            delay
+                        )
+                )
+
+                guard let self,
+                      Task.isCancelled == false
+                else {
+                    return
+                }
+
+                if self.isCoinBoostActive == false {
+
+                    self.coinBoostEndDate =
+                        nil
+
+                    self.updateEffectiveGameplaySpeed()
+                }
+
+                self.coinBoostTask =
+                    nil
+            }
     }
 
 
@@ -627,6 +850,15 @@ final class RobotController:
         gameplayDriveCommand =
             nil
 
+        coinBoostTask?
+            .cancel()
+
+        coinBoostTask =
+            nil
+
+        coinBoostEndDate =
+            nil
+
         waterStrokeTask?
             .cancel()
 
@@ -644,11 +876,23 @@ final class RobotController:
         isGameplayDriveLocked =
             false
 
-        gameplaySpeedMultiplier =
-            1.0
+        normalGameplaySpeedMultiplier =
+            baseGameplaySpeedMultiplier
 
-        pendingShitSpeedReductions =
-            0
+        gameplaySpeedMultiplier =
+            baseGameplaySpeedMultiplier
+
+        minSpeedPercent =
+            currentSpeedPercent
+
+        maxSpeedPercent =
+            currentSpeedPercent
+
+        isMovementCurrentlyBlocked =
+            false
+
+        obstacleDamageCooldownEndDates
+            .removeAll()
 
         joystickInput =
             (
@@ -1064,9 +1308,6 @@ final class RobotController:
             TimeInterval
     ) {
 
-        pendingShitSpeedReductions +=
-            1
-
         guard isGameplayDriveLocked == false
         else {
             return
@@ -1176,7 +1417,7 @@ final class RobotController:
                     else {
 
                         finishShitEffect(
-                            reduceSpeed:
+                            switchToDimmedLights:
                                 false
                         )
                         return
@@ -1185,7 +1426,7 @@ final class RobotController:
 
 
                 finishShitEffect(
-                    reduceSpeed:
+                    switchToDimmedLights:
                         true
                 )
             }
@@ -1193,7 +1434,7 @@ final class RobotController:
 
 
     private func finishShitEffect(
-        reduceSpeed:
+        switchToDimmedLights:
             Bool
     ) {
 
@@ -1206,30 +1447,11 @@ final class RobotController:
         gameplayDriveCommand =
             nil
 
-        if reduceSpeed {
-
-            gameplaySpeedMultiplier =
-                max(
-                    0,
-                    gameplaySpeedMultiplier
-                    - (
-                        0.10
-                        * Double(
-                            pendingShitSpeedReductions
-                        )
-                    )
-                )
-
-            pendingShitSpeedReductions =
-                0
+        if switchToDimmedLights {
 
             sendLightMode(
                 .dimmed
             )
-        } else {
-
-            pendingShitSpeedReductions =
-                0
         }
 
         isGameplayDriveLocked =
@@ -1511,18 +1733,53 @@ final class RobotController:
 
         if let pose =
             currentCollisionPose,
-           collisionManager.isMovementBlocked(
-            robotPose:
-                pose,
-            command:
-                command,
-            objects:
-                blockingObjects,
-            revealedTreeIDs:
-                blockingRevealedTreeIDs,
-            additionalSafetyMargin:
-                blockingSafetyMargin
-           ) {
+           let blockedObject =
+            collisionManager.blockingObject(
+                robotPose:
+                    pose,
+
+                command:
+                    command,
+
+                objects:
+                    blockingObjects,
+
+                revealedTreeIDs:
+                    blockingRevealedTreeIDs,
+
+                additionalSafetyMargin:
+                    blockingSafetyMargin
+            ) {
+
+            if hasLinearMovement(
+                command
+            ),
+               isMovementCurrentlyBlocked == false,
+               canApplyObstacleDamage(
+                for:
+                    blockedObject.id
+               ) {
+
+                isMovementCurrentlyBlocked =
+                    true
+
+                startObstacleDamageCooldown(
+                    for:
+                        blockedObject.id
+                )
+
+                applyObstacleDamage()
+
+                onObstacleDamage?(
+                    blockedObject.type
+                )
+            } else if hasLinearMovement(
+                command
+            ) {
+
+                isMovementCurrentlyBlocked =
+                    true
+            }
 
             command =
                 RobotDriveCommand(
@@ -1533,6 +1790,11 @@ final class RobotController:
                     rotation:
                         command.rotation
                 )
+
+        } else {
+
+            isMovementCurrentlyBlocked =
+                false
         }
 
 
@@ -1578,6 +1840,23 @@ final class RobotController:
                 command
             )
         }
+    }
+
+
+    private func hasLinearMovement(
+        _ command:
+            RobotDriveCommand
+    ) -> Bool {
+
+        abs(
+            command.forward
+        )
+        > 0.001
+        ||
+        abs(
+            command.sideways
+        )
+        > 0.001
     }
 
 

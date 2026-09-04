@@ -61,9 +61,6 @@ struct GameView: View {
     @State private var didDisableEduardAfterFinish =
         false
 
-    @State private var showStartNewGameMenu =
-        false
-
     private let collisionTimer =
         Timer.publish(
             every:
@@ -155,6 +152,7 @@ struct GameView: View {
             savedMapView
                 .allowsHitTesting(false)
             preRaceGuidance
+            restartIconButton
             arRobotControl
             startNewGameButton
             joystickControl
@@ -162,10 +160,6 @@ struct GameView: View {
                 .allowsHitTesting(false)
             gameplayOverlay
 
-            if showStartNewGameMenu {
-
-                startNewGameOverlay
-            }
         }
     }
 
@@ -453,9 +447,15 @@ struct GameView: View {
                             .borderedProminent
                         )
                         .tint(
-                            Color(
+                            isRobotBehindStartLine
+                            ? Color(
                                 "BrandGreen"
                             )
+                            : .red
+                        )
+                        .disabled(
+                            isRobotBehindStartLine
+                                == false
                         )
                         .padding(
                             .top,
@@ -485,6 +485,122 @@ struct GameView: View {
                 && isRobotReadyForRace
             )
         }
+    }
+
+
+    @ViewBuilder
+    private var restartIconButton: some View {
+
+        if shouldShowTopRestartButton {
+
+            Button {
+
+                startNewRace()
+
+            } label: {
+
+                HStack(
+                    spacing:
+                        8
+                ) {
+
+                    Image(
+                        systemName:
+                            "arrow.counterclockwise"
+                    )
+                    .font(
+                        .title3.weight(
+                            .bold
+                        )
+                    )
+                    .frame(
+                        width:
+                            44,
+
+                        height:
+                            44
+                    )
+                    .background(
+                        .black.opacity(
+                            0.68
+                        )
+                    )
+                    .clipShape(
+                        Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                .white.opacity(
+                                    0.36
+                                ),
+                                lineWidth:
+                                    2
+                            )
+                    }
+
+                    Text(
+                        "Restart"
+                    )
+                    .font(
+                        .caption.bold()
+                    )
+                    .padding(
+                        .horizontal,
+                        10
+                    )
+                    .padding(
+                        .vertical,
+                        7
+                    )
+                    .background(
+                        .black.opacity(
+                            0.68
+                        )
+                    )
+                    .clipShape(
+                        Capsule()
+                    )
+                }
+                .foregroundStyle(
+                    .white
+                )
+            }
+            .buttonStyle(
+                .plain
+            )
+            .frame(
+                maxWidth:
+                    .infinity,
+
+                maxHeight:
+                    .infinity,
+
+                alignment:
+                    .topLeading
+            )
+            .padding(
+                .top,
+                28
+            )
+            .padding(
+                .leading,
+                21
+            )
+        }
+    }
+
+
+    private var shouldShowTopRestartButton:
+        Bool {
+
+        isMapLocalized
+        &&
+        hasStartedGameplay
+        &&
+           countdownText == nil
+           &&
+        gameController.phase == .racing
     }
 
 
@@ -689,7 +805,9 @@ struct GameView: View {
         )
         .padding(
             .top,
-            28
+            shouldShowTopRestartButton
+            ? 84
+            : 28
         )
         .padding(
             .leading,
@@ -778,12 +896,13 @@ struct GameView: View {
     private var startNewGameButton: some View {
 
         if isMapLocalized,
-           countdownText == nil {
+           hasStartedGameplay,
+           countdownText == nil,
+           gameController.phase == .freeDrive {
 
             Button {
 
-                showStartNewGameMenu =
-                    true
+                startNewRace()
 
             } label: {
 
@@ -793,11 +912,19 @@ struct GameView: View {
                         "arrow.counterclockwise"
                 )
                 .font(
-                    .caption.bold()
+                    .title3.bold()
+                )
+                .frame(
+                    minWidth:
+                        260
                 )
             }
             .buttonStyle(
-                .borderedProminent
+                CenterGameButtonStyle()
+            )
+            .disabled(
+                isRobotBehindStartLine
+                    == false
             )
             .frame(
                 maxWidth:
@@ -807,15 +934,7 @@ struct GameView: View {
                     .infinity,
 
                 alignment:
-                    .topLeading
-            )
-            .padding(
-                .top,
-                90
-            )
-            .padding(
-                .leading,
-                21
+                    .center
             )
         }
     }
@@ -946,34 +1065,70 @@ struct GameView: View {
 
     private func configureGameController() {
 
-        gameController.setShitEffectHandler { duration in
+        gameController.setShitEffectHandler { [weak controller] duration in
 
-            controller.startShitEffect(
+            controller?.startShitEffect(
                 duration:
                     duration
             )
         }
 
-        gameController.setOilEffectHandler { duration in
+        gameController.setOilEffectHandler { [weak controller] duration in
 
-            controller.startOilEffect(
+            controller?.startOilEffect(
                 duration:
                     duration
             )
         }
 
-        gameController.setTreeEffectHandler { duration in
+        gameController.setTreeEffectHandler { [weak controller] duration in
 
-            controller.startTreeEffect(
+            controller?.startTreeEffect(
                 duration:
                     duration
             )
         }
 
-        gameController.setWaterModeHandler { active in
+        gameController.setWaterModeHandler { [weak controller] active in
 
-            controller.setWaterMode(
+            controller?.setWaterMode(
                 active
+            )
+        }
+
+        gameController.setCoinCollectedHandler { [weak controller] in
+
+            controller?.applyCoinSpeedBoost()
+        }
+
+        gameController.setEggsDeliveredHandler { [weak controller] in
+
+            controller?.repairObstacleDamage()
+        }
+
+        gameController.setCurrentSpeedPercentProvider { [weak controller] in
+
+            controller?.currentSpeedPercent
+            ?? 0
+        }
+
+        gameController.setMinSpeedPercentProvider { [weak controller] in
+
+            controller?.minSpeedPercent
+            ?? 0
+        }
+
+        gameController.setMaxSpeedPercentProvider { [weak controller] in
+
+            controller?.maxSpeedPercent
+            ?? 0
+        }
+
+        controller.setObstacleDamageHandler { [weak gameController] type in
+
+            gameController?.recordObstacleDamage(
+                type:
+                    type
             )
         }
 
@@ -1019,11 +1174,87 @@ struct GameView: View {
     }
 
 
+    private var currentRaceStartPose:
+        RobotPose? {
+
+        controller.realRobotPose
+        ??
+        (
+            controller.isSimulationVisible
+            ? controller.eduardSimulation.pose
+            : nil
+        )
+    }
+
+
+    private var isRobotBehindStartLine:
+        Bool {
+
+        guard let pose =
+            currentRaceStartPose,
+              map.trackPoints.count >= 2
+        else {
+            return false
+        }
+
+        let start =
+            map.trackPoints[0]
+
+        let next =
+            map.trackPoints[1]
+
+        let directionX =
+            next.x
+            -
+            start.x
+
+        let directionZ =
+            next.z
+            -
+            start.z
+
+        let length =
+            sqrt(
+                directionX * directionX
+                +
+                directionZ * directionZ
+            )
+
+        guard length > 0.001
+        else {
+            return true
+        }
+
+        let robotX =
+            pose.position.x
+            -
+            start.x
+
+        let robotZ =
+            pose.position.z
+            -
+            start.z
+
+        let forwardProjection =
+            (
+                robotX
+                * directionX
+                +
+                robotZ
+                * directionZ
+            )
+            / length
+
+        return forwardProjection <= 0
+    }
+
+
     private func startCountdown() {
 
         guard isNoDebugMode,
               isMapLocalized,
               isRobotReadyForRace,
+              isRobotBehindStartLine,
               countdownText == nil,
               hasStartedGameplay == false
         else {
@@ -1115,13 +1346,24 @@ struct GameView: View {
         isCountdownRunning =
             false
 
-        showStartNewGameMenu =
-            false
+        if isRobotBehindStartLine {
 
-        startCountdown()
+            startCountdown()
+        }
 
         print(
             "# GAME | New race started without relocalization"
+        )
+    }
+
+
+    private func closeFinishedOverlay() {
+
+        gameController
+            .continueAfterFinish()
+
+        controller.setGameplayInputLocked(
+            false
         )
     }
 
@@ -1367,96 +1609,6 @@ struct GameView: View {
     }
 
 
-    private var startNewGameOverlay: some View {
-
-        ZStack {
-
-            Color.black
-                .opacity(
-                    0.65
-                )
-                .ignoresSafeArea()
-
-            VStack(
-                spacing:
-                    18
-            ) {
-
-                Text(
-                    "Start New Game"
-                )
-                .font(
-                    .title.bold()
-                )
-
-                Button {
-
-                    startNewRace()
-
-                } label: {
-
-                    Label(
-                        "Start",
-                        systemImage:
-                            "play.fill"
-                    )
-                    .frame(
-                        maxWidth:
-                            .infinity
-                    )
-                }
-                .buttonStyle(
-                    .borderedProminent
-                )
-
-                Button {
-
-                    showStartNewGameMenu =
-                        false
-
-                } label: {
-
-                    Text(
-                        "Cancel"
-                    )
-                    .frame(
-                        maxWidth:
-                            .infinity
-                    )
-                }
-                .buttonStyle(
-                    .bordered
-                )
-            }
-            .foregroundStyle(
-                .white
-            )
-            .padding(
-                24
-            )
-            .frame(
-                maxWidth:
-                    320
-            )
-            .background(
-                .ultraThinMaterial
-            )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius:
-                        8,
-
-                    style:
-                        .continuous
-                )
-            )
-            .padding(
-                24
-            )
-        }
-    }
-
-
     private func outlinedCountdownText(
         _ text:
             String
@@ -1545,23 +1697,104 @@ struct GameView: View {
 
             VStack(
                 alignment:
-                    .leading,
+                    .center,
 
                 spacing:
-                    14
+                    16
             ) {
 
+                HStack {
+
+                    Spacer()
+
+                    Button {
+
+                        closeFinishedOverlay()
+
+                    } label: {
+
+                        Image(
+                            systemName:
+                                "xmark"
+                        )
+                        .font(
+                            .headline.bold()
+                        )
+                        .frame(
+                            width:
+                                34,
+
+                            height:
+                                34
+                        )
+                    }
+                    .buttonStyle(
+                        .plain
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+                    .background(
+                        .white.opacity(
+                            0.12
+                        )
+                    )
+                    .clipShape(
+                        Circle()
+                    )
+                }
+
                 Text(
-                    "Finished. Your Time \(formattedTime(gameController.elapsedTime))"
+                    "Finished"
                 )
                 .font(
-                    .title2.bold()
+                    .largeTitle.bold()
                 )
                 .foregroundStyle(
                     .white
                 )
 
-                scoreSummary
+                Text(
+                    "Your Time"
+                )
+                .font(
+                    .headline
+                )
+                .foregroundStyle(
+                    .white.opacity(
+                        0.76
+                    )
+                )
+
+                Text(
+                    formattedTime(
+                        gameController.elapsedTime
+                    )
+                )
+                .font(
+                    .system(
+                        size:
+                            52,
+
+                        weight:
+                            .bold,
+
+                        design:
+                            .rounded
+                    )
+                    .monospacedDigit()
+                )
+                .foregroundStyle(
+                    Color(
+                        "BrandGreen"
+                    )
+                )
+                .frame(
+                    maxWidth:
+                        .infinity
+                )
+
+                resultSummary
 
                 TextField(
                     "Name",
@@ -1585,19 +1818,16 @@ struct GameView: View {
                     hasSavedFinishedResult =
                         true
 
-                    gameController
-                        .continueAfterFinish()
-
-                    controller.setGameplayInputLocked(
-                        false
-                    )
-
                 } label: {
 
-                    Text(
+                    Label(
                         hasSavedFinishedResult
-                        ? "Saved"
-                        : "Save Result"
+                            ? "Saved"
+                            : "Save Result",
+                        systemImage:
+                            hasSavedFinishedResult
+                            ? "checkmark"
+                            : "square.and.arrow.down"
                     )
                     .frame(
                         maxWidth:
@@ -1605,7 +1835,7 @@ struct GameView: View {
                     )
                 }
                 .buttonStyle(
-                    .borderedProminent
+                    ResultSaveButtonStyle()
                 )
                 .disabled(
                     hasSavedFinishedResult
@@ -1649,45 +1879,92 @@ struct GameView: View {
     }
 
 
-    private var scoreSummary: some View {
+    private var resultSummary: some View {
 
-        VStack(
-            alignment:
-                .leading,
-
-            spacing:
-                6
-        ) {
-
-            Text(
-                "Points \(gameController.score)"
-            )
-            Text(
-                "Coins \(gameController.collectedCoins) x 100"
-            )
-            Text(
-                "Delivered Eggs \(gameController.deliveredEggs) x 300"
-            )
-            Text(
-                "Oil \(gameController.oilHits) x 0"
-            )
-            Text(
-                "Shit \(gameController.shitHits) x -50"
-            )
-            Text(
-                "Finish 1000"
-            )
-            Text(
-                "Best Time Bonus \(gameController.bestTimeBonusEarned ? 10 : 0)"
-            )
-        }
-        .font(
-            .subheadline
-        )
-        .foregroundStyle(
-            .white.opacity(
-                0.9
-            )
+        ItemStatsTableView(
+            stats:
+                [
+                    ItemStat(
+                        emoji:
+                            "🪙",
+                        title:
+                            "Coins",
+                        value:
+                            "\(gameController.collectedCoins)"
+                    ),
+                    ItemStat(
+                        emoji:
+                            "🥚",
+                        title:
+                            "Collected Eggs",
+                        value:
+                            "\(gameController.collectedEggs)"
+                    ),
+                    ItemStat(
+                        emoji:
+                            "🪺",
+                        title:
+                            "Delivered Eggs",
+                        value:
+                            "\(gameController.deliveredEggs)"
+                    ),
+                    ItemStat(
+                        emoji:
+                            "🛢",
+                        title:
+                            "Slipped on Oil",
+                        value:
+                            "\(gameController.oilHits)"
+                    ),
+                    ItemStat(
+                        emoji:
+                            "💩",
+                        title:
+                            "Road Pollution",
+                        value:
+                            "\(gameController.shitHits)"
+                    ),
+                    ItemStat(
+                        emoji:
+                            "🪨",
+                        title:
+                            "Crashed with Rock",
+                        value:
+                            "\(gameController.rockHits)"
+                    ),
+                    ItemStat(
+                        emoji:
+                            "🌳",
+                        title:
+                            "Crashed with Tree",
+                        value:
+                            "\(gameController.treeHits)"
+                    ),
+                    ItemStat(
+                        emoji:
+                            "⚡",
+                        title:
+                            "Final Speed",
+                        value:
+                            "\(controller.currentSpeedPercent)%"
+                    ),
+                    ItemStat(
+                        emoji:
+                            "⬇️",
+                        title:
+                            "Min Speed",
+                        value:
+                            "\(controller.minSpeedPercent)%"
+                    ),
+                    ItemStat(
+                        emoji:
+                            "⬆️",
+                        title:
+                            "Max Speed",
+                        value:
+                            "\(controller.maxSpeedPercent)%"
+                    )
+                ]
         )
     }
 
@@ -1712,79 +1989,14 @@ struct GameView: View {
                 .white
             )
 
-            if gameController.leaderboard.isEmpty {
-
-                Text(
-                    "No saved results yet"
-                )
-                .font(
-                    .caption
-                )
-                .foregroundStyle(
-                    .white.opacity(
-                        0.7
-                    )
-                )
-
-            } else {
-
-                ForEach(
-                    gameController.leaderboard.prefix(
-                        10
-                    )
-                ) { result in
-
-                    VStack(
-                        alignment:
-                            .leading,
-
-                        spacing:
-                            3
-                    ) {
-
-                        Text(
-                            "\(result.playerName) | \(result.trackName)"
-                        )
-                        .font(
-                            .subheadline.bold()
-                        )
-
-                        Text(
-                            "Time \(formattedTime(result.elapsedTime)) | Coins \(result.collectedCoins) | Eggs \(result.deliveredEggs ?? 0) | Oil \(result.oilHits) | Shit \(result.shitHits) | Points \(result.score)"
-                        )
-                        .font(
-                            .caption
-                        )
-                    }
-                    .foregroundStyle(
-                        .white
-                    )
-                    .padding(
-                        8
-                    )
-                    .frame(
-                        maxWidth:
-                            .infinity,
-
-                        alignment:
-                            .leading
-                    )
-                    .background(
-                        .white.opacity(
-                            0.08
+            LeaderboardResultsView(
+                results:
+                    Array(
+                        gameController.leaderboard.prefix(
+                            10
                         )
                     )
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius:
-                                8,
-
-                            style:
-                                .continuous
-                        )
-                    )
-                }
-            }
+            )
         }
     }
 
@@ -1801,7 +2013,739 @@ struct GameView: View {
         )
     }
 
+
 }
+
+
+struct ItemStat:
+    Identifiable {
+
+    let id =
+        UUID()
+
+    let emoji:
+        String
+
+    let title:
+        String
+
+    let value:
+        String
+}
+
+
+struct ItemStatsTableView: View {
+
+    let stats:
+        [ItemStat]
+
+    private let columns =
+        [
+            GridItem(
+                .flexible(),
+                spacing:
+                    8
+            ),
+            GridItem(
+                .flexible(),
+                spacing:
+                    8
+            )
+        ]
+
+
+    var body: some View {
+
+        LazyVGrid(
+            columns:
+                columns,
+
+            alignment:
+                .leading,
+
+            spacing:
+                8
+        ) {
+
+            ForEach(
+                stats
+            ) { stat in
+
+                HStack(
+                    spacing:
+                        8
+                ) {
+
+                    Text(
+                        stat.emoji
+                    )
+                    .font(
+                        .title3
+                    )
+                    .frame(
+                        width:
+                            28
+                    )
+
+                    VStack(
+                        alignment:
+                            .leading,
+
+                        spacing:
+                            1
+                    ) {
+
+                        Text(
+                            stat.title
+                        )
+                        .font(
+                            .caption2.bold()
+                        )
+                        .foregroundStyle(
+                            .white.opacity(
+                                0.66
+                            )
+                        )
+
+                        Text(
+                            stat.value
+                        )
+                        .font(
+                            .subheadline.bold()
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                    }
+
+                    Spacer(
+                        minLength:
+                            0
+                    )
+                }
+                .padding(
+                    8
+                )
+                .background(
+                    .white.opacity(
+                        0.08
+                    )
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius:
+                            8,
+
+                        style:
+                            .continuous
+                    )
+                )
+            }
+        }
+    }
+}
+
+
+struct LeaderboardTableView: View {
+
+    let results:
+        [GameResult]
+
+    @State private var selectedResultID:
+        UUID?
+
+    private let rankColumnWidth:
+        CGFloat = 36
+
+    private let nameColumnWidth:
+        CGFloat = 118
+
+    private let valueColumnWidth:
+        CGFloat = 54
+
+
+    var body: some View {
+
+        ScrollView(
+            .horizontal,
+            showsIndicators:
+                false
+        ) {
+
+            VStack(
+                alignment:
+                    .leading,
+
+                spacing:
+                    6
+            ) {
+
+                HStack(
+                    spacing:
+                        6
+                ) {
+
+                    Color.clear
+                        .frame(
+                            width:
+                                rankColumnWidth
+                        )
+
+                    Text(
+                        "Name"
+                    )
+                    .font(
+                        .caption.bold()
+                    )
+                    .foregroundStyle(
+                        .white.opacity(
+                            0.68
+                        )
+                    )
+                    .frame(
+                        width:
+                            nameColumnWidth,
+
+                        alignment:
+                            .leading
+                    )
+
+                    ForEach(
+                        leaderboardColumns
+                    ) { column in
+
+                        Text(
+                            column.emoji
+                        )
+                        .font(
+                            .title3
+                        )
+                        .frame(
+                            width:
+                                valueColumnWidth,
+
+                            height:
+                                28
+                        )
+
+                    }
+                }
+
+                ForEach(
+                    Array(
+                        results.prefix(
+                            10
+                        )
+                        .enumerated()
+                    ),
+                    id:
+                        \.element.id
+                ) { index, result in
+
+                    let isSelected =
+                        selectedResultID == result.id
+
+                    HStack(
+                        spacing:
+                            6
+                    ) {
+
+                        Text(
+                            "#\(index + 1)"
+                        )
+                        .font(
+                            .caption.bold()
+                        )
+                        .foregroundStyle(
+                            Color(
+                                "BrandGreen"
+                            )
+                        )
+                        .frame(
+                            width:
+                                rankColumnWidth
+                        )
+
+                        Text(
+                            result.playerName
+                        )
+                        .font(
+                            .caption.bold()
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .lineLimit(
+                            1
+                        )
+                        .frame(
+                            width:
+                                nameColumnWidth,
+
+                            alignment:
+                                .leading
+                        )
+
+                        ForEach(
+                            leaderboardValues(
+                                for:
+                                    result
+                            )
+                        ) { stat in
+
+                            Text(
+                                stat.value
+                            )
+                            .font(
+                                .caption.bold()
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                            .frame(
+                                width:
+                                    valueColumnWidth
+                            )
+                        }
+                    }
+                    .padding(
+                        8
+                    )
+                    .background(
+                        isSelected
+                        ? Color(
+                            "BrandGreen"
+                        )
+                        .opacity(
+                            0.62
+                        )
+                        : .white.opacity(
+                            0.08
+                        )
+                    )
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius:
+                                8,
+
+                            style:
+                                .continuous
+                        )
+                    )
+                    .contentShape(
+                        Rectangle()
+                    )
+                    .onTapGesture {
+
+                        withAnimation(
+                            .easeInOut(
+                                duration:
+                                    0.15
+                            )
+                        ) {
+
+                            selectedResultID =
+                                isSelected
+                                ? nil
+                                : result.id
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    private var leaderboardColumns:
+        [ItemStat] {
+
+        [
+            ItemStat(
+                emoji:
+                    "⏱",
+                title:
+                    "Time",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
+                    "🪙",
+                title:
+                    "Coins",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
+                    "🥚",
+                title:
+                    "Collected Eggs",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
+                    "🪺",
+                title:
+                    "Delivered Eggs",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
+                    "🛢",
+                title:
+                    "Slipped on Oil",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
+                    "💩",
+                title:
+                    "Road Pollution",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
+                    "🪨",
+                title:
+                    "Crashed with Rock",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
+                    "🌳",
+                title:
+                    "Crashed with Tree",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
+                    "⚡",
+                title:
+                    "Final Speed",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
+                    "⬇️",
+                title:
+                    "Min Speed",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
+                    "⬆️",
+                title:
+                    "Max Speed",
+                value:
+                    ""
+            )
+        ]
+    }
+
+
+    private func leaderboardValues(
+        for result:
+            GameResult
+    ) -> [ItemStat] {
+
+        [
+            ItemStat(
+                emoji:
+                    "⏱",
+                title:
+                    "Time",
+                value:
+                    formattedTime(
+                        result.elapsedTime
+                    )
+            ),
+            ItemStat(
+                emoji:
+                    "🪙",
+                title:
+                    "Coins",
+                value:
+                    "\(result.collectedCoins)"
+            ),
+            ItemStat(
+                emoji:
+                    "🥚",
+                title:
+                    "Collected Eggs",
+                value:
+                    "\(result.collectedEggs ?? 0)"
+            ),
+            ItemStat(
+                emoji:
+                    "🪺",
+                title:
+                    "Delivered Eggs",
+                value:
+                    "\(result.deliveredEggs ?? 0)"
+            ),
+            ItemStat(
+                emoji:
+                    "🛢",
+                title:
+                    "Slipped on Oil",
+                value:
+                    "\(result.oilHits)"
+            ),
+            ItemStat(
+                emoji:
+                    "💩",
+                title:
+                    "Road Pollution",
+                value:
+                    "\(result.shitHits)"
+            ),
+            ItemStat(
+                emoji:
+                    "🪨",
+                title:
+                    "Crashed with Rock",
+                value:
+                    "\(result.rockHits ?? 0)"
+            ),
+            ItemStat(
+                emoji:
+                    "🌳",
+                title:
+                    "Crashed with Tree",
+                value:
+                    "\(result.treeHits ?? 0)"
+            ),
+            ItemStat(
+                emoji:
+                    "⚡",
+                title:
+                    "Final Speed",
+                value:
+                    speedText(
+                        for:
+                            result
+                    )
+            ),
+            ItemStat(
+                emoji:
+                    "⬇️",
+                title:
+                    "Min Speed",
+                value:
+                    speedText(
+                        result.minSpeedPercent
+                    )
+            ),
+            ItemStat(
+                emoji:
+                    "⬆️",
+                title:
+                    "Max Speed",
+                value:
+                    speedText(
+                        result.maxSpeedPercent
+                    )
+            )
+        ]
+    }
+
+
+    private func formattedTime(
+        _ time:
+            TimeInterval
+    ) -> String {
+
+        String(
+            format:
+                "%.2f",
+            time
+        )
+    }
+
+
+    private func speedText(
+        for result:
+            GameResult
+    ) -> String {
+
+        speedText(
+            result.finalSpeedPercent
+        )
+    }
+
+
+    private func speedText(
+        _ speedPercent:
+            Int?
+    ) -> String {
+
+        guard let speedPercent
+        else {
+            return "-"
+        }
+
+        return "\(speedPercent)%"
+    }
+}
+
+
+struct LeaderboardResultsView: View {
+
+    let results:
+        [GameResult]
+
+
+    var body: some View {
+
+        if results.isEmpty {
+
+            Text(
+                "No saved results yet"
+            )
+            .font(
+                .caption
+            )
+            .foregroundStyle(
+                .white.opacity(
+                    0.7
+                )
+            )
+
+        } else {
+
+            LeaderboardTableView(
+                results:
+                    results
+            )
+        }
+    }
+}
+
+
+private struct CenterGameButtonStyle: ButtonStyle {
+
+    @Environment(\.isEnabled)
+    private var isEnabled
+
+
+    func makeBody(
+        configuration:
+            Configuration
+    ) -> some View {
+
+        configuration.label
+            .frame(
+                maxWidth:
+                    .infinity
+            )
+            .foregroundStyle(
+                .white
+            )
+            .padding(
+                .horizontal,
+                24
+            )
+            .padding(
+                .vertical,
+                16
+            )
+            .background(
+                Color(
+                    "BrandGreen"
+                )
+                .opacity(
+                    isEnabled == false
+                    ? 0.24
+                    : configuration.isPressed
+                    ? 0.54
+                    : 0.70
+                )
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        18,
+
+                    style:
+                        .continuous
+                )
+            )
+            .scaleEffect(
+                configuration.isPressed
+                ? 0.95
+                : 1
+            )
+            .animation(
+                .easeOut(
+                    duration:
+                        0.12
+                ),
+                value:
+                    configuration.isPressed
+            )
+    }
+}
+
+
+private struct ResultSaveButtonStyle: ButtonStyle {
+
+    func makeBody(
+        configuration:
+            Configuration
+    ) -> some View {
+
+        configuration.label
+            .font(
+                .headline.bold()
+            )
+            .foregroundStyle(
+                .white
+            )
+            .padding()
+            .background(
+                Color(
+                    "BrandGreen"
+                )
+                .opacity(
+                    configuration.isPressed
+                    ? 0.72
+                    : 1.0
+                )
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        18,
+
+                    style:
+                        .continuous
+                )
+            )
+            .scaleEffect(
+                configuration.isPressed
+                ? 0.97
+                : 1
+            )
+            .animation(
+                .easeOut(
+                    duration:
+                        0.12
+                ),
+                value:
+                    configuration.isPressed
+            )
+    }
+}
+
 
 struct SwipeBackDisabler:
     UIViewControllerRepresentable {

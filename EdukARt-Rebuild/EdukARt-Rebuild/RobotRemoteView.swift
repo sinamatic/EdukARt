@@ -212,40 +212,7 @@ private extension RobotRemoteView {
                 .buttonStyle(.plain)
             
             if driveExpanded {
-                JoystickView(
-                            joystickMonitor:
-                                joystickMonitor,
-
-                            turnJoystickMonitor:
-                                turnJoystickMonitor,
-
-                            width:
-                                180,
-
-                            shape:
-                                .circle
-                        )
-                        .frame(
-                            maxWidth:
-                                .infinity
-                        )
-                        .onChange(
-                            of:
-                                joystickMonitor.xyPoint
-                        ) { _, input in
-
-                            controller.updateJoystickInput(
-                                x:
-                                    Float(
-                                        input.x / 180
-                                    ),
-
-                                y:
-                                    Float(
-                                        input.y / 180
-                                    )
-                            )
-                        }
+                remoteJoystickControls
                         
             }
             
@@ -258,6 +225,88 @@ private extension RobotRemoteView {
         .clipShape(
             RoundedRectangle(cornerRadius: 8)
         )
+    }
+
+
+    var remoteJoystickControls: some View {
+
+        JoystickView(
+            joystickMonitor:
+                joystickMonitor,
+
+            turnJoystickMonitor:
+                turnJoystickMonitor,
+
+            width:
+                180,
+
+            shape:
+                .circle
+        )
+        .frame(
+            maxWidth:
+                .infinity
+        )
+        .onChange(
+            of:
+                joystickMonitor.xyPoint
+        ) { _, input in
+            handleRemoteJoystickInput(
+                input
+            )
+        }
+        .onChange(
+            of:
+                turnJoystickMonitor.xyPoint
+        ) { _, input in
+            handleRemoteTurnJoystickInput(
+                input
+            )
+        }
+        .onDisappear {
+            stopRemoteJoystickInput()
+        }
+    }
+
+
+    func handleRemoteJoystickInput(
+        _ input:
+            CGPoint
+    ) {
+
+        controller.updateJoystickInput(
+            x:
+                Float(
+                    input.x / 180
+                ),
+
+            y:
+                Float(
+                    input.y / 180
+                )
+        )
+    }
+
+
+    func handleRemoteTurnJoystickInput(
+        _ input:
+            CGPoint
+    ) {
+
+        controller.updateMechanumRotationInput(
+            x:
+                Float(
+                    input.x / 120
+                )
+        )
+    }
+
+
+    func stopRemoteJoystickInput() {
+
+        controller.stopJoystick()
+
+        controller.stopMechanumRotation()
     }
 }
 

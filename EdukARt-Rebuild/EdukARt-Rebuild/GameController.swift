@@ -85,6 +85,9 @@ struct GameResult:
     let collectedCoins:
         Int
 
+    let collectedEggs:
+        Int?
+
     let deliveredEggs:
         Int?
 
@@ -93,6 +96,24 @@ struct GameResult:
 
     let shitHits:
         Int
+
+    let rockHits:
+        Int?
+
+    let treeHits:
+        Int?
+
+    let obstacleHits:
+        Int?
+
+    let finalSpeedPercent:
+        Int?
+
+    let minSpeedPercent:
+        Int?
+
+    let maxSpeedPercent:
+        Int?
 
     let score:
         Int
@@ -107,7 +128,8 @@ final class GameController:
     // MARK: - Published Game State
     // ======================================================
 
-    /// Current score of the running game.
+    /// Legacy score kept for old leaderboard entries.
+    /// New gameplay uses elapsed time only.
     @Published private(set)
     var score:
         Int = 0
@@ -149,6 +171,18 @@ final class GameController:
 
     @Published private(set)
     var shitHits:
+        Int = 0
+
+    @Published private(set)
+    var rockHits:
+        Int = 0
+
+    @Published private(set)
+    var treeHits:
+        Int = 0
+
+    @Published private(set)
+    var obstacleHits:
         Int = 0
 
     @Published private(set)
@@ -228,6 +262,21 @@ final class GameController:
     private var onWaterModeChanged:
         ((Bool) -> Void)?
 
+    private var onCoinCollected:
+        (() -> Void)?
+
+    private var onEggsDelivered:
+        (() -> Void)?
+
+    private var currentSpeedPercentProvider:
+        (() -> Int)?
+
+    private var minSpeedPercentProvider:
+        (() -> Int)?
+
+    private var maxSpeedPercentProvider:
+        (() -> Int)?
+
     private var latestRobotPoses:
         [CollisionActor: RobotPose] = [:]
 
@@ -279,12 +328,6 @@ final class GameController:
 
     private let treeLightEffectDuration:
         TimeInterval = 3.0
-
-    private let eggDeliveryScore:
-        Int = 300
-
-    private let undeliveredEggPenalty:
-        Int = 600
 
     private let map:
         GameMap
@@ -377,6 +420,91 @@ final class GameController:
 
         onWaterModeChanged =
             handler
+    }
+
+
+    func setCoinCollectedHandler(
+        _ handler: @escaping () -> Void
+    ) {
+
+        onCoinCollected =
+            handler
+    }
+
+
+    func setEggsDeliveredHandler(
+        _ handler: @escaping () -> Void
+    ) {
+
+        onEggsDelivered =
+            handler
+    }
+
+
+    func setCurrentSpeedPercentProvider(
+        _ provider: @escaping () -> Int
+    ) {
+
+        currentSpeedPercentProvider =
+            provider
+    }
+
+
+    func setMinSpeedPercentProvider(
+        _ provider: @escaping () -> Int
+    ) {
+
+        minSpeedPercentProvider =
+            provider
+    }
+
+
+    func setMaxSpeedPercentProvider(
+        _ provider: @escaping () -> Int
+    ) {
+
+        maxSpeedPercentProvider =
+            provider
+    }
+
+
+    func recordObstacleDamage(
+        type:
+            MapObjectType
+    ) {
+
+        guard phase == .racing
+        else {
+            return
+        }
+
+        obstacleHits +=
+            1
+
+        switch type {
+
+        case .rock:
+            rockHits +=
+                1
+
+        case .tree:
+            treeHits +=
+                1
+
+        default:
+            break
+        }
+
+        triggerGameplayFeedback(
+            .warning
+        )
+
+        statusText =
+            "\(type.name) damage"
+
+        print(
+            "# GAME | Obstacle damage | \(type.name) | total \(obstacleHits)"
+        )
     }
 
 
@@ -576,6 +704,9 @@ final class GameController:
                 collectedCoins:
                     collectedCoins,
 
+                collectedEggs:
+                    collectedEggs,
+
                 deliveredEggs:
                     deliveredEggs,
 
@@ -585,8 +716,26 @@ final class GameController:
                 shitHits:
                     shitHits,
 
+                rockHits:
+                    rockHits,
+
+                treeHits:
+                    treeHits,
+
+                obstacleHits:
+                    obstacleHits,
+
+                finalSpeedPercent:
+                    currentSpeedPercentProvider?(),
+
+                minSpeedPercent:
+                    minSpeedPercentProvider?(),
+
+                maxSpeedPercent:
+                    maxSpeedPercentProvider?(),
+
                 score:
-                    score
+                    0
             )
 
         leaderboard.append(
@@ -594,13 +743,7 @@ final class GameController:
         )
 
         leaderboard.sort {
-
-            if $0.score == $1.score {
-
-                return $0.elapsedTime < $1.elapsedTime
-            }
-
-            return $0.score > $1.score
+            $0.elapsedTime < $1.elapsedTime
         }
 
         saveLeaderboard()
@@ -696,13 +839,7 @@ final class GameController:
         collectedCoins +=
             collectedIDs.count
 
-        if isScoringEnabled {
-
-            score +=
-                collectedIDs.count
-                *
-                100
-        }
+        onCoinCollected?()
 
         triggerGameplayFeedback(
             .success
@@ -1028,20 +1165,10 @@ final class GameController:
         }
 
 
-        // --------------------------------------------------
-        // Score
-        // --------------------------------------------------
-
-        if isScoringEnabled {
-
-            score +=
-                deliveredNow
-                * eggDeliveryScore
-        }
-
-
         deliveredEggs +=
             deliveredNow
+
+        onEggsDelivered?()
 
 
         collectedEggs =
@@ -1061,11 +1188,6 @@ final class GameController:
             "# EGG CUP | Total delivered:",
             deliveredEggs
         )
-
-        print(
-            "# GAME | Score:",
-            score
-        )
     }
 
 
@@ -1083,11 +1205,6 @@ final class GameController:
 
         shitHits += 1
 
-        if isScoringEnabled {
-
-            score -= 50
-        }
-
         triggerGameplayFeedback(
             .warning
         )
@@ -1104,10 +1221,6 @@ final class GameController:
 
         print(
             "# GAME | Shit hit | SHIT actor = \(actor.rawValue)"
-        )
-
-        print(
-            "# GAME | Score: \(score)"
         )
 
 
@@ -1245,10 +1358,6 @@ final class GameController:
             "# GAME | Oil hit"
         )
 
-        print(
-            "# GAME | Score: \(score)"
-        )
-
         startOilCooldown(
             for:
                 object
@@ -1353,11 +1462,6 @@ final class GameController:
 
     private func hitRock() {
 
-        if isScoringEnabled {
-
-            score -= 5
-        }
-
         statusText =
             "Rock hit"
 
@@ -1365,16 +1469,6 @@ final class GameController:
         print(
             "# GAME | Rock hit"
         )
-
-        print(
-            "# GAME | Score: \(score)"
-        )
-
-
-        // Later:
-        //
-        // RobotController:
-        // temporarily stop Eduard.
     }
 
 
@@ -1383,11 +1477,6 @@ final class GameController:
     // ======================================================
 
     private func hitTree() {
-
-        if isScoringEnabled {
-
-            score -= 5
-        }
 
         onTreeEffectStarted?(
             treeLightEffectDuration
@@ -1399,10 +1488,6 @@ final class GameController:
 
         print(
             "# GAME | Tree hit"
-        )
-
-        print(
-            "# GAME | Score: \(score)"
         )
     }
 
@@ -1478,6 +1563,15 @@ final class GameController:
             0
 
         shitHits =
+            0
+
+        rockHits =
+            0
+
+        treeHits =
+            0
+
+        obstacleHits =
             0
 
         elapsedTime =
@@ -1640,47 +1734,11 @@ final class GameController:
         timerTask =
             nil
 
-        score +=
-            1000
-
         bestTimeBonusEarned =
             isNewBestTime
 
-        if bestTimeBonusEarned {
-
-            score +=
-                10
-        }
-
-        let remainingEggs =
-            carriedEggCount
-
-        if remainingEggs > 0 {
-
-            let penalty =
-                remainingEggs
-                * undeliveredEggPenalty
-
-            score -=
-                penalty
-
-            statusText =
-                "Finished | \(remainingEggs) egg penalty"
-
-            print(
-                "# GAME | Undelivered eggs penalty | Eggs:",
-                remainingEggs,
-                "| Penalty:",
-                penalty,
-                "| Score:",
-                score
-            )
-
-        } else {
-
-            statusText =
-                "Finished"
-        }
+        statusText =
+            "Finished"
     }
 
 
@@ -1836,6 +1894,10 @@ final class GameController:
 
         leaderboard =
             decoded
+
+        leaderboard.sort {
+            $0.elapsedTime < $1.elapsedTime
+        }
     }
 
 

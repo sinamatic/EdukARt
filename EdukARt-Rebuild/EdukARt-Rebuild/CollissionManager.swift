@@ -213,6 +213,48 @@ final class CollisionManager {
             Float = 0
     ) -> Bool {
 
+        blockingObject(
+            robotPose:
+                robotPose,
+
+            command:
+                command,
+
+            objects:
+                objects,
+
+            revealedTreeIDs:
+                revealedTreeIDs,
+
+            predictionTime:
+                predictionTime,
+
+            additionalSafetyMargin:
+                additionalSafetyMargin
+        ) != nil
+    }
+
+
+    func blockingObject(
+        robotPose:
+            RobotPose,
+
+        command:
+            RobotDriveCommand,
+
+        objects:
+            [PlacedMapObject],
+
+        revealedTreeIDs:
+            Set<UUID>,
+
+        predictionTime:
+            Float = 0.10,
+
+        additionalSafetyMargin:
+            Float = 0
+    ) -> PlacedMapObject? {
+
         let currentPosition =
             SIMD2<Float>(
                 robotPose.position.x,
@@ -278,12 +320,12 @@ final class CollisionManager {
             if predictedDistance < minimumDistance,
                predictedDistance < currentDistance {
 
-                return true
+                return object
             }
         }
 
 
-        return false
+        return nil
     }
 
 
