@@ -2515,6 +2515,7 @@ struct CameraARView: UIViewRepresentable {
 
                     if object.type != .oil
                         && object.type != .eggCup
+                        && object.type != .rock
                         && object.type != .tree {
 
                         animatedMapObjects.append(

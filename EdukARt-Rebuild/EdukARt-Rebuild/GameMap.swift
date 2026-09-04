@@ -214,7 +214,6 @@ enum MapObjectType:
     case water
     case rock
     case tree
-    case stonehendge
 
 
     init(
@@ -296,8 +295,6 @@ enum MapObjectType:
         case .tree:
             "🌳"
 
-        case .stonehendge:
-            "🪨"
         }
     }
 
@@ -327,8 +324,6 @@ enum MapObjectType:
         case .tree:
             "Tree"
 
-        case .stonehendge:
-            "Stonehendge"
         }
     }
     
@@ -342,8 +337,7 @@ enum MapObjectType:
         case .oil,
              .water,
              .rock,
-             .tree,
-             .stonehendge:
+             .tree:
             true
 
         default:
@@ -363,8 +357,7 @@ enum MapObjectType:
              .oil,
              .water,
              .rock,
-             .tree,
-             .stonehendge:
+             .tree:
 
             return true
         } }
@@ -394,8 +387,6 @@ enum MapObjectType:
         case .tree:
             return 0.20 // ToDo: size
 
-        case .stonehendge:
-            return 0.22 // ToDo: size
         }
    
     
@@ -432,6 +423,9 @@ enum MapObjectType:
         case .oil:
             "Oil"
 
+        case .rock:
+            "Stonehendge"
+
         case .eggs:
             "Egg"
 
@@ -440,9 +434,6 @@ enum MapObjectType:
 
         case .tree:
             "tree"
-
-        case .stonehendge:
-            "Stonehendge"
 
         default:
             nil
