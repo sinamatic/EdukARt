@@ -1609,6 +1609,10 @@ struct GameView: View {
                 .top,
                 28
             )
+            .offset(
+                y:
+                    -50
+            )
         }
     }
 

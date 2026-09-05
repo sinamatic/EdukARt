@@ -956,7 +956,7 @@ struct CameraARView: UIViewRepresentable {
             [UUID: Entity] = [:]
 
         private let showsCollisionDebugCircles =
-            true // ToDo Debug Collissions
+            false // ToDo Debug Collissions
 
         private var collisionDebugCircleEntities:
             [String: Entity] = [:]
@@ -2547,17 +2547,6 @@ struct CameraARView: UIViewRepresentable {
                                     .arModelScale
                         )
 
-                    if object.type == .water {
-
-                        applyWaterOpacity(
-                            to:
-                                entity,
-
-                            opacity:
-                                0.90
-                        )
-                    }
-
                     objectRoot.addChild(
                         entity
                     )
@@ -2737,47 +2726,6 @@ struct CameraARView: UIViewRepresentable {
                 )
 
             return marker
-        }
-
-
-        private func applyWaterOpacity(
-            to entity:
-                Entity,
-
-            opacity:
-                CGFloat
-        ) {
-
-            if let modelEntity =
-                entity as? ModelEntity {
-
-                let material =
-                    SimpleMaterial(
-                        color:
-                            UIColor.systemBlue.withAlphaComponent(
-                                opacity
-                            ),
-
-                        isMetallic:
-                            false
-                    )
-
-                modelEntity.model?
-                    .materials = [
-                        material
-                    ]
-            }
-
-            for child in entity.children {
-
-                applyWaterOpacity(
-                    to:
-                        child,
-
-                    opacity:
-                        opacity
-                )
-            }
         }
 
 
