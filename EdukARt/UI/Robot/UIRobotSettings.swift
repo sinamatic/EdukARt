@@ -22,12 +22,8 @@ struct UIRobotSettings: View {
                     Text("Settings")
                         .font(.subheadline.weight(.bold))
                     
-                    
-                   
-                    
                     Spacer()
-                    
-                    
+                                  
                     Image(systemName: "chevron.down")
                         .rotationEffect(
                             .degrees(isExpanded ? 0 : -90)
@@ -36,7 +32,6 @@ struct UIRobotSettings: View {
                 .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
-            
             
             if isExpanded {
                 VStack(alignment: .leading, spacing: 10) {
