@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct EdukARt_RebuildApp: App {
+struct EdukARtApp: App {
     
     @StateObject private var eduardModelStore = EduardModelStore()
     

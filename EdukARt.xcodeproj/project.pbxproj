@@ -13,13 +13,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		90092AA13037942B00D9DE91 /* EdukARt-Rebuild.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "EdukARt-Rebuild.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		90092AA13037942B00D9DE91 /* EdukARt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EdukARt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		90092AA33037942B00D9DE91 /* EdukARt-Rebuild */ = {
+		90092AA33037942B00D9DE91 /* EdukARt */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "EdukARt-Rebuild";
+			path = EdukARt;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -41,7 +41,7 @@
 		90092A983037942B00D9DE91 = {
 			isa = PBXGroup;
 			children = (
-				90092AA33037942B00D9DE91 /* EdukARt-Rebuild */,
+				90092AA33037942B00D9DE91 /* EdukARt */,
 				90092AA23037942B00D9DE91 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -49,7 +49,7 @@
 		90092AA23037942B00D9DE91 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				90092AA13037942B00D9DE91 /* EdukARt-Rebuild.app */,
+				90092AA13037942B00D9DE91 /* EdukARt.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -57,9 +57,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		90092AA03037942B00D9DE91 /* EdukARt-Rebuild */ = {
+		90092AA03037942B00D9DE91 /* EdukARt */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 90092AAC3037942C00D9DE91 /* Build configuration list for PBXNativeTarget "EdukARt-Rebuild" */;
+			buildConfigurationList = 90092AAC3037942C00D9DE91 /* Build configuration list for PBXNativeTarget "EdukARt" */;
 			buildPhases = (
 				90092A9D3037942B00D9DE91 /* Sources */,
 				90092A9E3037942B00D9DE91 /* Frameworks */,
@@ -70,16 +70,16 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				90092AA33037942B00D9DE91 /* EdukARt-Rebuild */,
+				90092AA33037942B00D9DE91 /* EdukARt */,
 			);
-			name = "EdukARt-Rebuild";
+			name = EdukARt;
 			packageProductDependencies = (
 				90B4CBC5303846AE005FB20C /* SwiftUIJoystick */,
 				90819FA7303A106D00090B99 /* SwiftAprilTag */,
 				90EDCBCA303F56C6008E7D2E /* pingx */,
 			);
 			productName = "EdukARt-Rebuild";
-			productReference = 90092AA13037942B00D9DE91 /* EdukARt-Rebuild.app */;
+			productReference = 90092AA13037942B00D9DE91 /* EdukARt.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -97,7 +97,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 90092A9C3037942B00D9DE91 /* Build configuration list for PBXProject "EdukARt-Rebuild" */;
+			buildConfigurationList = 90092A9C3037942B00D9DE91 /* Build configuration list for PBXProject "EdukARt" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -116,7 +116,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				90092AA03037942B00D9DE91 /* EdukARt-Rebuild */,
+				90092AA03037942B00D9DE91 /* EdukARt */,
 			);
 		};
 /* End PBXProject section */
@@ -284,7 +284,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "sinamatic.EdukARt-Rebuild";
+				PRODUCT_BUNDLE_IDENTIFIER = sinamatic.EdukARt;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -317,7 +317,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "sinamatic.EdukARt-Rebuild";
+				PRODUCT_BUNDLE_IDENTIFIER = sinamatic.EdukARt;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -332,7 +332,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		90092A9C3037942B00D9DE91 /* Build configuration list for PBXProject "EdukARt-Rebuild" */ = {
+		90092A9C3037942B00D9DE91 /* Build configuration list for PBXProject "EdukARt" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				90092AAA3037942C00D9DE91 /* Debug */,
@@ -341,7 +341,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		90092AAC3037942C00D9DE91 /* Build configuration list for PBXNativeTarget "EdukARt-Rebuild" */ = {
+		90092AAC3037942C00D9DE91 /* Build configuration list for PBXNativeTarget "EdukARt" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				90092AAD3037942C00D9DE91 /* Debug */,
