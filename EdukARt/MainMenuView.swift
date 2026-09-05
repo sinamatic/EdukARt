@@ -54,7 +54,10 @@ struct MainMenuView: View {
                 
                 NavigationLink
                 {
-                    SettingsView()
+                    SettingsView(
+                        controller:
+                            controller
+                    )
                 } label: {Text("Settings")}
                     .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
 

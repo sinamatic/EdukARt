@@ -112,6 +112,9 @@ struct GameResult:
     let obstacleHits:
         Int?
 
+    let collectedItemboxes:
+        Int?
+
     let finalSpeedPercent:
         Int?
 
@@ -196,6 +199,10 @@ final class GameController:
         Int = 0
 
     @Published private(set)
+    var collectedItemboxes:
+        Int = 0
+
+    @Published private(set)
     var isRaceRunning:
         Bool = false
 
@@ -273,6 +280,9 @@ final class GameController:
         ((Bool) -> Void)?
 
     private var onCoinCollected:
+        (() -> Void)?
+
+    private var onItemboxCollected:
         (() -> Void)?
 
     private var onEggCollected:
@@ -447,6 +457,15 @@ final class GameController:
     ) {
 
         onCoinCollected =
+            handler
+    }
+
+
+    func setItemboxCollectedHandler(
+        _ handler: @escaping () -> Void
+    ) {
+
+        onItemboxCollected =
             handler
     }
 
@@ -759,6 +778,9 @@ final class GameController:
                 obstacleHits:
                     obstacleHits,
 
+                collectedItemboxes:
+                    collectedItemboxes,
+
                 finalSpeedPercent:
                     currentSpeedPercentProvider?(),
 
@@ -975,12 +997,26 @@ final class GameController:
     }
 
 
+    var itemboxTimeBonus:
+        TimeInterval {
+
+        TimeInterval(
+            collectedItemboxes * 20
+        )
+    }
+
+
     var resultingTime:
         TimeInterval {
 
-        elapsedTime
-        +
-        coinTimePenalty
+        max(
+            elapsedTime
+            +
+            coinTimePenalty
+            -
+            itemboxTimeBonus,
+            0
+        )
     }
 
 
@@ -1006,6 +1042,17 @@ final class GameController:
         case .eggs:
 
             collectEggs(
+                object
+            )
+
+
+        // --------------------------------------------------
+        // Itembox
+        // --------------------------------------------------
+
+        case .itembox:
+
+            collectItembox(
                 object
             )
 
@@ -1113,6 +1160,33 @@ final class GameController:
         default:
             break
         }
+    }
+
+
+    // ======================================================
+    // MARK: - Collect Itembox
+    // ======================================================
+
+    private func collectItembox(
+        _ object:
+            PlacedMapObject
+    ) {
+
+        activeMapObjects.removeAll {
+            $0.id == object.id
+        }
+
+        collectedItemboxes +=
+            1
+
+        statusText =
+            "Itembox collected"
+
+        onItemboxCollected?()
+
+        print(
+            "# ITEMBOX | Collected | bonus -20s"
+        )
     }
 
 
@@ -1655,6 +1729,9 @@ final class GameController:
             0
 
         obstacleHits =
+            0
+
+        collectedItemboxes =
             0
 
         elapsedTime =

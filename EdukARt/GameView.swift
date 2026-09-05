@@ -1103,6 +1103,11 @@ struct GameView: View {
             controller?.blinkCoinCollectedLights()
         }
 
+        gameController.setItemboxCollectedHandler { [weak controller] in
+
+            controller?.blinkItemboxCollectedLights()
+        }
+
         gameController.setEggCollectedHandler { [weak controller] in
 
             controller?.blinkEggCollectedLights()
@@ -1931,6 +1936,14 @@ struct GameView: View {
                     ),
                     ItemStat(
                         emoji:
+                            "🎁",
+                        title:
+                            "Itemboxes",
+                        value:
+                            "\(gameController.collectedItemboxes)"
+                    ),
+                    ItemStat(
+                        emoji:
                             "🥚",
                         title:
                             "Collected Eggs",
@@ -2051,6 +2064,18 @@ struct GameView: View {
 
             Text(
                 "\(gameController.missingCoins) missing coins x 5s = +\(formattedTime(gameController.coinTimePenalty))"
+            )
+            .font(
+                .caption2.bold()
+            )
+            .foregroundStyle(
+                .white.opacity(
+                    0.62
+                )
+            )
+
+            Text(
+                "\(gameController.collectedItemboxes) itemboxes x 20s = -\(formattedTime(gameController.itemboxTimeBonus))"
             )
             .font(
                 .caption2.bold()
@@ -2502,6 +2527,14 @@ struct LeaderboardTableView: View {
             ),
             ItemStat(
                 emoji:
+                    "🎁",
+                title:
+                    "Itemboxes",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
                     "🥚",
                 title:
                     "Collected Eggs",
@@ -2615,6 +2648,14 @@ struct LeaderboardTableView: View {
                         for:
                             result
                     )
+            ),
+            ItemStat(
+                emoji:
+                    "🎁",
+                title:
+                    "Itemboxes",
+                value:
+                    "\(result.collectedItemboxes ?? 0)"
             ),
             ItemStat(
                 emoji:

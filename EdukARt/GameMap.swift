@@ -205,15 +205,16 @@ enum MapObjectType:
     CaseIterable {
 
     // Items
-    case eggCup
+    case itembox
     case eggs
+    case eggCup
     case shit
 
     // Obstacles
-    case oil
+    case tree
     case water
     case rock
-    case tree
+    case oil
     case treeTrigger
 
 
@@ -284,6 +285,9 @@ enum MapObjectType:
         case .shit:
             "💩"
 
+        case .itembox:
+            "🎁"
+
         case .oil:
             "🛢"
 
@@ -315,6 +319,9 @@ enum MapObjectType:
 
         case .shit:
             "Shit"
+
+        case .itembox:
+            "Itembox"
 
         case .oil:
             "Oil"
@@ -366,6 +373,9 @@ enum MapObjectType:
             return 0.10 // ToDo: size
 
         case .shit:
+            return 0.12 // ToDo: size
+
+        case .itembox:
             return 0.12 // ToDo: size
 
         case .oil:
@@ -421,6 +431,9 @@ enum MapObjectType:
         case .oil:
             return 0.15 // ToDo: size
 
+        case .itembox:
+            return 0.8 // ToDo: size
+
         case .water:
             return 0.10 // ToDo: size
 
@@ -440,6 +453,9 @@ enum MapObjectType:
 
         case .oil:
             "Oil"
+
+        case .itembox:
+            "Itembox"
 
         case .rock:
             "Stonehendge"

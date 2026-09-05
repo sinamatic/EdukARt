@@ -738,6 +738,53 @@ final class RobotController:
     }
 
 
+    func resetPhysicalRobot() {
+
+        print(
+            "# ROBOT RESET | Start"
+        )
+
+        resetGameplayState()
+
+        eduard.reconnect()
+
+        if isConnected {
+
+            eduard.drive(
+                .stop
+            )
+
+            eduard.setEnabled(
+                false,
+                driveMode:
+                    driveMode
+            )
+
+            eduard.setEnabled(
+                true,
+                driveMode:
+                    driveMode
+            )
+
+            isEnabled =
+                true
+
+            statusMessage =
+                "Robot drive reset sent."
+
+            startCommandLoop()
+        } else {
+
+            statusMessage =
+                "Robot reset prepared. Connect Eduard first."
+        }
+
+        print(
+            "# ROBOT RESET | Finished"
+        )
+    }
+
+
     // ======================================================
     // MARK: - Drive Mode
     // ======================================================
@@ -927,6 +974,15 @@ final class RobotController:
         obstacleDamageCooldownEndDates
             .removeAll()
 
+        blockingObjects
+            .removeAll()
+
+        blockingRevealedTreeIDs
+            .removeAll()
+
+        realRobotPose =
+            nil
+
         feedbackLightTask?
             .cancel()
 
@@ -949,9 +1005,15 @@ final class RobotController:
     }
 
 
-    func resetForManualControl() {
+    func resetGameplayState() {
 
         resetGameplayEffects()
+    }
+
+
+    func resetForManualControl() {
+
+        resetGameplayState()
     }
 
 
@@ -1121,6 +1183,27 @@ final class RobotController:
 
             duration:
                 0.55,
+
+            mode:
+                .rotation
+        )
+    }
+
+
+    func blinkItemboxCollectedLights() {
+
+        blinkAllLights(
+            red:
+                180,
+
+            green:
+                80,
+
+            blue:
+                255,
+
+            duration:
+                0.8,
 
             mode:
                 .rotation

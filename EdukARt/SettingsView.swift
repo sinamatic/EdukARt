@@ -9,6 +9,10 @@ import SwiftUI
 
 struct SettingsView: View {
 
+    @ObservedObject var controller:
+        RobotController
+
+
     var body: some View {
 
         ZStack {
@@ -32,6 +36,50 @@ struct SettingsView: View {
                 )
                 .foregroundStyle(
                     .white
+                )
+
+                Text(
+                    "Use this if the physical Eduard keeps an old drive state after a game. It stops gameplay effects and sends a fresh disable/enable reset to the robot."
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .white.opacity(
+                        0.72
+                    )
+                )
+
+                Button {
+
+                    controller.resetPhysicalRobot()
+
+                } label: {
+
+                    Label(
+                        "Reset Robot Drive",
+                        systemImage:
+                            "arrow.triangle.2.circlepath"
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(
+                    SettingsMenuButtonStyle()
+                )
+
+                Text(
+                    controller.statusMessage
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .white.opacity(
+                        0.64
+                    )
                 )
 
                 Spacer()
@@ -215,6 +263,9 @@ private struct SettingsMenuButtonStyle: ButtonStyle {
 
     NavigationStack {
 
-        SettingsView()
+        SettingsView(
+            controller:
+                RobotController()
+        )
     }
 }

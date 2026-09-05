@@ -82,17 +82,18 @@ struct CreateMapView: View {
     private let mapSizeFactor: CGFloat = 2.0 / 3.0
     private let items:
         [MapObjectType] = [
-            .eggCup,
+            .itembox,
             .eggs,
+            .eggCup,
             .shit
         ]
 
     private let obstacles:
         [MapObjectType] = [
-            .oil,
+            .tree,
             .water,
             .rock,
-            .tree
+            .oil
         ]
 
     private var footerHeight: CGFloat {
