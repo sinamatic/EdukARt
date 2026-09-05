@@ -11,6 +11,9 @@ struct RobotControlOverlay: View {
     @ObservedObject var controller: RobotController
 
     var body: some View {
+        let wifiStatus = controller.isWifiReachable ? "reachable" : "not reachable"
+        let enabledStatus = controller.isEnabled ? "enabled" : "disabled"
+
         HStack(spacing: 7) {
             Button {
                 controller.toggleEnabled()
@@ -38,7 +41,7 @@ struct RobotControlOverlay: View {
         .padding(20)
         .offset(y: -20)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Robot Status: WiFi \(controller.isWifiReachable), Enabled \(controller.isEnabled)")
+        .accessibilityLabel("Robot Status: WiFi \(wifiStatus), \(enabledStatus)")
         .onAppear { controller.checkConnection() }
     }
 

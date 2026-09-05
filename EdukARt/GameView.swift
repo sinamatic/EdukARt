@@ -993,16 +993,16 @@ struct GameView: View {
         )
         .onChange(
             of:
-                joystickMonitor.xyPoint,
-            perform:
-                handleJoystickInput
-        )
+                joystickMonitor.xyPoint
+        ) { _, newInput in
+            handleJoystickInput(newInput)
+        }
         .onChange(
             of:
-                turnJoystickMonitor.xyPoint,
-            perform:
-                handleTurnJoystickInput
-        )
+                turnJoystickMonitor.xyPoint
+        ) { _, newInput in
+            handleTurnJoystickInput(newInput)
+        }
         .onDisappear(
             perform:
                 stopJoystickInput
