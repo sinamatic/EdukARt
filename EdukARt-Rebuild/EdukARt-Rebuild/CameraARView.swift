@@ -2547,6 +2547,17 @@ struct CameraARView: UIViewRepresentable {
                                     .arModelScale
                         )
 
+                    if object.type == .water {
+
+                        applyWaterOpacity(
+                            to:
+                                entity,
+
+                            opacity:
+                                0.90
+                        )
+                    }
+
                     objectRoot.addChild(
                         entity
                     )
@@ -2726,6 +2737,47 @@ struct CameraARView: UIViewRepresentable {
                 )
 
             return marker
+        }
+
+
+        private func applyWaterOpacity(
+            to entity:
+                Entity,
+
+            opacity:
+                CGFloat
+        ) {
+
+            if let modelEntity =
+                entity as? ModelEntity {
+
+                let material =
+                    SimpleMaterial(
+                        color:
+                            UIColor.systemBlue.withAlphaComponent(
+                                opacity
+                            ),
+
+                        isMetallic:
+                            false
+                    )
+
+                modelEntity.model?
+                    .materials = [
+                        material
+                    ]
+            }
+
+            for child in entity.children {
+
+                applyWaterOpacity(
+                    to:
+                        child,
+
+                    opacity:
+                        opacity
+                )
+            }
         }
 
 
@@ -3127,14 +3179,15 @@ struct CameraARView: UIViewRepresentable {
             }
 
 
-            let eggCup =
+            let eggCups =
                 gameMap?
                     .mapObjects
-                    .first {
+                    .filter {
 
                         $0.type
                             == .eggCup
                     }
+                ?? []
 
 
             eggRenderer.update(
@@ -3144,8 +3197,8 @@ struct CameraARView: UIViewRepresentable {
                 robotPose:
                     robotPose,
 
-                eggCup:
-                    eggCup,
+                eggCups:
+                    eggCups,
 
                 parent:
                     mapRoot

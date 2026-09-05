@@ -24,21 +24,4 @@ enum TrackRules {
         roadWidth / 2
     }
 
-
-    // ======================================================
-    // MARK: - Offroad
-    // ======================================================
-
-    /// Eduard immediately drops to 50 % speed
-    /// after leaving the road.
-    static let offRoadInitialSpeedScale:
-        Double = 0.50
-
-    /// Additional speed loss per second offroad.
-    static let offRoadSpeedLossPerSecond:
-        Double = 0.05
-
-    /// Eventually Eduard stops completely.
-    static let minimumOffRoadSpeedScale:
-        Double = 0.0
 }

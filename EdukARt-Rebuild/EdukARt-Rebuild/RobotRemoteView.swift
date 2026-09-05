@@ -51,6 +51,10 @@ struct RobotRemoteView: View {
         }
         .navigationTitle("Robot Remote")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+
+            controller.resetForManualControl()
+        }
     }
 }
 

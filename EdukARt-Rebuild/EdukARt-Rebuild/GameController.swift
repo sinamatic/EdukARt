@@ -82,6 +82,12 @@ struct GameResult:
     let elapsedTime:
         TimeInterval
 
+    let totalCoins:
+        Int?
+
+    let resultingTime:
+        TimeInterval?
+
     let collectedCoins:
         Int
 
@@ -160,6 +166,10 @@ final class GameController:
     @Published private(set)
     var coins:
         [GameCoin] = []
+
+    @Published private(set)
+    var totalCoins:
+        Int = 0
 
     @Published private(set)
     var collectedCoins:
@@ -265,6 +275,9 @@ final class GameController:
     private var onCoinCollected:
         (() -> Void)?
 
+    private var onEggCollected:
+        (() -> Void)?
+
     private var onEggsDelivered:
         (() -> Void)?
 
@@ -300,7 +313,7 @@ final class GameController:
     }
 
     private let shitEffectDuration:
-        TimeInterval = 4
+        TimeInterval = 5
 
     private let shitDotSpawnDistance:
         Float = 0.14
@@ -367,11 +380,17 @@ final class GameController:
         self.activeMapObjects =
             map.mapObjects
 
-        self.coins =
+        let generatedCoins =
             Self.generateCoins(
                 from:
                     map.trackPoints
             )
+
+        self.coins =
+            generatedCoins
+
+        self.totalCoins =
+            generatedCoins.count
 
         loadLeaderboard()
     }
@@ -428,6 +447,15 @@ final class GameController:
     ) {
 
         onCoinCollected =
+            handler
+    }
+
+
+    func setEggCollectedHandler(
+        _ handler: @escaping () -> Void
+    ) {
+
+        onEggCollected =
             handler
     }
 
@@ -701,6 +729,12 @@ final class GameController:
                 elapsedTime:
                     elapsedTime,
 
+                totalCoins:
+                    totalCoins,
+
+                resultingTime:
+                    resultingTime,
+
                 collectedCoins:
                     collectedCoins,
 
@@ -743,7 +777,15 @@ final class GameController:
         )
 
         leaderboard.sort {
-            $0.elapsedTime < $1.elapsedTime
+            Self.rankingTime(
+                for:
+                    $0
+            )
+            <
+            Self.rankingTime(
+                for:
+                    $1
+            )
         }
 
         saveLeaderboard()
@@ -914,6 +956,34 @@ final class GameController:
     }
 
 
+    var missingCoins:
+        Int {
+
+        max(
+            totalCoins - collectedCoins,
+            0
+        )
+    }
+
+
+    var coinTimePenalty:
+        TimeInterval {
+
+        TimeInterval(
+            missingCoins * 5
+        )
+    }
+
+
+    var resultingTime:
+        TimeInterval {
+
+        elapsedTime
+        +
+        coinTimePenalty
+    }
+
+
     // ======================================================
     // MARK: - Collision Began
     // ======================================================
@@ -1009,7 +1079,9 @@ final class GameController:
 
         case .eggCup:
 
-            deliverEggsToEggCup()
+            deliverEggsToEggCup(
+                object
+            )
         }
     }
 
@@ -1101,6 +1173,8 @@ final class GameController:
         statusText =
             "Egg collected"
 
+        onEggCollected?()
+
 
         print(
             "# EGG | Collected | carrying \(collectedEggs)"
@@ -1112,7 +1186,10 @@ final class GameController:
     // MARK: - Deliver Eggs to Egg Cup
     // ======================================================
 
-    private func deliverEggsToEggCup() {
+    private func deliverEggsToEggCup(
+        _ eggCup:
+            PlacedMapObject
+    ) {
 
         // All currently carried eggs.
         let carriedIndices =
@@ -1153,6 +1230,9 @@ final class GameController:
 
             runtimeEggs[index].state =
                 .delivered(
+                    eggCupID:
+                        eggCup.id,
+
                     slot:
                         nextDeliveredSlot
                 )
@@ -1547,6 +1627,9 @@ final class GameController:
         collectedCoins =
             0
 
+        totalCoins =
+            0
+
         collectedEggs =
             0
 
@@ -1608,11 +1691,17 @@ final class GameController:
         activeMapObjects =
             map.mapObjects
 
-        coins =
+        let generatedCoins =
             Self.generateCoins(
                 from:
                     map.trackPoints
             )
+
+        coins =
+            generatedCoins
+
+        totalCoins =
+            generatedCoins.count
 
         shitEffectTask?
             .cancel()
@@ -1747,13 +1836,18 @@ final class GameController:
 
         guard let bestTime =
             leaderboard
-                .map(\.elapsedTime)
+                .map({
+                    Self.rankingTime(
+                        for:
+                            $0
+                    )
+                })
                 .min()
         else {
             return false
         }
 
-        return elapsedTime < bestTime
+        return resultingTime < bestTime
     }
 
 
@@ -1896,7 +1990,15 @@ final class GameController:
             decoded
 
         leaderboard.sort {
-            $0.elapsedTime < $1.elapsedTime
+            Self.rankingTime(
+                for:
+                    $0
+            )
+            <
+            Self.rankingTime(
+                for:
+                    $1
+            )
         }
     }
 
@@ -2007,5 +2109,16 @@ final class GameController:
         }
 
         return result
+    }
+
+
+    private static func rankingTime(
+        for result:
+            GameResult
+    ) -> TimeInterval {
+
+        result.resultingTime
+        ??
+        result.elapsedTime
     }
 }

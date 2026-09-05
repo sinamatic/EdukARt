@@ -53,6 +53,10 @@ struct CoursesView: View {
             }
             .padding(.bottom, 50)
         }
+        .onAppear {
+
+            controller.resetForManualControl()
+        }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(

@@ -137,8 +137,6 @@ struct GameView: View {
                 controller.setGameplayInputLocked(
                     false
                 )
-
-                controller.clearMapMovementSafety()
             }
     }
 
@@ -271,7 +269,7 @@ struct GameView: View {
             )
 
             Text(
-                "🪙 \(gameController.collectedCoins)"
+                "🪙 \(gameController.collectedCoins)/\(gameController.totalCoins)"
             )
             .font(
                 .caption.bold()
@@ -1101,11 +1099,20 @@ struct GameView: View {
         gameController.setCoinCollectedHandler { [weak controller] in
 
             controller?.applyCoinSpeedBoost()
+
+            controller?.blinkCoinCollectedLights()
+        }
+
+        gameController.setEggCollectedHandler { [weak controller] in
+
+            controller?.blinkEggCollectedLights()
         }
 
         gameController.setEggsDeliveredHandler { [weak controller] in
 
             controller?.repairObstacleDamage()
+
+            controller?.blinkEggsDeliveredLights()
         }
 
         gameController.setCurrentSpeedPercentProvider { [weak controller] in
@@ -1133,14 +1140,6 @@ struct GameView: View {
                     type
             )
         }
-
-        controller.updateMapMovementSafety(
-            trackPoints:
-                map.trackPoints,
-
-            blockingLines:
-                map.blockingLines
-        )
 
         syncBlockingObjects()
 
@@ -1471,6 +1470,8 @@ struct GameView: View {
             true
 
         controller.sendDisable()
+
+        controller.startFinishLightEffect()
     }
 
 
@@ -1547,14 +1548,34 @@ struct GameView: View {
            hasStartedGameplay,
            gameController.phase == .racing {
 
-            Text(
-                formattedTime(
-                    gameController.elapsedTime
+            HStack(
+                spacing:
+                    8
+            ) {
+
+                Text(
+                    formattedTime(
+                        gameController.elapsedTime
+                    )
                 )
-            )
-            .font(
-                .headline.monospacedDigit()
-            )
+                .font(
+                    .headline.monospacedDigit()
+                )
+
+                Text(
+                    "Speed \(controller.currentSpeedPercent)%"
+                )
+                .font(
+                    .caption.bold()
+                )
+
+                Text(
+                    "Damage \(gameController.obstacleHits)"
+                )
+                .font(
+                    .caption.bold()
+                )
+            }
             .foregroundStyle(
                 .white
             )
@@ -1806,6 +1827,8 @@ struct GameView: View {
 
                 resultSummary
 
+                resultingTimeSummary
+
                 TextField(
                     "Name",
                     text:
@@ -1900,7 +1923,7 @@ struct GameView: View {
                         title:
                             "Coins",
                         value:
-                            "\(gameController.collectedCoins)"
+                            "\(gameController.collectedCoins)/\(gameController.totalCoins)"
                     ),
                     ItemStat(
                         emoji:
@@ -1975,6 +1998,85 @@ struct GameView: View {
                             "\(controller.maxSpeedPercent)%"
                     )
                 ]
+        )
+    }
+
+
+    private var resultingTimeSummary: some View {
+
+        VStack(
+            spacing:
+                6
+        ) {
+
+            Text(
+                "Resulting Time"
+            )
+            .font(
+                .caption.bold()
+            )
+            .foregroundStyle(
+                .white.opacity(
+                    0.68
+                )
+            )
+
+            Text(
+                formattedTime(
+                    gameController.resultingTime
+                )
+            )
+            .font(
+                .system(
+                    size:
+                        32,
+
+                    weight:
+                        .bold,
+
+                    design:
+                        .rounded
+                )
+                .monospacedDigit()
+            )
+            .foregroundStyle(
+                Color(
+                    "BrandGreen"
+                )
+            )
+
+            Text(
+                "\(gameController.missingCoins) missing coins x 5s = +\(formattedTime(gameController.coinTimePenalty))"
+            )
+            .font(
+                .caption2.bold()
+            )
+            .foregroundStyle(
+                .white.opacity(
+                    0.62
+                )
+            )
+        }
+        .frame(
+            maxWidth:
+                .infinity
+        )
+        .padding(
+            10
+        )
+        .background(
+            .white.opacity(
+                0.08
+            )
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius:
+                    8,
+
+                style:
+                    .continuous
+            )
         )
     }
 
@@ -2372,6 +2474,14 @@ struct LeaderboardTableView: View {
         [
             ItemStat(
                 emoji:
+                    "🏁",
+                title:
+                    "Resulting Time",
+                value:
+                    ""
+            ),
+            ItemStat(
+                emoji:
                     "⏱",
                 title:
                     "Time",
@@ -2470,6 +2580,19 @@ struct LeaderboardTableView: View {
         [
             ItemStat(
                 emoji:
+                    "🏁",
+                title:
+                    "Resulting Time",
+                value:
+                    formattedTime(
+                        rankingTime(
+                            for:
+                                result
+                        )
+                    )
+            ),
+            ItemStat(
+                emoji:
                     "⏱",
                 title:
                     "Time",
@@ -2484,7 +2607,10 @@ struct LeaderboardTableView: View {
                 title:
                     "Coins",
                 value:
-                    "\(result.collectedCoins)"
+                    coinText(
+                        for:
+                            result
+                    )
             ),
             ItemStat(
                 emoji:
@@ -2604,6 +2730,32 @@ struct LeaderboardTableView: View {
         }
 
         return "\(speedPercent)%"
+    }
+
+
+    private func rankingTime(
+        for result:
+            GameResult
+    ) -> TimeInterval {
+
+        result.resultingTime
+        ??
+        result.elapsedTime
+    }
+
+
+    private func coinText(
+        for result:
+            GameResult
+    ) -> String {
+
+        guard let totalCoins =
+            result.totalCoins
+        else {
+            return "\(result.collectedCoins)"
+        }
+
+        return "\(result.collectedCoins)/\(totalCoins)"
     }
 }
 

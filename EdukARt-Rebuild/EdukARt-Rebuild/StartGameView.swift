@@ -75,6 +75,7 @@ struct StartGameView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            controller.resetForManualControl()
             selectFirstMapIfNeeded()
         }
         .onChange(of: gameMapStore.maps.count) { _, _ in

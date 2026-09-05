@@ -90,6 +90,10 @@ struct MainMenuView: View {
             .padding(30)
 
                 }
+        .onAppear {
+
+            controller.resetForManualControl()
+        }
         
                 
 

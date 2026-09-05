@@ -22,6 +22,7 @@ struct RuntimeEgg:
 
         /// Egg has successfully been delivered to Egg Cup.
         case delivered(
+            eggCupID: UUID,
             slot: Int
         )
     }

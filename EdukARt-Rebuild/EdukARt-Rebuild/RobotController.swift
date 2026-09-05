@@ -190,12 +190,6 @@ final class RobotController:
     private var blockingRevealedTreeIDs:
         Set<UUID> = []
 
-    private var safetyTrackPoints:
-        [StoredTrackPoint] = []
-
-    private var blockingLines:
-        [BlockingLine] = []
-
     private let collisionManager =
         CollisionManager()
 
@@ -251,9 +245,6 @@ final class RobotController:
     private let obstacleDamageCooldownDuration:
         TimeInterval = 10
 
-    private var offRoadStartedAt:
-        Date?
-
     private(set) var minSpeedPercent:
         Int = 80
 
@@ -273,6 +264,9 @@ final class RobotController:
         Task<Void, Never>?
 
     private var treeLightEffectTask:
+        Task<Void, Never>?
+
+    private var feedbackLightTask:
         Task<Void, Never>?
 
     private var isGameplayInputLocked =
@@ -412,6 +406,9 @@ final class RobotController:
         treeLightEffectTask?
             .cancel()
 
+        feedbackLightTask?
+            .cancel()
+
         gameplayDriveTask?
             .cancel()
 
@@ -477,6 +474,8 @@ final class RobotController:
             )
 
         updateEffectiveGameplaySpeed()
+
+        blinkObstacleDamageLights()
     }
 
 
@@ -732,6 +731,8 @@ final class RobotController:
         isEnabled =
             false
 
+        setDisabledLightState()
+
         statusMessage =
             "Disable sent."
     }
@@ -850,6 +851,24 @@ final class RobotController:
 
     func resetGameplayEffects() {
 
+        oilEffectTask?
+            .cancel()
+
+        oilEffectTask =
+            nil
+
+        treeLightEffectTask?
+            .cancel()
+
+        treeLightEffectTask =
+            nil
+
+        feedbackLightTask?
+            .cancel()
+
+        feedbackLightTask =
+            nil
+
         gameplayDriveTask?
             .cancel()
 
@@ -882,7 +901,12 @@ final class RobotController:
 
         restoreWaterLights()
 
+        setDisabledLightState()
+
         isGameplayDriveLocked =
+            false
+
+        isGameplayInputLocked =
             false
 
         normalGameplaySpeedMultiplier =
@@ -903,7 +927,11 @@ final class RobotController:
         obstacleDamageCooldownEndDates
             .removeAll()
 
-        resetOffRoadState()
+        feedbackLightTask?
+            .cancel()
+
+        feedbackLightTask =
+            nil
 
         joystickInput =
             (
@@ -921,6 +949,31 @@ final class RobotController:
     }
 
 
+    func resetForManualControl() {
+
+        resetGameplayEffects()
+    }
+
+
+    private func setDisabledLightState() {
+
+        eduard.setLightMode(
+            .running
+        )
+
+        eduard.setAllLightsColor(
+            red:
+                140,
+
+            green:
+                0,
+
+            blue:
+                255
+        )
+    }
+
+
     func updateBlockingObjects(
         _ objects:
             [PlacedMapObject],
@@ -935,35 +988,6 @@ final class RobotController:
         blockingRevealedTreeIDs =
             revealedTreeIDs
     }
-
-
-    func updateMapMovementSafety(
-        trackPoints:
-            [StoredTrackPoint],
-
-        blockingLines:
-            [BlockingLine]
-    ) {
-
-        safetyTrackPoints =
-            trackPoints
-
-        self.blockingLines =
-            blockingLines
-
-        resetOffRoadState()
-    }
-
-
-    func clearMapMovementSafety() {
-
-        safetyTrackPoints.removeAll()
-
-        blockingLines.removeAll()
-
-        resetOffRoadState()
-    }
-
 
     func setWaterMode(
         _ active:
@@ -1061,6 +1085,195 @@ final class RobotController:
             nil
     }
 
+
+    private func blinkObstacleDamageLights() {
+
+        blinkAllLights(
+            red:
+                120,
+
+            green:
+                0,
+
+            blue:
+                0,
+
+            duration:
+                0.8,
+
+            mode:
+                .slowBlinking
+        )
+    }
+
+
+    func blinkCoinCollectedLights() {
+
+        blinkAllLights(
+            red:
+                255,
+
+            green:
+                220,
+
+            blue:
+                0,
+
+            duration:
+                0.55,
+
+            mode:
+                .rotation
+        )
+    }
+
+
+    func blinkEggCollectedLights() {
+
+        blinkAllLights(
+            red:
+                0,
+
+            green:
+                255,
+
+            blue:
+                0,
+
+            duration:
+                0.55,
+
+            mode:
+                .rotation
+        )
+    }
+
+
+    func blinkEggsDeliveredLights() {
+
+        blinkAllLights(
+            red:
+                0,
+
+            green:
+                255,
+
+            blue:
+                0,
+
+            duration:
+                1.5,
+
+            mode:
+                .rotation
+        )
+    }
+
+
+    func startFinishLightEffect() {
+
+        feedbackLightTask?
+            .cancel()
+
+        eduard.setLightMode(
+            .rainbow
+        )
+
+        feedbackLightTask =
+            Task { [weak self] in
+
+                try? await Task.sleep(
+                    for:
+                        .seconds(
+                            10
+                        )
+                )
+
+                guard Task.isCancelled == false,
+                      let self
+                else {
+                    return
+                }
+
+                self.eduard.setLightMode(
+                    .enabled
+                )
+
+                self.feedbackLightTask =
+                    nil
+            }
+    }
+
+
+    private func blinkAllLights(
+        red: Int,
+        green: Int,
+        blue: Int,
+        duration: TimeInterval,
+        mode: Eduard.LightMode
+    ) {
+
+        feedbackLightTask?
+            .cancel()
+
+        let previousLightMode =
+            eduard.activeLightMode
+
+        let previousAllLightsColor =
+            eduard.activeAllLightsColor
+
+        eduard.setLightMode(
+            mode
+        )
+
+        eduard.setAllLightsColor(
+            red:
+                red,
+
+            green:
+                green,
+
+            blue:
+                blue
+        )
+
+        feedbackLightTask =
+            Task { [weak self] in
+
+                try? await Task.sleep(
+                    for:
+                        .seconds(
+                            duration
+                        )
+                )
+
+                guard Task.isCancelled == false,
+                      let self
+                else {
+                    return
+                }
+
+
+                self.eduard.setAllLightsColor(
+                    red:
+                        previousAllLightsColor.red,
+
+                    green:
+                        previousAllLightsColor.green,
+
+                    blue:
+                        previousAllLightsColor.blue
+                )
+
+                self.eduard.setLightMode(
+                    previousLightMode
+                )
+
+                self.feedbackLightTask =
+                    nil
+            }
+    }
+
     func stopJoystick() {
 
         guard isGameplayInputLocked == false,
@@ -1104,6 +1317,16 @@ final class RobotController:
 
         guard driveMode == .mechanum
         else {
+            return
+        }
+
+        if isWaterModeActive {
+
+            updateWaterRotationInput(
+                x:
+                    x
+            )
+
             return
         }
 
@@ -1254,6 +1477,115 @@ final class RobotController:
 
                 rotation:
                     0
+            )
+
+        let duration =
+            waterStrokeDistance
+            / waterStrokeSpeed
+
+        waterStrokeTask =
+            Task { @MainActor [weak self] in
+
+                guard let self
+                else {
+                    return
+                }
+
+
+                gameplayDriveCommand =
+                    command
+
+                sendCurrentCommand()
+
+                try? await Task.sleep(
+                    for:
+                        .seconds(
+                            duration
+                        )
+                )
+
+                guard Task.isCancelled == false
+                else {
+                    return
+                }
+
+
+                gameplayDriveCommand =
+                    .stop
+
+                sendCurrentCommand()
+
+                gameplayDriveCommand =
+                    nil
+
+                waterStrokeTask =
+                    nil
+            }
+    }
+
+
+    private func updateWaterRotationInput(
+        x: Float
+    ) {
+
+        let input =
+            Double(x)
+
+        if abs(input) <= joystickDeadZone {
+
+            waterStrokeArmed =
+                true
+
+            mechanumRotationInput =
+                0
+
+            return
+        }
+
+
+        guard waterStrokeArmed
+        else {
+            return
+        }
+
+
+        waterStrokeArmed =
+            false
+
+        startWaterRotationStroke(
+            x:
+                input
+        )
+    }
+
+
+    private func startWaterRotationStroke(
+        x: Double
+    ) {
+
+        guard waterStrokeTask == nil
+        else {
+            return
+        }
+
+
+        let direction =
+            x < 0
+            ? -1.0
+            : 1.0
+
+        let command =
+            RobotDriveCommand(
+                forward:
+                    0,
+
+                sideways:
+                    0,
+
+                rotation:
+                    direction
+                    * waterStrokeSpeed
+                    * 2
             )
 
         let duration =
@@ -1555,10 +1887,10 @@ final class RobotController:
                 255,
 
             green:
-                0,
+                80,
 
             blue:
-                0
+                80
         )
 
         eduard.setLightMode(
@@ -1773,19 +2105,6 @@ final class RobotController:
         if let pose =
             currentCollisionPose {
 
-            let speedScale =
-                offRoadSpeedScale(
-                    for:
-                        pose
-                )
-
-            command =
-                applyingSpeedScale(
-                    speedScale,
-                    to:
-                        command
-                )
-
             if let blockedObject =
                 collisionManager.blockingObject(
                     robotPose:
@@ -1833,36 +2152,6 @@ final class RobotController:
                     isMovementCurrentlyBlocked =
                         true
                 }
-
-                command =
-                    RobotDriveCommand(
-                        forward:
-                            0,
-                        sideways:
-                            0,
-                        rotation:
-                            command.rotation
-                    )
-
-            } else if collisionManager
-                .isMovementBlockedByBlockingLines(
-                    robotPose:
-                        pose,
-
-                    command:
-                        command,
-
-                    blockingLines:
-                        blockingLines,
-
-                    additionalSafetyMargin:
-                        blockingSafetyMargin
-                ) {
-
-                isMovementCurrentlyBlocked =
-                    hasLinearMovement(
-                        command
-                    )
 
                 command =
                     RobotDriveCommand(
@@ -1946,117 +2235,6 @@ final class RobotController:
             command.sideways
         )
         > 0.001
-    }
-
-
-    private func resetOffRoadState() {
-
-        offRoadStartedAt =
-            nil
-    }
-
-
-    private func offRoadSpeedScale(
-        for pose:
-            RobotPose
-    ) -> Double {
-
-        guard safetyTrackPoints.count >= 2
-        else {
-
-            offRoadStartedAt =
-                nil
-
-            return 1.0
-        }
-
-
-        let isOnRoad =
-            collisionManager
-                .isRobotOnRoad(
-                    robotPose:
-                        pose,
-
-                    trackPoints:
-                        safetyTrackPoints
-                )
-
-        if isOnRoad {
-
-            offRoadStartedAt =
-                nil
-
-            return 1.0
-        }
-
-
-        if offRoadStartedAt == nil {
-
-            offRoadStartedAt =
-                Date()
-        }
-
-
-        guard let offRoadStartedAt
-        else {
-
-            return TrackRules
-                .offRoadInitialSpeedScale
-        }
-
-
-        let duration =
-            Date()
-                .timeIntervalSince(
-                    offRoadStartedAt
-                )
-
-        let completeSeconds =
-            floor(
-                duration
-            )
-
-        let loss =
-            completeSeconds
-            *
-            TrackRules
-                .offRoadSpeedLossPerSecond
-
-
-        return max(
-            TrackRules
-                .minimumOffRoadSpeedScale,
-
-            TrackRules
-                .offRoadInitialSpeedScale
-            -
-            loss
-        )
-    }
-
-
-    private func applyingSpeedScale(
-        _ scale:
-            Double,
-
-        to command:
-            RobotDriveCommand
-    ) -> RobotDriveCommand {
-
-        RobotDriveCommand(
-            forward:
-                command.forward
-                *
-                scale,
-
-            sideways:
-                command.sideways
-                *
-                scale,
-
-            rotation:
-                command.rotation
-        )
     }
 
 

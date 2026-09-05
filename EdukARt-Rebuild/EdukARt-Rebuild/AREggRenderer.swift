@@ -78,8 +78,8 @@ final class AREggRenderer {
         robotPose:
             RobotPose?,
 
-        eggCup:
-            PlacedMapObject?,
+        eggCups:
+            [PlacedMapObject],
 
         parent:
             Entity?
@@ -202,10 +202,18 @@ final class AREggRenderer {
             // ==================================================
 
             case .delivered(
+                let eggCupID,
                 let slot
             ):
 
                 guard let eggCup
+                    =
+                    eggCups.first(
+                        where: {
+                            $0.id
+                                == eggCupID
+                        }
+                    )
                 else {
                     continue
                 }
