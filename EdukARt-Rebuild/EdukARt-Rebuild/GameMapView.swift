@@ -53,6 +53,15 @@ struct GameMapView: View {
     private let treeSpawnOffset:
         Float = 1.0 // ToDo: position
 
+    private struct TrackProjection {
+
+        let point:
+            SIMD2<Float>
+
+        let distanceAlongTrack:
+            Float
+    }
+
 
     // MARK: - Body
 
@@ -192,14 +201,22 @@ struct GameMapView: View {
 
         if type == .tree {
 
+            let treePlacement =
+                treePlacement(
+                    for:
+                        point
+                )
+
             let trigger =
                 PlacedMapObject(
                     type:
                         .treeTrigger,
                     x:
-                        point.x,
+                        treePlacement.trigger.x,
                     z:
-                        point.y
+                        treePlacement.trigger.y,
+                    rotation:
+                        treePlacement.rotation
                 )
 
             let tree =
@@ -207,10 +224,11 @@ struct GameMapView: View {
                     type:
                         .tree,
                     x:
-                        point.x,
+                        treePlacement.tree.x,
                     z:
-                        point.y
-                        - treeSpawnOffset
+                        treePlacement.tree.y,
+                    rotation:
+                        treePlacement.rotation
                 )
 
             mapObjects.append(
@@ -222,7 +240,7 @@ struct GameMapView: View {
             )
 
             print(
-                "# MAP OBJECT ADDED | Tree Trigger x \(point.x) | z \(point.y) | Tree x \(tree.x) | z \(tree.z)"
+                "# MAP OBJECT ADDED | Tree Trigger x \(trigger.x) | z \(trigger.z) | Tree x \(tree.x) | z \(tree.z) | rotation \(tree.rotation)"
             )
 
             return
@@ -248,6 +266,365 @@ struct GameMapView: View {
         print(
             "# MAP OBJECT ADDED | \(type.name) | x \(point.x) | z \(point.y)"
         )
+    }
+
+
+    private func treePlacement(
+        for point:
+            SIMD2<Float>
+    ) -> (
+        trigger: SIMD2<Float>,
+        tree: SIMD2<Float>,
+        rotation: Float
+    ) {
+
+        guard let projection =
+            projectedTrackPoint(
+                nearest:
+                    point
+            )
+        else {
+
+            let fallbackTree =
+                SIMD2<Float>(
+                    point.x,
+                    point.y
+                    - treeSpawnOffset
+                )
+
+            return (
+                trigger:
+                    point,
+                tree:
+                    fallbackTree,
+                rotation:
+                    0
+            )
+        }
+
+        let totalTrackLength =
+            trackLength()
+
+        let forwardDistance =
+            projection.distanceAlongTrack
+            +
+            treeSpawnOffset
+
+        let treePoint:
+            SIMD2<Float>
+
+        if forwardDistance <= totalTrackLength,
+           let sampledPoint =
+            trackPoint(
+                atDistance:
+                    forwardDistance
+            ) {
+
+            treePoint =
+                sampledPoint
+
+        } else if let sampledPoint =
+            trackPoint(
+                atDistance:
+                    max(
+                        projection.distanceAlongTrack
+                        -
+                        treeSpawnOffset,
+                        0
+                    )
+            ) {
+
+            treePoint =
+                sampledPoint
+
+        } else {
+
+            treePoint =
+                projection.point
+                +
+                SIMD2<Float>(
+                    0,
+                    -treeSpawnOffset
+                )
+        }
+
+        return (
+            trigger:
+                projection.point,
+            tree:
+                treePoint,
+            rotation:
+                quantizedTreeRotation(
+                    from:
+                        projection.point,
+                    to:
+                        treePoint
+                )
+        )
+    }
+
+
+    private func projectedTrackPoint(
+        nearest point:
+            SIMD2<Float>
+    ) -> TrackProjection? {
+
+        let points =
+            trackMapPoints()
+
+        guard points.count >= 2
+        else {
+            return nil
+        }
+
+        var bestProjection:
+            TrackProjection?
+
+        var bestDistanceSquared =
+            Float.greatestFiniteMagnitude
+
+        var distanceBeforeSegment:
+            Float = 0
+
+        for index in 0..<(points.count - 1) {
+
+            let start =
+                points[index]
+
+            let end =
+                points[index + 1]
+
+            let segment =
+                end - start
+
+            let segmentLengthSquared =
+                simd_length_squared(
+                    segment
+                )
+
+            guard segmentLengthSquared > 0.000001
+            else {
+                continue
+            }
+
+            let t =
+                max(
+                    0,
+                    min(
+                        1,
+                        simd_dot(
+                            point - start,
+                            segment
+                        )
+                        /
+                        segmentLengthSquared
+                    )
+                )
+
+            let projectedPoint =
+                start
+                +
+                segment
+                *
+                t
+
+            let distanceSquared =
+                simd_length_squared(
+                    point - projectedPoint
+                )
+
+            if distanceSquared < bestDistanceSquared {
+
+                bestDistanceSquared =
+                    distanceSquared
+
+                bestProjection =
+                    TrackProjection(
+                        point:
+                            projectedPoint,
+                        distanceAlongTrack:
+                            distanceBeforeSegment
+                            +
+                            sqrt(
+                                segmentLengthSquared
+                            )
+                            *
+                            t
+                    )
+            }
+
+            distanceBeforeSegment +=
+                sqrt(
+                    segmentLengthSquared
+                )
+        }
+
+        return bestProjection
+    }
+
+
+    private func trackPoint(
+        atDistance targetDistance:
+            Float
+    ) -> SIMD2<Float>? {
+
+        let points =
+            trackMapPoints()
+
+        guard let first =
+            points.first
+        else {
+            return nil
+        }
+
+        guard points.count >= 2
+        else {
+            return first
+        }
+
+        var distanceBeforeSegment:
+            Float = 0
+
+        for index in 0..<(points.count - 1) {
+
+            let start =
+                points[index]
+
+            let end =
+                points[index + 1]
+
+            let segment =
+                end - start
+
+            let segmentLength =
+                simd_length(
+                    segment
+                )
+
+            guard segmentLength > 0.001
+            else {
+                continue
+            }
+
+            if distanceBeforeSegment + segmentLength >= targetDistance {
+
+                let t =
+                    max(
+                        0,
+                        min(
+                            1,
+                            (
+                                targetDistance
+                                -
+                                distanceBeforeSegment
+                            )
+                            /
+                            segmentLength
+                        )
+                    )
+
+                return start
+                +
+                segment
+                *
+                t
+            }
+
+            distanceBeforeSegment +=
+                segmentLength
+        }
+
+        return points.last
+    }
+
+
+    private func trackLength() -> Float {
+
+        let points =
+            trackMapPoints()
+
+        guard points.count >= 2
+        else {
+            return 0
+        }
+
+        var length:
+            Float = 0
+
+        for index in 0..<(points.count - 1) {
+
+            length +=
+                simd_distance(
+                    points[index],
+                    points[index + 1]
+                )
+        }
+
+        return length
+    }
+
+
+    private func quantizedTreeRotation(
+        from trigger:
+            SIMD2<Float>,
+        to tree:
+            SIMD2<Float>
+    ) -> Float {
+
+        let direction =
+            tree - trigger
+
+        guard simd_length_squared(
+            direction
+        ) > 0.000001
+        else {
+            return 0
+        }
+
+        let axis:
+            SIMD2<Float>
+
+        if abs(
+            direction.x
+        ) > abs(
+            direction.y
+        ) {
+
+            axis =
+                SIMD2<Float>(
+                    direction.x >= 0
+                    ? 1
+                    : -1,
+                    0
+                )
+
+        } else {
+
+            axis =
+                SIMD2<Float>(
+                    0,
+                    direction.y >= 0
+                    ? 1
+                    : -1
+                )
+        }
+
+        return atan2(
+            axis.x,
+            -axis.y
+        )
+    }
+
+
+    private func trackMapPoints() -> [SIMD2<Float>] {
+
+        course.trackPoints.map { point in
+
+            SIMD2<Float>(
+                point.x,
+                point.y
+            )
+        }
     }
 }
 
