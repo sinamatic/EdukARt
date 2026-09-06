@@ -1,10 +1,10 @@
 //
-//  ShowEdukARtMapCoordinateSystem.swift
+//  ShowRealityKitMapSpace.swift
 //  EdukARt-Rebuild
 //
-//  Visualizes the EdukARt map coordinate system using AprilTag #1 as the
-//  reference marker. This helper is independent from gameplay, robot control,
-//  joystick, minimap rendering, and the live CameraARView pipeline.
+//  Visualizes the RealityKit MapRoot space used as the parent coordinate system
+//  for AR map content. AprilTag #1 localizes the MapRoot transform in ARKit
+//  world space; all rendered children are placed in MapRoot-local coordinates.
 //
 
 import SwiftUI
@@ -13,24 +13,24 @@ import ARKit
 import SwiftAprilTag
 import UIKit
 
-struct ShowEdukARtMapCoordinateSystem: View {
+struct ShowRealityKitMapSpace: View {
 
     @State private var selectedCoordinate: SIMD3<Float>?
-    @State private var hasLocalizedReferenceTag = false
+    @State private var hasLocalizedMapRoot = false
 
     var body: some View {
         ZStack(alignment: .top) {
-            EdukARtMapCoordinateSystemView(
+            RealityKitMapSpaceView(
                 selectedCoordinate: $selectedCoordinate,
-                hasLocalizedReferenceTag: $hasLocalizedReferenceTag
+                hasLocalizedMapRoot: $hasLocalizedMapRoot
             )
             .ignoresSafeArea()
 
             VStack(spacing: 10) {
                 if let selectedCoordinate {
-                    EdukARtMapCoordinateReadout(coordinate: selectedCoordinate)
-                } else if hasLocalizedReferenceTag == false {
-                    Text("Scan AprilTag #1 to place the map coordinate system")
+                    RealityKitMapSpaceReadout(coordinate: selectedCoordinate)
+                } else if hasLocalizedMapRoot == false {
+                    Text("Scan AprilTag #1 to place MapRoot")
                         .font(.callout)
                         .foregroundStyle(.white)
                         .padding(12)
@@ -41,24 +41,24 @@ struct ShowEdukARtMapCoordinateSystem: View {
             .padding(.top, 16)
             .padding(.horizontal, 16)
         }
-        .navigationTitle("EdukARt Map Coordinates")
+        .navigationTitle("RealityKit Map Space")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
 
-private struct EdukARtMapCoordinateReadout: View {
+private struct RealityKitMapSpaceReadout: View {
 
     let coordinate: SIMD3<Float>
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Selected map-local point")
+            Text("Selected MapRoot-local point")
                 .font(.headline)
 
             HStack(spacing: 12) {
-                EdukARtMapCoordinateValue(label: "X", value: coordinate.x, color: .red)
-                EdukARtMapCoordinateValue(label: "Y", value: coordinate.y, color: .green)
-                EdukARtMapCoordinateValue(label: "Z", value: coordinate.z, color: .blue)
+                RealityKitMapSpaceValue(label: "X", value: coordinate.x, color: .red)
+                RealityKitMapSpaceValue(label: "Y", value: coordinate.y, color: .green)
+                RealityKitMapSpaceValue(label: "Z", value: coordinate.z, color: .blue)
             }
         }
         .padding(14)
@@ -67,7 +67,7 @@ private struct EdukARtMapCoordinateReadout: View {
     }
 }
 
-private struct EdukARtMapCoordinateValue: View {
+private struct RealityKitMapSpaceValue: View {
 
     let label: String
     let value: Float
@@ -82,26 +82,26 @@ private struct EdukARtMapCoordinateValue: View {
     }
 }
 
-private struct EdukARtMapCoordinateSystemView: UIViewControllerRepresentable {
+private struct RealityKitMapSpaceView: UIViewControllerRepresentable {
 
     @Binding var selectedCoordinate: SIMD3<Float>?
-    @Binding var hasLocalizedReferenceTag: Bool
+    @Binding var hasLocalizedMapRoot: Bool
 
-    func makeUIViewController(context: Context) -> EdukARtMapCoordinateSystemViewController {
-        EdukARtMapCoordinateSystemViewController { coordinate, isLocalized in
+    func makeUIViewController(context: Context) -> RealityKitMapSpaceViewController {
+        RealityKitMapSpaceViewController { coordinate, isLocalized in
             selectedCoordinate = coordinate
-            hasLocalizedReferenceTag = isLocalized
+            hasLocalizedMapRoot = isLocalized
         }
     }
 
     func updateUIViewController(
-        _ uiViewController: EdukARtMapCoordinateSystemViewController,
+        _ uiViewController: RealityKitMapSpaceViewController,
         context: Context
     ) {
     }
 }
 
-final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessionDelegate {
+final class RealityKitMapSpaceViewController: UIViewController, ARSessionDelegate {
 
     private let referenceTagID = 1
     private let tagSize = 0.096
@@ -109,8 +109,9 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
     private let onCoordinateSelected: (SIMD3<Float>?, Bool) -> Void
 
     private var arView: ARView!
-    private var mapCoordinateAnchor: AnchorEntity?
-    private var mapCoordinateTransform: simd_float4x4?
+    private var worldAnchor: AnchorEntity?
+    private var mapRoot: Entity?
+    private var mapRootWorldTransform: simd_float4x4?
     private var labelEntities: [Entity] = []
     private var markerAnchor: AnchorEntity?
     private var isDetecting = false
@@ -152,7 +153,7 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         updateLabelOrientation(cameraTransform: frame.camera.transform)
 
-        guard mapCoordinateTransform == nil else {
+        guard mapRootWorldTransform == nil else {
             return
         }
 
@@ -201,18 +202,18 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
                 * aprilTagToARKitCamera
                 * pose.transform
 
-            let mapTransform = makeMapTransform(from: tagWorldTransform)
+            let mapRootTransform = makeMapRootTransform(from: tagWorldTransform)
 
             DispatchQueue.main.async { [weak self] in
-                self?.placeCoordinateSystem(with: mapTransform)
+                self?.placeMapRoot(with: mapRootTransform)
             }
         } catch {
-            print("# EdukARt map coordinate detection error:", error)
+            print("# RealityKit MapRoot detection error:", error)
         }
     }
 
     @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
-        guard let mapCoordinateTransform else {
+        guard let mapRootWorldTransform else {
             return
         }
 
@@ -224,7 +225,7 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
 
         showMarker(at: worldPosition)
 
-        let inverseTransform = simd_inverse(mapCoordinateTransform)
+        let inverseTransform = simd_inverse(mapRootWorldTransform)
         let localPosition = inverseTransform * SIMD4<Float>(
             worldPosition.x,
             worldPosition.y,
@@ -238,8 +239,8 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
         )
     }
 
-    private func makeMapTransform(from tagWorldTransform: simd_float4x4) -> simd_float4x4 {
-        let position = tagWorldTransform.edukartMapTranslation
+    private func makeMapRootTransform(from tagWorldTransform: simd_float4x4) -> simd_float4x4 {
+        let position = tagWorldTransform.realityKitMapTranslation
 
         var xAxis = SIMD3<Float>(
             tagWorldTransform.columns.0.x,
@@ -266,22 +267,30 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
         )
     }
 
-    private func placeCoordinateSystem(with transform: simd_float4x4) {
-        guard mapCoordinateTransform == nil else {
+    private func placeMapRoot(with transform: simd_float4x4) {
+        guard mapRootWorldTransform == nil else {
             return
         }
 
         labelEntities.removeAll()
 
-        let anchor = AnchorEntity(world: transform)
-        addCoordinatePlanes(to: anchor)
-        addAxisBars(to: anchor)
-        addDirectionLabels(to: anchor)
-        addOriginMarker(to: anchor)
+        let anchor = AnchorEntity(world: .zero)
+        let root = Entity()
+        root.name = "MapRoot"
+        root.transform.matrix = transform
 
+        addCoordinatePlanes(to: root)
+        addAxisBars(to: root)
+        addDirectionLabels(to: root)
+        addOriginMarker(to: root)
+        addExampleMapChild(to: root)
+
+        anchor.addChild(root)
         arView.scene.addAnchor(anchor)
-        mapCoordinateAnchor = anchor
-        mapCoordinateTransform = transform
+
+        worldAnchor = anchor
+        mapRoot = root
+        mapRootWorldTransform = transform
         onCoordinateSelected(nil, true)
     }
 
@@ -291,14 +300,14 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
             allowing: .estimatedPlane,
             alignment: .any
         ).first {
-            return raycastResult.worldTransform.edukartMapTranslation
+            return raycastResult.worldTransform.realityKitMapTranslation
         }
 
         guard let cameraTransform = arView.session.currentFrame?.camera.transform else {
             return nil
         }
 
-        let cameraPosition = cameraTransform.edukartMapTranslation
+        let cameraPosition = cameraTransform.realityKitMapTranslation
         let forwardDirection = -SIMD3<Float>(
             cameraTransform.columns.2.x,
             cameraTransform.columns.2.y,
@@ -314,7 +323,7 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
 
         addBox(
             to: parent,
-            name: "EdukARt map X axis plane",
+            name: "MapRoot X axis plane",
             size: SIMD3<Float>(size, thickness, size),
             position: SIMD3<Float>(0, 0, 0),
             color: UIColor.systemRed.withAlphaComponent(0.36)
@@ -322,7 +331,7 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
 
         addBox(
             to: parent,
-            name: "EdukARt map Y axis plane",
+            name: "MapRoot Y axis plane",
             size: SIMD3<Float>(size, size, thickness),
             position: SIMD3<Float>(0, 0, 0),
             color: UIColor.systemGreen.withAlphaComponent(0.36)
@@ -330,7 +339,7 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
 
         addBox(
             to: parent,
-            name: "EdukARt map Z axis plane",
+            name: "MapRoot Z axis plane",
             size: SIMD3<Float>(thickness, size, size),
             position: SIMD3<Float>(0, 0, 0),
             color: UIColor.systemBlue.withAlphaComponent(0.36)
@@ -343,7 +352,7 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
 
         addBox(
             to: parent,
-            name: "EdukARt map X axis bar",
+            name: "MapRoot X axis bar",
             size: SIMD3<Float>(length, thickness, thickness),
             position: SIMD3<Float>(0, 0, 0),
             color: .systemRed
@@ -351,7 +360,7 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
 
         addBox(
             to: parent,
-            name: "EdukARt map Y axis bar",
+            name: "MapRoot Y axis bar",
             size: SIMD3<Float>(thickness, length, thickness),
             position: SIMD3<Float>(0, 0, 0),
             color: .systemGreen
@@ -359,7 +368,7 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
 
         addBox(
             to: parent,
-            name: "EdukARt map Z axis bar",
+            name: "MapRoot Z axis bar",
             size: SIMD3<Float>(thickness, thickness, length),
             position: SIMD3<Float>(0, 0, 0),
             color: .systemBlue
@@ -379,8 +388,17 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
         let mesh = MeshResource.generateSphere(radius: 0.004)
         let material = SimpleMaterial(color: .white, isMetallic: false)
         let origin = ModelEntity(mesh: mesh, materials: [material])
-        origin.name = "EdukARt map coordinate origin"
+        origin.name = "MapRoot local origin"
         parent.addChild(origin)
+    }
+
+    private func addExampleMapChild(to parent: Entity) {
+        let mesh = MeshResource.generateSphere(radius: 0.008)
+        let material = SimpleMaterial(color: .yellow, isMetallic: false)
+        let child = ModelEntity(mesh: mesh, materials: [material])
+        child.name = "Example child at MapRoot local x 0.08 z 0.08"
+        child.position = SIMD3<Float>(0.08, 0.012, 0.08)
+        parent.addChild(child)
     }
 
     private func addBox(
@@ -427,7 +445,7 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
         let mesh = MeshResource.generateSphere(radius: 0.012)
         let material = SimpleMaterial(color: .yellow, isMetallic: false)
         let marker = ModelEntity(mesh: mesh, materials: [material])
-        marker.name = "Selected EdukARt map coordinate marker"
+        marker.name = "Selected MapRoot-local coordinate marker"
 
         anchor.addChild(marker)
         arView.scene.addAnchor(anchor)
@@ -435,7 +453,7 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
     }
 
     private func updateLabelOrientation(cameraTransform: simd_float4x4) {
-        let cameraPosition = cameraTransform.edukartMapTranslation
+        let cameraPosition = cameraTransform.realityKitMapTranslation
 
         DispatchQueue.main.async { [weak self] in
             guard let self else {
@@ -459,13 +477,13 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
 
 private extension simd_float4x4 {
 
-    var edukartMapTranslation: SIMD3<Float> {
+    var realityKitMapTranslation: SIMD3<Float> {
         SIMD3<Float>(columns.3.x, columns.3.y, columns.3.z)
     }
 }
 
 #Preview {
     NavigationStack {
-        ShowEdukARtMapCoordinateSystem()
+        ShowRealityKitMapSpace()
     }
 }

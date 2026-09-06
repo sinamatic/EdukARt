@@ -359,6 +359,10 @@ final class AprilTagCoordinateSystemViewController: UIViewController, ARSessionD
                     from: labelEntity.position(relativeTo: nil),
                     relativeTo: nil
                 )
+                labelEntity.orientation *= simd_quatf(
+                    angle: .pi,
+                    axis: SIMD3<Float>(0, 1, 0)
+                )
             }
         }
 

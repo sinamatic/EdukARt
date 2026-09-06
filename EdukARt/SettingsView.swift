@@ -70,21 +70,38 @@ struct SettingsView: View {
                     SettingsMenuButtonStyle()
                 )
 
-                NavigationLink {
-                    ShowARkitCoordinateSystem()
-                } label: {
-                    Label(
-                        "Show ARkit World Coordinate System",
-                        systemImage:
-                            "arkit"
+                VStack(
+                    alignment:
+                        .leading,
+
+                    spacing:
+                        6
+                ) {
+                    Text(
+                        "AR Coordinate Systems"
                     )
-                    .frame(
-                        maxWidth:
-                            .infinity
+                    .font(
+                        .title3.bold()
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+
+                    Text(
+                        "Open these views to debug and understand the coordinate systems behind EdukARt's AR mapping."
+                    )
+                    .font(
+                        .callout
+                    )
+                    .foregroundStyle(
+                        .white.opacity(
+                            0.72
+                        )
                     )
                 }
-                .buttonStyle(
-                    SettingsMenuButtonStyle()
+                .padding(
+                    .top,
+                    8
                 )
 
                 NavigationLink {
@@ -111,6 +128,40 @@ struct SettingsView: View {
                         "Show EdukARt Map Coordinate System",
                         systemImage:
                             "map"
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(
+                    SettingsMenuButtonStyle()
+                )
+
+                NavigationLink {
+                    ShowRealityKitMapSpace()
+                } label: {
+                    Label(
+                        "Show RealityKit Map Space",
+                        systemImage:
+                            "cube"
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(
+                    SettingsMenuButtonStyle()
+                )
+
+                NavigationLink {
+                    ShowFloorMiniMapCoordinateSystem()
+                } label: {
+                    Label(
+                        "Show Floor MiniMap",
+                        systemImage:
+                            "grid"
                     )
                     .frame(
                         maxWidth:
