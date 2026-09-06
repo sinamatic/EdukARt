@@ -2,7 +2,7 @@
 //  ShowAprilTagCoordinateSystem.swift
 //  EdukARt-Rebuild
 //
-//  Visualizes AprilTag #0's coordinate system independently from
+//  Visualizes the first detected AprilTag coordinate system independently from
 //  game, robot, joystick, minimap, and live AprilTag detection code.
 //
 
@@ -29,7 +29,7 @@ struct ShowAprilTagCoordinateSystem: View {
                 if let selectedCoordinate {
                     AprilTagCoordinateReadout(coordinate: selectedCoordinate)
                 } else if hasPlacedCoordinateSystem == false {
-                    Text("Scan AprilTag #0 to place the coordinate system")
+                    Text("Scan any AprilTag to place the coordinate system")
                         .font(.callout)
                         .foregroundStyle(.white)
                         .padding(12)
@@ -102,7 +102,6 @@ private struct AprilTagCoordinateSystemView: UIViewControllerRepresentable {
 
 final class AprilTagCoordinateSystemViewController: UIViewController, ARSessionDelegate {
 
-    private let referenceTagID = 0
     private let tagSize = 0.096
     private let maximumReprojectionError: Float = 0.5
     private let onCoordinateSelected: (SIMD3<Float>?, Bool) -> Void
@@ -386,10 +385,6 @@ final class AprilTagCoordinateSystemViewController: UIViewController, ARSessionD
         do {
             let detections = try detector.detect(pixelBuffer: frame.capturedImage)
 
-            guard let referenceDetection = detections.first(where: { $0.id == referenceTagID }) else {
-                return
-            }
-
             let cameraMatrix = frame.camera.intrinsics
             let intrinsics = CameraIntrinsics(
                 fx: Double(cameraMatrix.columns.0.x),
@@ -398,11 +393,18 @@ final class AprilTagCoordinateSystemViewController: UIViewController, ARSessionD
                 cy: Double(cameraMatrix.columns.2.y)
             )
 
-            guard let pose = referenceDetection.estimatePose(
-                intrinsics: intrinsics,
-                tagSize: tagSize
-            ),
-                  pose.reprojectionError <= maximumReprojectionError
+            guard let referencePose = detections.compactMap({ detection -> simd_float4x4? in
+                guard let pose = detection.estimatePose(
+                    intrinsics: intrinsics,
+                    tagSize: tagSize
+                ),
+                      pose.reprojectionError <= maximumReprojectionError
+                else {
+                    return nil
+                }
+
+                return pose.transform
+            }).first
             else {
                 return
             }
@@ -413,7 +415,7 @@ final class AprilTagCoordinateSystemViewController: UIViewController, ARSessionD
 
             let tagWorldTransform = frame.camera.transform
                 * aprilTagToARKitCamera
-                * pose.transform
+                * referencePose
 
             DispatchQueue.main.async { [weak self] in
                 self?.placeCoordinateSystem(with: tagWorldTransform)

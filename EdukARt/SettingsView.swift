@@ -105,6 +105,23 @@ struct SettingsView: View {
                 )
 
                 NavigationLink {
+                    ShowARkitCoordinateSystem()
+                } label: {
+                    Label(
+                        "Show ARkit World Coordinate System",
+                        systemImage:
+                            "arkit"
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(
+                    SettingsMenuButtonStyle()
+                )
+
+                NavigationLink {
                     ShowAprilTagCoordinateSystem()
                 } label: {
                     Label(
@@ -128,23 +145,6 @@ struct SettingsView: View {
                         "Show EdukARt Map Coordinate System",
                         systemImage:
                             "map"
-                    )
-                    .frame(
-                        maxWidth:
-                            .infinity
-                    )
-                }
-                .buttonStyle(
-                    SettingsMenuButtonStyle()
-                )
-
-                NavigationLink {
-                    ShowRealityKitMapSpace()
-                } label: {
-                    Label(
-                        "Show RealityKit Map Space",
-                        systemImage:
-                            "cube"
                     )
                     .frame(
                         maxWidth:
