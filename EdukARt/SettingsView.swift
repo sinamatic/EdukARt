@@ -70,6 +70,57 @@ struct SettingsView: View {
                     SettingsMenuButtonStyle()
                 )
 
+                NavigationLink {
+                    ShowARkitCoordinateSystem()
+                } label: {
+                    Label(
+                        "Show ARkit World Coordinate System",
+                        systemImage:
+                            "arkit"
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(
+                    SettingsMenuButtonStyle()
+                )
+
+                NavigationLink {
+                    ShowAprilTagCoordinateSystem()
+                } label: {
+                    Label(
+                        "Show AprilTag Coordinate System",
+                        systemImage:
+                            "viewfinder"
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(
+                    SettingsMenuButtonStyle()
+                )
+
+                NavigationLink {
+                    ShowEdukARtMapCoordinateSystem()
+                } label: {
+                    Label(
+                        "Show EdukARt Map Coordinate System",
+                        systemImage:
+                            "map"
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(
+                    SettingsMenuButtonStyle()
+                )
+
                 Text(
                     controller.statusMessage
                 )
