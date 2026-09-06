@@ -2,8 +2,8 @@
 //  ShowEdukARtMapCoordinateSystem.swift
 //  EdukARt-Rebuild
 //
-//  Visualizes the EdukARt map coordinate system using AprilTag #1 as the
-//  reference marker. This helper is independent from gameplay, robot control,
+//  Visualizes the EdukARt map coordinate system using the first detected
+//  AprilTag as reference marker. This helper is independent from gameplay, robot control,
 //  joystick, minimap rendering, and the live CameraARView pipeline.
 //
 
@@ -30,7 +30,7 @@ struct ShowEdukARtMapCoordinateSystem: View {
                 if let selectedCoordinate {
                     EdukARtMapCoordinateReadout(coordinate: selectedCoordinate)
                 } else if hasLocalizedReferenceTag == false {
-                    Text("Scan AprilTag #1 to place the map coordinate system")
+                    Text("Scan any AprilTag to place the map coordinate system")
                         .font(.callout)
                         .foregroundStyle(.white)
                         .padding(12)
@@ -103,7 +103,6 @@ private struct EdukARtMapCoordinateSystemView: UIViewControllerRepresentable {
 
 final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessionDelegate {
 
-    private let referenceTagID = 1
     private let tagSize = 0.096
     private let maximumReprojectionError: Float = 0.5
     private let onCoordinateSelected: (SIMD3<Float>?, Bool) -> Void
@@ -172,10 +171,6 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
         do {
             let detections = try detector.detect(pixelBuffer: frame.capturedImage)
 
-            guard let referenceDetection = detections.first(where: { $0.id == referenceTagID }) else {
-                return
-            }
-
             let cameraMatrix = frame.camera.intrinsics
             let intrinsics = CameraIntrinsics(
                 fx: Double(cameraMatrix.columns.0.x),
@@ -184,11 +179,18 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
                 cy: Double(cameraMatrix.columns.2.y)
             )
 
-            guard let pose = referenceDetection.estimatePose(
-                intrinsics: intrinsics,
-                tagSize: tagSize
-            ),
-                  pose.reprojectionError <= maximumReprojectionError
+            guard let referencePose = detections.compactMap({ detection -> simd_float4x4? in
+                guard let pose = detection.estimatePose(
+                    intrinsics: intrinsics,
+                    tagSize: tagSize
+                ),
+                      pose.reprojectionError <= maximumReprojectionError
+                else {
+                    return nil
+                }
+
+                return pose.transform
+            }).first
             else {
                 return
             }
@@ -199,7 +201,7 @@ final class EdukARtMapCoordinateSystemViewController: UIViewController, ARSessio
 
             let tagWorldTransform = frame.camera.transform
                 * aprilTagToARKitCamera
-                * pose.transform
+                * referencePose
 
             let mapTransform = makeMapTransform(from: tagWorldTransform)
 
