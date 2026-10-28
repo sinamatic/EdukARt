@@ -1,7 +1,9 @@
 import Foundation
 
 final class ConsumentaDriveRecorder {
-    private let minimumSampleInterval: TimeInterval = 0.1
+    private let minimumSampleInterval: TimeInterval = 0.2
+    private let maximumPlausibleSpeed: Float = 0.75
+    private let positionTolerance: Float = 0.06
     // Keep observing Eduard after crossing the finish line. The robot can
     // continue rolling while AprilTag detection briefly catches up.
     private let maximumPostFinishDuration: TimeInterval = 3.5
@@ -192,6 +194,21 @@ final class ConsumentaDriveRecorder {
            let lastSampleTime,
            time - lastSampleTime < minimumSampleInterval {
             return
+        }
+
+        if force == false,
+           let lastSample = samples.last {
+            let elapsed = max(0, Float(time - lastSample.time))
+            let distance = hypot(
+                pose.position.x - lastSample.x,
+                pose.position.z - lastSample.z
+            )
+            let maximumDistance = positionTolerance
+                + maximumPlausibleSpeed * elapsed
+
+            guard distance <= maximumDistance else {
+                return
+            }
         }
 
         samples.append(

@@ -180,9 +180,11 @@ struct GameView: View {
 
                 if ghostReplayController.phase != .inactive {
                     gameController.endGhostPlayback()
-                    controller.eduardSimulation.setPose(
+                    controller.ghostSimulation.setPose(
                         .zero
                     )
+
+                    controller.ghostSimulation.setVisible(false)
 
                     controller.setSimulationVisible(
                         wasSimulationVisibleBeforeGhost
@@ -280,7 +282,7 @@ struct GameView: View {
                 }
 
                 if ghostReplayController.phase == .awaitingReference {
-                    controller.setSimulationVisible(
+                    controller.ghostSimulation.setVisible(
                         true
                     )
                 }
@@ -420,7 +422,9 @@ struct GameView: View {
         while Task.isCancelled == false {
 
             simulationRobotPose =
-                controller.eduardSimulation.pose
+                ghostReplayController.phase != .inactive
+                ? controller.ghostSimulation.pose
+                : controller.eduardSimulation.pose
 
             try? await Task.sleep(
                 nanoseconds:
@@ -1791,17 +1795,17 @@ struct GameView: View {
         ghostReplayController.prepare(
             recordingURL: url,
             mode: .liveRaceGhost,
-            simulation: controller.eduardSimulation
+            simulation: controller.ghostSimulation
         )
         guard ghostReplayController.phase != .failed else {
             return
         }
 
         ghostReplayController.referenceLocalized()
-        controller.setSimulationVisible(true)
-        controller.eduardSimulation.setOpacity(0.5)
+        controller.ghostSimulation.setVisible(true)
+        controller.ghostSimulation.setOpacity(0.5)
         ghostReplayController.start(
-            simulation: controller.eduardSimulation,
+            simulation: controller.ghostSimulation,
             onEvent: { _ in },
             onFinished: {}
         )
@@ -1824,7 +1828,7 @@ struct GameView: View {
                 mode,
 
             simulation:
-                controller.eduardSimulation
+                controller.ghostSimulation
         )
 
         guard ghostReplayController.phase != .failed
@@ -1833,7 +1837,7 @@ struct GameView: View {
         }
 
         activeGhostRecordingURL = recordingURL
-        controller.eduardSimulation.setOpacity(1)
+        controller.ghostSimulation.setOpacity(0.5)
 
         stopJoystickInput()
 
@@ -1853,7 +1857,7 @@ struct GameView: View {
         controller.isLiveSyncEnabled =
             false
 
-        controller.setSimulationVisible(
+        controller.ghostSimulation.setVisible(
             false
         )
 
@@ -1876,7 +1880,7 @@ struct GameView: View {
         }
 
         ghostReplayController.start(
-            simulation: controller.eduardSimulation,
+            simulation: controller.ghostSimulation,
             onEvent: { event in
                 gameController.applyGhostEvent(event)
             },
@@ -1893,10 +1897,10 @@ struct GameView: View {
         ghostReplayController.reset()
         activeGhostRecordingURL = nil
 
-        controller.eduardSimulation.setPose(
+        controller.ghostSimulation.setPose(
             .zero
         )
-        controller.eduardSimulation.setOpacity(1)
+        controller.ghostSimulation.setVisible(false)
 
         controller.setSimulationVisible(
             wasSimulationVisibleBeforeGhost

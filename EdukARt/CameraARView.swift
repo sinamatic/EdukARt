@@ -671,6 +671,27 @@ struct CameraARView: UIViewRepresentable {
                     simulationRoot
             )
 
+            let ghostRoot =
+                Entity()
+
+            ghostRoot.addChild(
+                model.clone(
+                    recursive:
+                        true
+                )
+            )
+
+            context.coordinator.ghostRoot =
+                ghostRoot
+
+            controller.ghostSimulation.show(
+                entity:
+                    ghostRoot
+            )
+
+            controller.ghostSimulation.setOpacity(0.5)
+            controller.ghostSimulation.setVisible(false)
+
             if let occlusionRoot =
                 makeEduardOcclusionRoot() {
 
@@ -923,6 +944,7 @@ struct CameraARView: UIViewRepresentable {
             Float = 0.35
 
         var simulationRoot: Entity?
+        var ghostRoot: Entity?
         var occlusionRoot: Entity?
         private let trackRenderer =
             ARTrackRenderer()
@@ -2269,6 +2291,12 @@ struct CameraARView: UIViewRepresentable {
 
             attach(
                 simulationRoot,
+                to:
+                    mapRoot
+            )
+
+            attach(
+                ghostRoot,
                 to:
                     mapRoot
             )

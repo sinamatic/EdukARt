@@ -71,6 +71,9 @@ final class RobotController:
     let eduardSimulation:
         EduardSimulation
 
+    let ghostSimulation:
+        EduardSimulation
+
     let eduardOccluder:
         EduardOccluder
 
@@ -374,6 +377,10 @@ final class RobotController:
             EduardSimulation =
                 EduardSimulation(),
 
+        ghostSimulation:
+            EduardSimulation =
+                EduardSimulation(),
+
         eduardOccluder:
             EduardOccluder =
                 EduardOccluder()
@@ -384,6 +391,9 @@ final class RobotController:
 
         self.eduardSimulation =
             eduardSimulation
+
+        self.ghostSimulation =
+            ghostSimulation
 
         self.eduardOccluder =
             eduardOccluder
