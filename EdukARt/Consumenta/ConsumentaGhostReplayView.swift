@@ -9,15 +9,42 @@ struct ConsumentaGhostReplayView: View {
 
     var body: some View {
         if phase != .inactive {
-            VStack(spacing: 16) {
-                content
+            VStack {
+                Spacer()
+
+                VStack(spacing: 10) {
+                    HStack {
+                        Label("Ghost Mode", systemImage: "car.side.fill")
+                            .font(.headline)
+
+                        Spacer()
+
+                        Button(action: onClose) {
+                            Image(systemName: "xmark")
+                                .font(.headline.bold())
+                                .frame(width: 32, height: 32)
+                                .background(.white.opacity(0.14))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Close Ghost Mode")
+                    }
+
+                    content
+                }
+                .padding(16)
+                .frame(maxWidth: 380)
+                .background(.black.opacity(0.72))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(.white.opacity(0.5), lineWidth: 1.5)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
-            .padding(24)
-            .frame(maxWidth: 360)
-            .background(.black.opacity(0.84))
-            .clipShape(RoundedRectangle(cornerRadius: 18))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(24)
+            .padding(.horizontal, 18)
+            .padding(.bottom, 20)
+            .foregroundStyle(.white)
         }
     }
 
@@ -49,14 +76,12 @@ struct ConsumentaGhostReplayView: View {
                 .tint(Color("BrandGreen"))
 
         case .playing:
-            ProgressView()
-                .tint(.white)
-
-            Text("Ghost Drive")
-                .font(.title2.bold())
-
-            Text("The AR Eduard is replaying the saved drive.")
-                .multilineTextAlignment(.center)
+            HStack(spacing: 10) {
+                ProgressView()
+                    .tint(.white)
+                Text("The AR Eduard is replaying the saved drive.")
+                    .font(.subheadline)
+            }
 
         case .finished:
             Text("Ghost Drive Finished")

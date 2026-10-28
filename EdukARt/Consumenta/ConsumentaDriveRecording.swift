@@ -9,6 +9,8 @@ struct ConsumentaDriveRecording: Codable, Identifiable {
     let startedAt: Date
     let duration: TimeInterval
     let samples: [ConsumentaDriveSample]
+    let initialCoins: [ConsumentaRecordedCoin]
+    let events: [ConsumentaGhostEvent]
 }
 
 struct ConsumentaDriveSample: Codable {
@@ -16,4 +18,31 @@ struct ConsumentaDriveSample: Codable {
     let x: Float
     let z: Float
     let rotation: Float
+}
+
+struct ConsumentaRecordedCoin: Codable, Identifiable {
+    let id: UUID
+    let x: Float
+    let z: Float
+}
+
+struct ConsumentaGhostEvent: Codable, Identifiable {
+    enum Kind: String, Codable {
+        case coinCollected
+        case objectEntered
+        case objectExited
+    }
+
+    let id: UUID
+    let time: TimeInterval
+    let kind: Kind
+    let objectID: UUID
+    let objectType: MapObjectType?
+    let x: Float
+    let z: Float
+}
+
+enum GhostPlaybackMode: String, Codable {
+    case replay
+    case liveRaceGhost
 }

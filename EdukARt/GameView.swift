@@ -73,6 +73,17 @@ struct GameView: View {
     @State private var wasLiveSyncEnabledBeforeGhost =
         false
 
+    @State private var activeGhostRecordingURL:
+        URL?
+
+    @State private var isBestGhostEnabled =
+        false
+
+    private var isBlockingGhostReplayActive: Bool {
+        ghostReplayController.mode == .replay
+            && ghostReplayController.phase != .inactive
+    }
+
     private let collisionTimer =
         Timer.publish(
             every:
@@ -147,6 +158,7 @@ struct GameView: View {
             .onDisappear {
 
                 if ghostReplayController.phase != .inactive {
+                    gameController.endGhostPlayback()
                     controller.eduardSimulation.setPose(
                         .zero
                     )
@@ -182,12 +194,12 @@ struct GameView: View {
             restartIconButton
             arRobotControl
                 .opacity(
-                    ghostReplayController.phase == .inactive
+                    isBlockingGhostReplayActive == false
                     ? 1
                     : 0
                 )
                 .allowsHitTesting(
-                    ghostReplayController.phase == .inactive
+                    isBlockingGhostReplayActive == false
                 )
             startNewGameButton
             joystickControl
@@ -808,6 +820,20 @@ struct GameView: View {
                                 : "Show AR"
                         )
                     }
+
+                    Button {
+                        isBestGhostEnabled.toggle()
+                    } label: {
+                        arMenuRow(
+                            icon: "car.side.fill",
+                            title: "Show Best Ghost",
+                            statusIcon: isBestGhostEnabled
+                                ? "checkmark.circle.fill"
+                                : "xmark.circle.fill",
+                            statusColor: isBestGhostEnabled ? .green : .red
+                        )
+                    }
+                    .disabled(gameController.bestGhostRecordingURL == nil)
                 }
                 .font(
                     .caption.bold()
@@ -947,7 +973,7 @@ struct GameView: View {
            hasStartedGameplay,
            countdownText == nil,
            gameController.phase == .freeDrive,
-           ghostReplayController.phase == .inactive {
+           isBlockingGhostReplayActive == false {
 
             Button {
 
@@ -995,7 +1021,7 @@ struct GameView: View {
     private var joystickControl: some View {
 
         if isMapLocalized,
-           ghostReplayController.phase == .inactive {
+           isBlockingGhostReplayActive == false {
 
             VStack {
 
@@ -1369,6 +1395,7 @@ struct GameView: View {
             )
 
             gameController.startRace()
+            startBestLiveGhostIfEnabled()
         }
     }
 
@@ -1437,6 +1464,7 @@ struct GameView: View {
         guard isNoDebugMode,
               hasStartedGameplay,
               ghostReplayController.phase == .inactive
+                || ghostReplayController.mode == .liveRaceGhost
         else {
             return
         }
@@ -1702,9 +1730,10 @@ struct GameView: View {
     }
 
 
+    @ViewBuilder
     private var ghostReplayOverlay: some View {
-
-        ConsumentaGhostReplayView(
+        if ghostReplayController.mode == .replay {
+            ConsumentaGhostReplayView(
             phase:
                 ghostReplayController.phase,
 
@@ -1716,8 +1745,7 @@ struct GameView: View {
             },
 
             onReplay: {
-                if let recordingURL =
-                    gameController.latestDriveRecordingURL {
+                if let recordingURL = activeGhostRecordingURL {
 
                     prepareGhostReplay(
                         recordingURL:
@@ -1729,12 +1757,38 @@ struct GameView: View {
             onClose: {
                 finishGhostReplay()
             }
+            )
+        }
+    }
+
+    private func startBestLiveGhostIfEnabled() {
+        guard isBestGhostEnabled,
+              let url = gameController.bestGhostRecordingURL else {
+            return
+        }
+
+        ghostReplayController.prepare(
+            recordingURL: url,
+            mode: .liveRaceGhost,
+            simulation: controller.eduardSimulation
+        )
+        guard ghostReplayController.phase != .failed else {
+            return
+        }
+
+        ghostReplayController.referenceLocalized()
+        controller.setSimulationVisible(true)
+        ghostReplayController.start(
+            simulation: controller.eduardSimulation,
+            onEvent: { _ in },
+            onFinished: {}
         )
     }
 
 
     private func prepareGhostReplay(
-        recordingURL: URL
+        recordingURL: URL,
+        mode: GhostPlaybackMode = .replay
     ) {
 
         let isStartingNewGhostSession =
@@ -1743,6 +1797,9 @@ struct GameView: View {
         ghostReplayController.prepare(
             recordingURL:
                 recordingURL,
+
+            mode:
+                mode,
 
             simulation:
                 controller.eduardSimulation
@@ -1753,9 +1810,7 @@ struct GameView: View {
             return
         }
 
-        if isStartingNewGhostSession {
-            closeFinishedOverlay()
-        }
+        activeGhostRecordingURL = recordingURL
 
         stopJoystickInput()
 
@@ -1793,16 +1848,30 @@ struct GameView: View {
             true
         )
 
+        if let recording = ghostReplayController.recording {
+            gameController.beginGhostPlayback(
+                recording: recording,
+                mode: ghostReplayController.mode
+            )
+        }
+
         ghostReplayController.start(
-            simulation:
-                controller.eduardSimulation
+            simulation: controller.eduardSimulation,
+            onEvent: { event in
+                gameController.applyGhostEvent(event)
+            },
+            onFinished: {
+                gameController.endGhostPlayback()
+            }
         )
     }
 
 
     private func finishGhostReplay() {
 
+        gameController.endGhostPlayback()
         ghostReplayController.reset()
+        activeGhostRecordingURL = nil
 
         controller.eduardSimulation.setPose(
             .zero
@@ -1841,7 +1910,8 @@ struct GameView: View {
             )
 
         } else if isNoDebugMode,
-                  gameController.phase == .finished {
+                  gameController.phase == .finished,
+                  isBlockingGhostReplayActive == false {
 
             finishView
         }
@@ -2364,7 +2434,19 @@ struct GameView: View {
                         gameController.leaderboard.prefix(
                             10
                         )
-                    )
+                    ),
+                onGhostSelected: { result in
+                    guard let url = gameController.ghostRecordingURL(for: result) else {
+                        return
+                    }
+                    prepareGhostReplay(recordingURL: url, mode: .replay)
+                },
+                ghostURLProvider: { result in
+                    gameController.ghostRecordingURL(for: result)
+                },
+                onDelete: { result in
+                    gameController.deleteLeaderboardResult(result)
+                }
             )
         }
     }
@@ -2520,6 +2602,22 @@ struct LeaderboardTableView: View {
     let results:
         [GameResult]
 
+    let onGhostSelected: (GameResult) -> Void
+    let ghostURLProvider: (GameResult) -> URL?
+    let onDelete: ((GameResult) -> Void)?
+
+    init(
+        results: [GameResult],
+        onGhostSelected: @escaping (GameResult) -> Void = { _ in },
+        ghostURLProvider: @escaping (GameResult) -> URL? = { _ in nil },
+        onDelete: ((GameResult) -> Void)? = nil
+    ) {
+        self.results = results
+        self.onGhostSelected = onGhostSelected
+        self.ghostURLProvider = ghostURLProvider
+        self.onDelete = onDelete
+    }
+
     @State private var selectedResultID:
         UUID?
 
@@ -2534,192 +2632,149 @@ struct LeaderboardTableView: View {
 
 
     var body: some View {
+        let displayedResults = Array(results.prefix(10).enumerated())
 
-        ScrollView(
-            .horizontal,
-            showsIndicators:
-                false
-        ) {
+        List {
+            ScrollView(.horizontal, showsIndicators: false) {
+                leaderboardHeader
+            }
+            .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 4, trailing: 8))
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
 
-            VStack(
-                alignment:
-                    .leading,
+            ForEach(displayedResults, id: \.element.id) { index, result in
+                let isSelected = selectedResultID == result.id
 
-                spacing:
-                    6
-            ) {
-
-                HStack(
-                    spacing:
-                        6
-                ) {
-
-                    Color.clear
-                        .frame(
-                            width:
-                                rankColumnWidth
-                        )
-
-                    Text(
-                        "Name"
-                    )
-                    .font(
-                        .caption.bold()
-                    )
-                    .foregroundStyle(
-                        .white.opacity(
-                            0.68
-                        )
-                    )
-                    .frame(
-                        width:
-                            nameColumnWidth,
-
-                        alignment:
-                            .leading
-                    )
-
-                    ForEach(
-                        leaderboardColumns
-                    ) { column in
-
-                        Text(
-                            column.emoji
-                        )
-                        .font(
-                            .title3
-                        )
-                        .frame(
-                            width:
-                                valueColumnWidth,
-
-                            height:
-                                28
-                        )
-
+                VStack(alignment: .leading, spacing: 12) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        leaderboardRow(rank: index + 1, result: result)
+                            .frame(minHeight: 58)
                     }
-                }
-
-                ForEach(
-                    Array(
-                        results.prefix(
-                            10
-                        )
-                        .enumerated()
-                    ),
-                    id:
-                        \.element.id
-                ) { index, result in
-
-                    let isSelected =
-                        selectedResultID == result.id
-
-                    HStack(
-                        spacing:
-                            6
-                    ) {
-
-                        Text(
-                            "#\(index + 1)"
-                        )
-                        .font(
-                            .caption.bold()
-                        )
-                        .foregroundStyle(
-                            Color(
-                                "BrandGreen"
-                            )
-                        )
-                        .frame(
-                            width:
-                                rankColumnWidth
-                        )
-
-                        Text(
-                            result.playerName
-                        )
-                        .font(
-                            .caption.bold()
-                        )
-                        .foregroundStyle(
-                            .white
-                        )
-                        .lineLimit(
-                            1
-                        )
-                        .frame(
-                            width:
-                                nameColumnWidth,
-
-                            alignment:
-                                .leading
-                        )
-
-                        ForEach(
-                            leaderboardValues(
-                                for:
-                                    result
-                            )
-                        ) { stat in
-
-                            Text(
-                                stat.value
-                            )
-                            .font(
-                                .caption.bold()
-                            )
-                            .foregroundStyle(
-                                .white
-                            )
-                            .frame(
-                                width:
-                                    valueColumnWidth
-                            )
-                        }
-                    }
-                    .padding(
-                        8
-                    )
-                    .background(
-                        isSelected
-                        ? Color(
-                            "BrandGreen"
-                        )
-                        .opacity(
-                            0.62
-                        )
-                        : .white.opacity(
-                            0.08
-                        )
-                    )
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius:
-                                8,
-
-                            style:
-                                .continuous
-                        )
-                    )
-                    .contentShape(
-                        Rectangle()
-                    )
+                    .contentShape(Rectangle())
                     .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            selectedResultID = isSelected ? nil : result.id
+                        }
+                    }
 
-                        withAnimation(
-                            .easeInOut(
-                                duration:
-                                    0.15
-                            )
-                        ) {
+                    if isSelected {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Ghost Drive: \(result.playerName)")
+                                .font(.headline)
+                                .foregroundStyle(.white)
 
-                            selectedResultID =
-                                isSelected
-                                ? nil
-                                : result.id
+                            if result.ghostID != nil,
+                               ghostURLProvider(result) != nil {
+                                Button {
+                                    onGhostSelected(result)
+                                } label: {
+                                    Label(
+                                        "Start AR Ghost Drive on Course \(result.trackName)",
+                                        systemImage: "arkit"
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(Color("BrandGreen"))
+
+                                if let ghostURL = ghostURLProvider(result) {
+                                    ShareLink(item: ghostURL) {
+                                        Label(
+                                            "Share Ghost Drive",
+                                            systemImage: "square.and.arrow.up"
+                                        )
+                                        .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(.white)
+                                }
+                            } else {
+                                Text("No Ghost Drive is available for this result.")
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                        }
+                        .padding(.bottom, 6)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    Color("BrandGreen").opacity(
+                        isSelected ? 0.18 : (index.isMultiple(of: 2) ? 0.055 : 0.095)
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    if let onDelete {
+                        Button("Delete", role: .destructive) {
+                            onDelete(result)
+                            if selectedResultID == result.id {
+                                selectedResultID = nil
+                            }
                         }
                     }
                 }
+            }
+        }
+        .listStyle(.plain)
+        .scrollDisabled(true)
+        .frame(
+            height: CGFloat(displayedResults.count * 82 + 48)
+                + (selectedResultID == nil ? 0 : 154)
+        )
+        .background(Color.clear)
+    }
+
+    private var leaderboardHeader: some View {
+        HStack(spacing: 6) {
+            Color.clear.frame(width: rankColumnWidth)
+            Text("Name")
+                .font(.caption.bold())
+                .foregroundStyle(.white.opacity(0.68))
+                .frame(width: nameColumnWidth, alignment: .leading)
+
+            ForEach(leaderboardColumns) { column in
+                Text(column.emoji)
+                    .font(.title3)
+                    .frame(width: valueColumnWidth, height: 28)
+            }
+        }
+    }
+
+    private func leaderboardRow(rank: Int, result: GameResult) -> some View {
+        HStack(spacing: 6) {
+            Text("#\(rank)")
+                .font(.caption.bold())
+                .foregroundStyle(Color("BrandGreen"))
+                .frame(width: rankColumnWidth)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(result.playerName)
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                if let ghostID = result.ghostID {
+                    Label(
+                        "Ghost \(ghostID.uuidString.prefix(6))",
+                        systemImage: "car.side.fill"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(Color("BrandGreen"))
+                    .lineLimit(1)
+                }
+            }
+            .frame(width: nameColumnWidth, alignment: .leading)
+
+            ForEach(leaderboardValues(for: result)) { stat in
+                Text(stat.value)
+                    .font(.caption.bold())
+                    .foregroundStyle(.white)
+                    .frame(width: valueColumnWidth)
             }
         }
     }
@@ -3038,6 +3093,22 @@ struct LeaderboardResultsView: View {
     let results:
         [GameResult]
 
+    let onGhostSelected: (GameResult) -> Void
+    let ghostURLProvider: (GameResult) -> URL?
+    let onDelete: ((GameResult) -> Void)?
+
+    init(
+        results: [GameResult],
+        onGhostSelected: @escaping (GameResult) -> Void = { _ in },
+        ghostURLProvider: @escaping (GameResult) -> URL? = { _ in nil },
+        onDelete: ((GameResult) -> Void)? = nil
+    ) {
+        self.results = results
+        self.onGhostSelected = onGhostSelected
+        self.ghostURLProvider = ghostURLProvider
+        self.onDelete = onDelete
+    }
+
 
     var body: some View {
 
@@ -3059,7 +3130,13 @@ struct LeaderboardResultsView: View {
 
             LeaderboardTableView(
                 results:
-                    results
+                    results,
+                onGhostSelected:
+                    onGhostSelected,
+                ghostURLProvider:
+                    ghostURLProvider,
+                onDelete:
+                    onDelete
             )
         }
     }

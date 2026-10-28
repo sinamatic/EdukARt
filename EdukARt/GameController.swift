@@ -126,6 +126,12 @@ struct GameResult:
 
     let score:
         Int
+
+    let ghostID:
+        UUID?
+
+    let ghostFileName:
+        String?
 }
 
 
@@ -373,6 +379,16 @@ final class GameController:
 
     private var timerTask:
         Task<Void, Never>?
+
+    private struct GhostStateSnapshot {
+        let activeMapObjects: [PlacedMapObject]
+        let coins: [GameCoin]
+        let revealedTreeIDs: Set<UUID>
+        let runtimeEggs: [RuntimeEgg]
+        let shitDots: [ShitDot]
+    }
+
+    private var ghostStateSnapshot: GhostStateSnapshot?
 
 
     // ======================================================
@@ -720,8 +736,8 @@ final class GameController:
             nil
 
         consumentaDriveRecorder.start(
-            map:
-                map
+            map: map,
+            coins: coins
         )
 
         hasLeftStartArea =
@@ -774,15 +790,30 @@ final class GameController:
                         .whitespacesAndNewlines
                 )
 
+        let resolvedName = trimmedName.isEmpty ? "Player" : trimmedName
+        let ghostID = UUID()
+        var savedRecordingURL: URL?
+
+        do {
+            savedRecordingURL = try consumentaDriveRecorder.save(
+                playerName: resolvedName,
+                recordingID: ghostID
+            )
+            latestDriveRecordingURL = savedRecordingURL
+        } catch {
+            latestDriveRecordingURL = nil
+            print(
+                "# CONSUMENTA | Drive recording could not be saved: \(error)"
+            )
+        }
+
         let result =
             GameResult(
                 id:
                     UUID(),
 
                 playerName:
-                    trimmedName.isEmpty
-                    ? "Player"
-                    : trimmedName,
+                    resolvedName,
 
                 finishedAt:
                     Date(),
@@ -836,7 +867,13 @@ final class GameController:
                     maxSpeedPercentProvider?(),
 
                 score:
-                    0
+                    0,
+
+                ghostID:
+                    savedRecordingURL == nil ? nil : ghostID,
+
+                ghostFileName:
+                    savedRecordingURL?.lastPathComponent
             )
 
         leaderboard.append(
@@ -857,20 +894,6 @@ final class GameController:
 
         saveLeaderboard()
 
-        do {
-            latestDriveRecordingURL =
-                try consumentaDriveRecorder.save(
-                    playerName:
-                        trimmedName
-                )
-        } catch {
-            latestDriveRecordingURL =
-                nil
-
-            print(
-                "# CONSUMENTA | Drive recording could not be saved: \(error)"
-            )
-        }
     }
 
 
@@ -902,6 +925,163 @@ final class GameController:
         )
     }
 
+    func ghostRecordingURL(for result: GameResult) -> URL? {
+        guard let fileName = result.ghostFileName else {
+            return nil
+        }
+
+        let directory = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        )[0]
+        .appendingPathComponent("ConsumentaDrives", isDirectory: true)
+        let url = directory.appendingPathComponent(fileName)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    var bestGhostRecordingURL: URL? {
+        leaderboard.lazy.compactMap { self.ghostRecordingURL(for: $0) }.first
+    }
+
+    func deleteLeaderboardResult(_ result: GameResult) {
+        if let recordingURL = ghostRecordingURL(for: result) {
+            try? FileManager.default.removeItem(at: recordingURL)
+        }
+        leaderboard.removeAll { $0.id == result.id }
+        saveLeaderboard()
+    }
+
+    func beginGhostPlayback(
+        recording: ConsumentaDriveRecording,
+        mode: GhostPlaybackMode
+    ) {
+        endGhostPlayback()
+
+        guard mode == .replay else {
+            return
+        }
+
+        ghostStateSnapshot = GhostStateSnapshot(
+            activeMapObjects: activeMapObjects,
+            coins: coins,
+            revealedTreeIDs: revealedTreeIDs,
+            runtimeEggs: runtimeEggs,
+            shitDots: shitDots
+        )
+        activeMapObjects = map.mapObjects
+        coins = recording.initialCoins.map {
+            GameCoin(
+                id: $0.id,
+                position: SIMD2<Float>($0.x, $0.z)
+            )
+        }
+        revealedTreeIDs.removeAll()
+        runtimeEggs.removeAll()
+        shitDots.removeAll()
+        collisionManager.reset()
+        onWaterModeChanged?(false)
+    }
+
+    func applyGhostEvent(_ event: ConsumentaGhostEvent) {
+        guard ghostStateSnapshot != nil else {
+            return
+        }
+
+        switch event.kind {
+        case .coinCollected:
+            coins.removeAll { $0.id == event.objectID }
+            onCoinCollected?()
+
+        case .objectExited:
+            if event.objectType == .water {
+                onWaterModeChanged?(false)
+            }
+
+        case .objectEntered:
+            applyGhostObjectEvent(event)
+        }
+    }
+
+    func endGhostPlayback() {
+        guard let snapshot = ghostStateSnapshot else {
+            return
+        }
+
+        activeMapObjects = snapshot.activeMapObjects
+        coins = snapshot.coins
+        revealedTreeIDs = snapshot.revealedTreeIDs
+        runtimeEggs = snapshot.runtimeEggs
+        shitDots = snapshot.shitDots
+        ghostStateSnapshot = nil
+        onWaterModeChanged?(false)
+        collisionManager.reset()
+    }
+
+    private func applyGhostObjectEvent(_ event: ConsumentaGhostEvent) {
+        guard let type = event.objectType else {
+            return
+        }
+
+        switch type {
+        case .eggs:
+            activeMapObjects.removeAll { $0.id == event.objectID }
+            runtimeEggs.append(
+                RuntimeEgg(
+                    id: event.objectID,
+                    state: .carried(slot: carriedEggCount)
+                )
+            )
+            onEggCollected?()
+
+        case .itembox:
+            activeMapObjects.removeAll { $0.id == event.objectID }
+            onItemboxCollected?()
+
+        case .shit:
+            activeMapObjects.removeAll { $0.id == event.objectID }
+            onShitEffectStarted?(shitEffectDuration)
+
+        case .oil:
+            onOilEffectStarted?(oilCooldownDuration)
+
+        case .water:
+            onWaterModeChanged?(true)
+
+        case .tree:
+            onTreeEffectStarted?(treeLightEffectDuration)
+
+        case .treeTrigger:
+            let triggerPosition = SIMD2<Float>(event.x, event.z)
+            if let tree = activeMapObjects
+                .filter({ $0.type == .tree && revealedTreeIDs.contains($0.id) == false })
+                .min(by: {
+                    simd_distance(SIMD2<Float>($0.x, $0.z), triggerPosition)
+                    < simd_distance(SIMD2<Float>($1.x, $1.z), triggerPosition)
+                }) {
+                revealedTreeIDs.insert(tree.id)
+                activeMapObjects.removeAll { $0.id == event.objectID }
+                onTreeEffectStarted?(treeLightEffectDuration)
+            }
+
+        case .eggCup:
+            var deliveredSlot = 0
+            for index in runtimeEggs.indices {
+                guard case .carried = runtimeEggs[index].state else {
+                    continue
+                }
+                runtimeEggs[index].state = .delivered(
+                    eggCupID: event.objectID,
+                    slot: deliveredSlot
+                )
+                deliveredSlot += 1
+            }
+            onEggsDelivered?()
+
+        case .rock:
+            break
+        }
+    }
+
 
     private func collectCoins(
         robotPose:
@@ -921,8 +1101,8 @@ final class GameController:
             *
             collisionDistance
 
-        let collectedIDs =
-            coins.compactMap { coin -> UUID? in
+        let collectedCoinItems =
+            coins.filter { coin in
 
                 let dx =
                     robotPose.position.x
@@ -940,18 +1120,20 @@ final class GameController:
                     dz * dz
 
                 return distanceSquared <= collisionDistanceSquared
-                    ? coin.id
-                    : nil
             }
 
-        guard collectedIDs.isEmpty == false
+        guard collectedCoinItems.isEmpty == false
         else {
             return
         }
 
+        collectedCoinItems.forEach {
+            consumentaDriveRecorder.recordCoinCollected($0)
+        }
+
         let collectedIDSet =
             Set(
-                collectedIDs
+                collectedCoinItems.map(\.id)
             )
 
         coins.removeAll {
@@ -961,7 +1143,7 @@ final class GameController:
         }
 
         collectedCoins +=
-            collectedIDs.count
+            collectedIDSet.count
 
         onCoinCollected?()
 
@@ -1092,6 +1274,14 @@ final class GameController:
             CollisionActor
     ) {
 
+        if object.type != .treeTrigger,
+           object.type != .eggCup {
+            consumentaDriveRecorder.recordObjectEvent(
+                kind: .objectEntered,
+                object: object
+            )
+        }
+
         switch object.type {
 
 
@@ -1175,6 +1365,13 @@ final class GameController:
 
         case .treeTrigger:
 
+            if nearestHiddenTree(to: object) != nil {
+                consumentaDriveRecorder.recordObjectEvent(
+                    kind: .objectEntered,
+                    object: object
+                )
+            }
+
             triggerTree(
                 object
             )
@@ -1185,6 +1382,13 @@ final class GameController:
         // --------------------------------------------------
 
         case .eggCup:
+
+            if carriedEggCount > 0 {
+                consumentaDriveRecorder.recordObjectEvent(
+                    kind: .objectEntered,
+                    object: object
+                )
+            }
 
             deliverEggsToEggCup(
                 object
@@ -1201,6 +1405,13 @@ final class GameController:
         with object:
             PlacedMapObject
     ) {
+
+        if object.type == .water {
+            consumentaDriveRecorder.recordObjectEvent(
+                kind: .objectExited,
+                object: object
+            )
+        }
 
         switch object.type {
 

@@ -12,14 +12,46 @@ final class ConsumentaDriveRecorder {
     private var raceDuration: TimeInterval?
     private var postFinishEndDate: Date?
     private var samples: [ConsumentaDriveSample] = []
+    private var initialCoins: [ConsumentaRecordedCoin] = []
+    private var events: [ConsumentaGhostEvent] = []
     private var lastSampleTime: TimeInterval?
     private var lastObservedPose: RobotPose?
 
-    func start(map: GameMap) {
+    func start(map: GameMap, coins: [GameCoin]) {
         reset()
         mapID = map.id
         mapName = map.name
         startedAt = Date()
+        initialCoins = coins.map {
+            ConsumentaRecordedCoin(
+                id: $0.id,
+                x: $0.position.x,
+                z: $0.position.y
+            )
+        }
+    }
+
+    func recordCoinCollected(_ coin: GameCoin) {
+        recordEvent(
+            kind: .coinCollected,
+            objectID: coin.id,
+            objectType: nil,
+            x: coin.position.x,
+            z: coin.position.y
+        )
+    }
+
+    func recordObjectEvent(
+        kind: ConsumentaGhostEvent.Kind,
+        object: PlacedMapObject
+    ) {
+        recordEvent(
+            kind: kind,
+            objectID: object.id,
+            objectType: object.type,
+            x: object.x,
+            z: object.z
+        )
     }
 
     func record(pose: RobotPose) {
@@ -67,7 +99,7 @@ final class ConsumentaDriveRecorder {
         )
     }
 
-    func save(playerName: String) throws -> URL {
+    func save(playerName: String, recordingID: UUID) throws -> URL {
         guard let mapID,
               let startedAt,
               raceDuration != nil else {
@@ -80,14 +112,16 @@ final class ConsumentaDriveRecorder {
         let trimmedName = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedName = trimmedName.isEmpty ? "Player" : trimmedName
         let recording = ConsumentaDriveRecording(
-            formatVersion: 1,
-            id: UUID(),
+            formatVersion: 2,
+            id: recordingID,
             mapID: mapID,
             mapName: mapName,
             playerName: resolvedName,
             startedAt: startedAt,
             duration: duration,
-            samples: exportSamples
+            samples: exportSamples,
+            initialCoins: initialCoins,
+            events: events.sorted { $0.time < $1.time }
         )
 
         let directory = FileManager.default.urls(
@@ -117,8 +151,36 @@ final class ConsumentaDriveRecorder {
         raceDuration = nil
         postFinishEndDate = nil
         samples.removeAll(keepingCapacity: true)
+        initialCoins.removeAll(keepingCapacity: true)
+        events.removeAll(keepingCapacity: true)
         lastSampleTime = nil
         lastObservedPose = nil
+    }
+
+    private func recordEvent(
+        kind: ConsumentaGhostEvent.Kind,
+        objectID: UUID,
+        objectType: MapObjectType?,
+        x: Float,
+        z: Float
+    ) {
+        guard ConsumentaConfiguration.isEnabled,
+              raceDuration == nil,
+              let startedAt else {
+            return
+        }
+
+        events.append(
+            ConsumentaGhostEvent(
+                id: UUID(),
+                time: Date().timeIntervalSince(startedAt),
+                kind: kind,
+                objectID: objectID,
+                objectType: objectType,
+                x: x,
+                z: z
+            )
+        )
     }
 
     private func append(

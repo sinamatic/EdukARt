@@ -14,11 +14,13 @@ final class ConsumentaGhostReplayController: ObservableObject {
 
     @Published private(set) var phase: Phase = .inactive
 
-    private var recording: ConsumentaDriveRecording?
+    private(set) var recording: ConsumentaDriveRecording?
+    private(set) var mode: GhostPlaybackMode = .replay
     private var replayTask: Task<Void, Never>?
 
     func prepare(
         recordingURL: URL,
+        mode: GhostPlaybackMode = .replay,
         simulation: EduardSimulation
     ) {
         replayTask?.cancel()
@@ -38,6 +40,7 @@ final class ConsumentaGhostReplayController: ObservableObject {
             }
 
             self.recording = recording
+            self.mode = mode
             simulation.setPose(firstSample.robotPose)
             phase = .awaitingReference
         } catch {
@@ -54,7 +57,11 @@ final class ConsumentaGhostReplayController: ObservableObject {
         phase = .ready
     }
 
-    func start(simulation: EduardSimulation) {
+    func start(
+        simulation: EduardSimulation,
+        onEvent: @escaping (ConsumentaGhostEvent) -> Void,
+        onFinished: @escaping () -> Void
+    ) {
         guard phase == .ready,
               let recording,
               recording.samples.isEmpty == false else {
@@ -63,6 +70,7 @@ final class ConsumentaGhostReplayController: ObservableObject {
 
         replayTask?.cancel()
         phase = .playing
+        let playbackMode = mode
 
         replayTask = Task { @MainActor [weak self] in
             guard let self else {
@@ -70,6 +78,21 @@ final class ConsumentaGhostReplayController: ObservableObject {
             }
 
             simulation.setPose(recording.samples[0].robotPose)
+            var eventIndex = 0
+
+            func emitEvents(upTo time: TimeInterval) {
+                guard playbackMode == .replay else {
+                    return
+                }
+
+                while eventIndex < recording.events.count,
+                      recording.events[eventIndex].time <= time {
+                    onEvent(recording.events[eventIndex])
+                    eventIndex += 1
+                }
+            }
+
+            emitEvents(upTo: recording.samples[0].time)
 
             for index in 1..<recording.samples.count {
                 guard Task.isCancelled == false else {
@@ -81,7 +104,8 @@ final class ConsumentaGhostReplayController: ObservableObject {
                 await animate(
                     from: previous,
                     to: current,
-                    simulation: simulation
+                    simulation: simulation,
+                    onTimeUpdated: emitEvents
                 )
             }
 
@@ -89,7 +113,9 @@ final class ConsumentaGhostReplayController: ObservableObject {
                 return
             }
 
+            emitEvents(upTo: recording.duration)
             phase = .finished
+            onFinished()
         }
     }
 
@@ -97,13 +123,15 @@ final class ConsumentaGhostReplayController: ObservableObject {
         replayTask?.cancel()
         replayTask = nil
         recording = nil
+        mode = .replay
         phase = .inactive
     }
 
     private func animate(
         from start: ConsumentaDriveSample,
         to end: ConsumentaDriveSample,
-        simulation: EduardSimulation
+        simulation: EduardSimulation,
+        onTimeUpdated: (TimeInterval) -> Void
     ) async {
         let duration = max(0, end.time - start.time)
         let steps = max(1, Int(ceil(duration * 30)))
@@ -129,6 +157,9 @@ final class ConsumentaGhostReplayController: ObservableObject {
             )
 
             simulation.setPose(pose)
+            onTimeUpdated(
+                start.time + (end.time - start.time) * Double(progress)
+            )
 
             if stepDuration > 0 {
                 try? await Task.sleep(
