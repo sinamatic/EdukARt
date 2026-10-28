@@ -196,8 +196,20 @@ struct SettingsView: View {
 
 struct ScoresView: View {
 
+    @ObservedObject var eduardModelStore:
+        EduardModelStore
+
+    @ObservedObject var controller:
+        RobotController
+
     @ObservedObject var gameMapStore:
         GameMapStore
+
+    @State private var selectedGhostMap:
+        GameMap?
+
+    @State private var selectedGhostURL:
+        URL?
 
     var body: some View {
 
@@ -266,7 +278,24 @@ struct ScoresView: View {
                                         leaderboardResults(
                                             for:
                                                 map
+                                        ),
+
+                                    onGhostSelected: { result in
+                                        guard let url = GameController.ghostRecordingURL(
+                                            for: result
+                                        ) else {
+                                            return
+                                        }
+
+                                        selectedGhostMap = map
+                                        selectedGhostURL = url
+                                    },
+
+                                    ghostURLProvider: { result in
+                                        GameController.ghostRecordingURL(
+                                            for: result
                                         )
+                                    }
                                 )
                             }
                         }
@@ -274,6 +303,30 @@ struct ScoresView: View {
                 }
                 .padding(
                     24
+                )
+            }
+        }
+        .navigationDestination(
+            isPresented: Binding(
+                get: {
+                    selectedGhostMap != nil
+                        && selectedGhostURL != nil
+                },
+                set: { isPresented in
+                    if isPresented == false {
+                        selectedGhostMap = nil
+                        selectedGhostURL = nil
+                    }
+                }
+            )
+        ) {
+            if let selectedGhostMap,
+               let selectedGhostURL {
+                GameView(
+                    map: selectedGhostMap,
+                    eduardModelStore: eduardModelStore,
+                    controller: controller,
+                    initialGhostRecordingURL: selectedGhostURL
                 )
             }
         }

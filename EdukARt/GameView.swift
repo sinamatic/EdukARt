@@ -22,6 +22,9 @@ struct GameView: View {
     @ObservedObject var controller:
         RobotController
 
+    private let initialGhostRecordingURL:
+        URL?
+
     @StateObject private var gameController:
         GameController
 
@@ -79,6 +82,9 @@ struct GameView: View {
     @State private var isBestGhostEnabled =
         false
 
+    @State private var didPrepareInitialGhost =
+        false
+
     private var isBlockingGhostReplayActive: Bool {
         ghostReplayController.mode == .replay
             && ghostReplayController.phase != .inactive
@@ -115,7 +121,8 @@ struct GameView: View {
     init(
         map: GameMap,
         eduardModelStore: EduardModelStore,
-        controller: RobotController
+        controller: RobotController,
+        initialGhostRecordingURL: URL? = nil
     ) {
 
         self.map =
@@ -126,6 +133,9 @@ struct GameView: View {
 
         self.controller =
             controller
+
+        self.initialGhostRecordingURL =
+            initialGhostRecordingURL
 
         _gameController =
             StateObject(
@@ -154,6 +164,17 @@ struct GameView: View {
                 controller.resetGameplayEffects()
 
                 configureGameController()
+
+                if let initialGhostRecordingURL,
+                   didPrepareInitialGhost == false {
+                    didPrepareInitialGhost = true
+                    DispatchQueue.main.async {
+                        prepareGhostReplay(
+                            recordingURL: initialGhostRecordingURL,
+                            mode: .replay
+                        )
+                    }
+                }
             }
             .onDisappear {
 
@@ -1778,6 +1799,7 @@ struct GameView: View {
 
         ghostReplayController.referenceLocalized()
         controller.setSimulationVisible(true)
+        controller.eduardSimulation.setOpacity(0.5)
         ghostReplayController.start(
             simulation: controller.eduardSimulation,
             onEvent: { _ in },
@@ -1811,6 +1833,7 @@ struct GameView: View {
         }
 
         activeGhostRecordingURL = recordingURL
+        controller.eduardSimulation.setOpacity(1)
 
         stopJoystickInput()
 
@@ -1836,9 +1859,6 @@ struct GameView: View {
 
         isMapLocalized =
             false
-
-        localizationResetID +=
-            1
     }
 
 
@@ -1876,6 +1896,7 @@ struct GameView: View {
         controller.eduardSimulation.setPose(
             .zero
         )
+        controller.eduardSimulation.setOpacity(1)
 
         controller.setSimulationVisible(
             wasSimulationVisibleBeforeGhost
@@ -2443,9 +2464,6 @@ struct GameView: View {
                 },
                 ghostURLProvider: { result in
                     gameController.ghostRecordingURL(for: result)
-                },
-                onDelete: { result in
-                    gameController.deleteLeaderboardResult(result)
                 }
             )
         }
@@ -2604,18 +2622,15 @@ struct LeaderboardTableView: View {
 
     let onGhostSelected: (GameResult) -> Void
     let ghostURLProvider: (GameResult) -> URL?
-    let onDelete: ((GameResult) -> Void)?
 
     init(
         results: [GameResult],
         onGhostSelected: @escaping (GameResult) -> Void = { _ in },
-        ghostURLProvider: @escaping (GameResult) -> URL? = { _ in nil },
-        onDelete: ((GameResult) -> Void)? = nil
+        ghostURLProvider: @escaping (GameResult) -> URL? = { _ in nil }
     ) {
         self.results = results
         self.onGhostSelected = onGhostSelected
         self.ghostURLProvider = ghostURLProvider
-        self.onDelete = onDelete
     }
 
     @State private var selectedResultID:
@@ -2648,7 +2663,6 @@ struct LeaderboardTableView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         leaderboardRow(rank: index + 1, result: result)
-                            .frame(minHeight: 58)
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -2698,32 +2712,22 @@ struct LeaderboardTableView: View {
                     }
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 8)
+                .padding(.vertical, 4)
                 .background(
                     Color("BrandGreen").opacity(
                         isSelected ? 0.18 : (index.isMultiple(of: 2) ? 0.055 : 0.095)
                     )
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0))
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if let onDelete {
-                        Button("Delete", role: .destructive) {
-                            onDelete(result)
-                            if selectedResultID == result.id {
-                                selectedResultID = nil
-                            }
-                        }
-                    }
-                }
             }
         }
         .listStyle(.plain)
         .scrollDisabled(true)
         .frame(
-            height: CGFloat(displayedResults.count * 82 + 48)
+            height: CGFloat(displayedResults.count * 62 + 48)
                 + (selectedResultID == nil ? 0 : 154)
         )
         .background(Color.clear)
@@ -3095,18 +3099,15 @@ struct LeaderboardResultsView: View {
 
     let onGhostSelected: (GameResult) -> Void
     let ghostURLProvider: (GameResult) -> URL?
-    let onDelete: ((GameResult) -> Void)?
 
     init(
         results: [GameResult],
         onGhostSelected: @escaping (GameResult) -> Void = { _ in },
-        ghostURLProvider: @escaping (GameResult) -> URL? = { _ in nil },
-        onDelete: ((GameResult) -> Void)? = nil
+        ghostURLProvider: @escaping (GameResult) -> URL? = { _ in nil }
     ) {
         self.results = results
         self.onGhostSelected = onGhostSelected
         self.ghostURLProvider = ghostURLProvider
-        self.onDelete = onDelete
     }
 
 
@@ -3134,9 +3135,7 @@ struct LeaderboardResultsView: View {
                 onGhostSelected:
                     onGhostSelected,
                 ghostURLProvider:
-                    ghostURLProvider,
-                onDelete:
-                    onDelete
+                    ghostURLProvider
             )
         }
     }
@@ -3266,7 +3265,7 @@ struct SwipeBackDisabler:
         context: Context
     ) -> UIViewController {
 
-        UIViewController()
+        SwipeBackDisablingViewController()
     }
 
 
@@ -3275,14 +3274,8 @@ struct SwipeBackDisabler:
         context: Context
     ) {
 
-        DispatchQueue.main.async {
-
-            uiViewController
-                .navigationController?
-                .interactivePopGestureRecognizer?
-                .isEnabled =
-                false
-        }
+        (uiViewController as? SwipeBackDisablingViewController)?
+            .disableSwipeBack()
     }
 
 
@@ -3296,5 +3289,20 @@ struct SwipeBackDisabler:
             .interactivePopGestureRecognizer?
             .isEnabled =
             true
+    }
+}
+
+
+private final class SwipeBackDisablingViewController: UIViewController {
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        disableSwipeBack()
+    }
+
+    func disableSwipeBack() {
+        navigationController?
+            .interactivePopGestureRecognizer?
+            .isEnabled = false
     }
 }

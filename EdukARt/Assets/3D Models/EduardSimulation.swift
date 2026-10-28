@@ -223,6 +223,18 @@ final class EduardSimulation {
     }
 
 
+    func setOpacity(
+        _ opacity: Float
+    ) {
+
+        entity?.components.set(
+            OpacityComponent(
+                opacity: max(0, min(1, opacity))
+            )
+        )
+    }
+
+
     // MARK: - Set Pose
 
     func setPose(

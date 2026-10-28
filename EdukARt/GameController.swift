@@ -926,29 +926,40 @@ final class GameController:
     }
 
     func ghostRecordingURL(for result: GameResult) -> URL? {
-        guard let fileName = result.ghostFileName else {
-            return nil
-        }
+        Self.ghostRecordingURL(for: result)
+    }
 
+
+    static func ghostRecordingURL(for result: GameResult) -> URL? {
         let directory = FileManager.default.urls(
             for: .documentDirectory,
             in: .userDomainMask
         )[0]
         .appendingPathComponent("ConsumentaDrives", isDirectory: true)
-        let url = directory.appendingPathComponent(fileName)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+
+        if let fileName = result.ghostFileName {
+            let storedURL = directory.appendingPathComponent(fileName)
+            if FileManager.default.fileExists(atPath: storedURL.path) {
+                return storedURL
+            }
+        }
+
+        guard let ghostID = result.ghostID,
+              let files = try? FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil
+              ) else {
+            return nil
+        }
+
+        return files.first {
+            $0.pathExtension.lowercased() == "json"
+                && $0.lastPathComponent.contains(ghostID.uuidString)
+        }
     }
 
     var bestGhostRecordingURL: URL? {
         leaderboard.lazy.compactMap { self.ghostRecordingURL(for: $0) }.first
-    }
-
-    func deleteLeaderboardResult(_ result: GameResult) {
-        if let recordingURL = ghostRecordingURL(for: result) {
-            try? FileManager.default.removeItem(at: recordingURL)
-        }
-        leaderboard.removeAll { $0.id == result.id }
-        saveLeaderboard()
     }
 
     func beginGhostPlayback(

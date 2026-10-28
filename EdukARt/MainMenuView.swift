@@ -64,6 +64,12 @@ struct MainMenuView: View {
                 NavigationLink {
 
                     ScoresView(
+                        eduardModelStore:
+                            eduardModelStore,
+
+                        controller:
+                            controller,
+
                         gameMapStore:
                             gameMapStore
                     )
