@@ -147,6 +147,10 @@ struct GameView: View {
             .onDisappear {
 
                 if ghostReplayController.phase != .inactive {
+                    controller.eduardSimulation.setPose(
+                        .zero
+                    )
+
                     controller.setSimulationVisible(
                         wasSimulationVisibleBeforeGhost
                     )
@@ -1432,9 +1436,13 @@ struct GameView: View {
 
         guard isNoDebugMode,
               hasStartedGameplay,
-              gameController.phase != .finished,
               ghostReplayController.phase == .inactive
         else {
+            return
+        }
+
+        if gameController.phase == .finished {
+            recordPostFinishPose()
             return
         }
 
@@ -1452,15 +1460,40 @@ struct GameView: View {
             )
         }
 
-        updateGameCollision(
-            actor:
-                .simulation,
+        if controller.isSimulationVisible {
+            updateGameCollision(
+                actor:
+                    .simulation,
 
-            with:
-                controller
-                    .eduardSimulation
-                    .pose
-        )
+                with:
+                    controller
+                        .eduardSimulation
+                        .pose
+            )
+        }
+    }
+
+
+    private func recordPostFinishPose() {
+
+        switch gameController.finishActor {
+        case .real:
+            if let realRobotPose = controller.realRobotPose {
+                gameController.recordPostFinishRobotPose(
+                    realRobotPose,
+                    actor: .real
+                )
+            }
+
+        case .simulation:
+            gameController.recordPostFinishRobotPose(
+                controller.eduardSimulation.pose,
+                actor: .simulation
+            )
+
+        case nil:
+            break
+        }
     }
 
 
@@ -1770,6 +1803,10 @@ struct GameView: View {
     private func finishGhostReplay() {
 
         ghostReplayController.reset()
+
+        controller.eduardSimulation.setPose(
+            .zero
+        )
 
         controller.setSimulationVisible(
             wasSimulationVisibleBeforeGhost

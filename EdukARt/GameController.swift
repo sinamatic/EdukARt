@@ -147,6 +147,9 @@ final class GameController:
     var latestDriveRecordingURL:
         URL?
 
+    private(set) var finishActor:
+        CollisionActor?
+
     @Published private(set)
     var phase:
         GamePhase = .racing
@@ -666,6 +669,25 @@ final class GameController:
 
         updateFinishState(
             robotPose:
+                pose,
+
+            actor:
+                actor
+        )
+    }
+
+
+    func recordPostFinishRobotPose(
+        _ pose: RobotPose,
+        actor: CollisionActor
+    ) {
+        guard phase == .finished,
+              actor == finishActor else {
+            return
+        }
+
+        consumentaDriveRecorder.recordPostFinish(
+            pose:
                 pose
         )
     }
@@ -692,6 +714,9 @@ final class GameController:
             Date()
 
         latestDriveRecordingURL =
+            nil
+
+        finishActor =
             nil
 
         consumentaDriveRecorder.start(
@@ -1866,7 +1891,10 @@ final class GameController:
 
     private func updateFinishState(
         robotPose:
-            RobotPose
+            RobotPose,
+
+        actor:
+            CollisionActor
     ) {
 
         guard phase == .racing,
@@ -1912,11 +1940,16 @@ final class GameController:
             return
         }
 
-        finishRace()
+        finishRace(
+            actor:
+                actor
+        )
     }
 
 
-    private func finishRace() {
+    private func finishRace(
+        actor: CollisionActor
+    ) {
 
         guard phase == .racing
         else {
@@ -1929,6 +1962,9 @@ final class GameController:
             duration:
                 elapsedTime
         )
+
+        finishActor =
+            actor
 
         phase =
             .finished

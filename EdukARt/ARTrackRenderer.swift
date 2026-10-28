@@ -1636,13 +1636,13 @@ final class ARTrackRenderer {
 
         let startPosition =
             path[0]
-            + startDirection * 0.30
+            + startDirection * 0.50
 
 
         makeMarker(
             imageName: "Start",
             position: startPosition,
-            direction: startDirection,
+            direction: -startDirection,
             parent: parent
         )
 
@@ -1667,8 +1667,9 @@ final class ARTrackRenderer {
            makeMarker(
                imageName: "Finish",
                position: finishPosition,
-               direction: finishDirection,
-               rotationOffset: -.pi,
+               // The finish label must be readable while approaching it
+               // from the start, so its texture faces against travel.
+               direction: -finishDirection,
                parent: parent
            )
 
@@ -1701,7 +1702,6 @@ final class ARTrackRenderer {
         imageName: String,
         position: SIMD3<Float>,
         direction: SIMD3<Float>,
-        rotationOffset: Float = 0,
         parent: Entity
     ) {
 
@@ -1787,15 +1787,13 @@ final class ARTrackRenderer {
             let yaw =
                 atan2(
                     normalizedDirection.x,
-                    normalizedDirection.y
+                    normalizedDirection.z
                 )
 
             marker.orientation =
                 simd_quatf(
                     angle:
-                        yaw
-                        + .pi / 2
-                        + rotationOffset,
+                        yaw,
                     axis:
                         SIMD3<Float>(
                             0,
