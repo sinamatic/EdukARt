@@ -40,7 +40,7 @@ struct StartGameView: View {
 
                 VStack(spacing: 12) {
                     NavigationLink {
-                        CoursesView(
+                        ConsumentaCourseAccessView(
                             eduardModelStore: eduardModelStore,
                             controller: controller,
                             gameMapStore: gameMapStore

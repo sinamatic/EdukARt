@@ -44,6 +44,40 @@ final class GameMapStore:
 
 
         load()
+        installBundledConsumentaCoursesIfNeeded()
+    }
+
+
+    // MARK: - Consumenta Export
+
+    func exportConsumentaCourses() throws -> URL {
+
+        let encoder =
+            JSONEncoder()
+
+        encoder.outputFormatting =
+            [
+                .prettyPrinted,
+                .sortedKeys
+            ]
+
+        let data =
+            try encoder.encode(
+                maps
+            )
+
+        let exportURL =
+            FileManager.default.temporaryDirectory
+                .appendingPathComponent(
+                    "ConsumentaCourses.json"
+                )
+
+        try data.write(
+            to: exportURL,
+            options: .atomic
+        )
+
+        return exportURL
     }
 
 
@@ -140,6 +174,38 @@ final class GameMapStore:
 
             options:
                 .atomic
+        )
+    }
+
+
+    // MARK: - Consumenta Bundled Courses
+
+    private func installBundledConsumentaCoursesIfNeeded() {
+
+        guard ConsumentaConfiguration.isEnabled,
+              UserDefaults.standard.integer(
+                forKey: "consumentaBundledCourseVersion"
+              ) != ConsumentaConfiguration.bundledCourseVersion,
+              let bundledURL = Bundle.main.url(
+                forResource: ConsumentaConfiguration.bundledCourseResourceName,
+                withExtension: "json"
+              ),
+              let data = try? Data(contentsOf: bundledURL),
+              let bundledMaps = try? JSONDecoder().decode(
+                [GameMap].self,
+                from: data
+              ),
+              bundledMaps.isEmpty == false
+        else {
+            return
+        }
+
+        maps = bundledMaps
+        saveToDisk()
+
+        UserDefaults.standard.set(
+            ConsumentaConfiguration.bundledCourseVersion,
+            forKey: "consumentaBundledCourseVersion"
         )
     }
 }

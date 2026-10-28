@@ -1883,6 +1883,44 @@ struct GameView: View {
                     hasSavedFinishedResult
                 )
 
+                if let recordingURL =
+                    gameController.latestDriveRecordingURL {
+
+                    Text(
+                        "Share your drive with the EdukARt team so it can be evaluated as a ghost drive."
+                    )
+                    .font(
+                        .caption
+                    )
+                    .multilineTextAlignment(
+                        .center
+                    )
+                    .foregroundStyle(
+                        .white.opacity(
+                            0.76
+                        )
+                    )
+
+                    ShareLink(
+                        item:
+                            recordingURL
+                    ) {
+
+                        Label(
+                            "Share Drive",
+                            systemImage:
+                                "square.and.arrow.up"
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                    }
+                    .buttonStyle(
+                        ResultSaveButtonStyle()
+                    )
+                }
+
                 leaderboardView
             }
             .padding(

@@ -38,7 +38,7 @@ struct MainMenuView: View {
                     .buttonStyle(MenuButtonStyle(color: Color("BrandGreen")))
                 
                 NavigationLink{
-                    CoursesView(
+                    ConsumentaCourseAccessView(
                         eduardModelStore: eduardModelStore,
                         controller: controller,
                         gameMapStore: gameMapStore

@@ -144,6 +144,10 @@ final class GameController:
         Int = 0
 
     @Published private(set)
+    var latestDriveRecordingURL:
+        URL?
+
+    @Published private(set)
     var phase:
         GamePhase = .racing
 
@@ -354,6 +358,9 @@ final class GameController:
 
     private let map:
         GameMap
+
+    private let consumentaDriveRecorder =
+        ConsumentaDriveRecorder()
 
     private var raceStartDate:
         Date?
@@ -596,6 +603,11 @@ final class GameController:
             }
         }
 
+        consumentaDriveRecorder.record(
+            pose:
+                pose
+        )
+
         updateOilCooldowns()
 
         let collidableObjects =
@@ -678,6 +690,14 @@ final class GameController:
 
         raceStartDate =
             Date()
+
+        latestDriveRecordingURL =
+            nil
+
+        consumentaDriveRecorder.start(
+            map:
+                map
+        )
 
         hasLeftStartArea =
             false
@@ -811,6 +831,21 @@ final class GameController:
         }
 
         saveLeaderboard()
+
+        do {
+            latestDriveRecordingURL =
+                try consumentaDriveRecorder.save(
+                    playerName:
+                        trimmedName
+                )
+        } catch {
+            latestDriveRecordingURL =
+                nil
+
+            print(
+                "# CONSUMENTA | Drive recording could not be saved: \(error)"
+            )
+        }
     }
 
 
@@ -1692,6 +1727,11 @@ final class GameController:
             GameMap
     ) {
 
+        consumentaDriveRecorder.reset()
+
+        latestDriveRecordingURL =
+            nil
+
         phase =
             .racing
 
@@ -1884,6 +1924,11 @@ final class GameController:
         }
 
         updateElapsedTime()
+
+        consumentaDriveRecorder.finish(
+            duration:
+                elapsedTime
+        )
 
         phase =
             .finished

@@ -17,6 +17,8 @@ struct CoursesView: View {
 
     @State private var editingMap: GameMap?
     @State private var isShowingEditView = false
+    @State private var consumentaExportURL: URL?
+    @State private var consumentaExportError = false
 
     var body: some View {
         MapMenuBackground {
@@ -50,6 +52,26 @@ struct CoursesView: View {
                     onEdit: beginEditing,
                     onDelete: gameMapStore.delete
                 )
+
+                if ConsumentaConfiguration.isEnabled {
+                    Button("Prepare Consumenta Course Export") {
+                        prepareConsumentaExport()
+                    }
+                    .buttonStyle(MapMenuButtonStyle(color: Color("BlackOverlay")))
+
+                    if let consumentaExportURL {
+                        ShareLink(item: consumentaExportURL) {
+                            Label("Share Consumenta Courses", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(MapMenuButtonStyle(color: Color("BrandGreen")))
+                    }
+
+                    if consumentaExportError {
+                        Text("The course export could not be prepared.")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
             }
             .padding(.bottom, 50)
         }
@@ -97,6 +119,16 @@ struct CoursesView: View {
 
         isShowingEditView =
             true
+    }
+
+    private func prepareConsumentaExport() {
+        do {
+            consumentaExportURL = try gameMapStore.exportConsumentaCourses()
+            consumentaExportError = false
+        } catch {
+            consumentaExportURL = nil
+            consumentaExportError = true
+        }
     }
 }
 
