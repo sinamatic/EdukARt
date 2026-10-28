@@ -1628,15 +1628,35 @@ final class ARTrackRenderer {
         // START
         // ======================================================
 
-        let startDirection =
-            normalizedDirection(
-                from: path[0],
-                to: path[1]
+        let cumulativeDistances =
+            calculateCumulativeDistances(
+                for: path
             )
 
-        let startPosition =
-            path[0]
-            + startDirection * 0.50
+        guard let totalLength = cumulativeDistances.last,
+              totalLength > 0.001 else {
+            return
+        }
+
+        let startDistance = min(0.20, totalLength)
+        let startPosition = point(
+            atDistance: startDistance,
+            path: path,
+            cumulativeDistances: cumulativeDistances
+        )
+        let directionSampleDistance = min(pathSampleDistance, totalLength / 2)
+        let startDirection = normalizedDirection(
+            from: point(
+                atDistance: max(0, startDistance - directionSampleDistance),
+                path: path,
+                cumulativeDistances: cumulativeDistances
+            ),
+            to: point(
+                atDistance: min(totalLength, startDistance + directionSampleDistance),
+                path: path,
+                cumulativeDistances: cumulativeDistances
+            )
+        )
 
 
         makeMarker(
