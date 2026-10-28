@@ -32,8 +32,8 @@ struct ConsumentaGhostReplayView: View {
 
                     content
                 }
-                .padding(16)
-                .frame(maxWidth: 380)
+                .padding(12)
+                .frame(maxWidth: 360)
                 .background(.black.opacity(0.72))
                 .overlay {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -43,7 +43,7 @@ struct ConsumentaGhostReplayView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 18)
-            .padding(.bottom, 20)
+            .padding(.bottom, 8)
             .foregroundStyle(.white)
         }
     }
@@ -61,7 +61,7 @@ struct ConsumentaGhostReplayView: View {
             Text("Return to the start")
                 .font(.title2.bold())
 
-            Text("Point the camera at reference AprilTag #\(referenceTagID). The Ghost Drive can start as soon as the course is localized again.")
+            Text("Point the camera at reference AprilTag #\(referenceTagID) to localize the course.")
                 .multilineTextAlignment(.center)
 
         case .ready:

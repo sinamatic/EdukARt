@@ -39,6 +39,11 @@ final class EduardSimulation {
     private(set) var pose:
         RobotPose = .zero
 
+    /// Center of the imported model relative to its authored origin. The USD
+    /// model's origin is near the front, so rotating the wrapper directly
+    /// otherwise makes Eduard orbit around that point.
+    private var visualPivotOffset: SIMD3<Float> = .zero
+
 
     // MARK: - AR Representation
 
@@ -104,6 +109,16 @@ final class EduardSimulation {
 
         self.entity =
             entity
+
+        let bounds = entity.visualBounds(relativeTo: entity)
+        visualPivotOffset = SIMD3<Float>(
+            bounds.center.x,
+            0,
+            bounds.center.z
+        )
+        for child in entity.children {
+            child.position -= visualPivotOffset
+        }
         
 
 
@@ -177,6 +192,8 @@ final class EduardSimulation {
         entity =
             nil
 
+        visualPivotOffset = .zero
+
         frontLeftWheel =
             nil
 
@@ -238,13 +255,47 @@ final class EduardSimulation {
     // MARK: - Set Pose
 
     func setPose(
-        _ pose: RobotPose
+        _ pose: RobotPose,
+        animateMovement: Bool = false
     ) {
-
+        let previousPose = self.pose
         self.pose =
             pose
 
         applyPose()
+
+        if animateMovement {
+            animateWheelsForPoseChange(
+                from: previousPose,
+                to: pose
+            )
+        }
+    }
+
+    private func animateWheelsForPoseChange(
+        from start: RobotPose,
+        to end: RobotPose
+    ) {
+        let dx = end.position.x - start.position.x
+        let dz = end.position.z - start.position.z
+        let sinHeading = sin(start.rotation)
+        let cosHeading = cos(start.rotation)
+        let forward = -(dx * sinHeading + dz * cosHeading)
+            / movementUpdateInterval
+        let sideways = (dx * cosHeading - dz * sinHeading)
+            / movementUpdateInterval
+        let rotation = -atan2(
+            sin(end.rotation - start.rotation),
+            cos(end.rotation - start.rotation)
+        ) / movementUpdateInterval
+
+        animateWheels(
+            RobotDriveCommand(
+                forward: Double(forward),
+                sideways: Double(sideways),
+                rotation: Double(rotation)
+            )
+        )
     }
 
 
@@ -494,6 +545,16 @@ final class EduardSimulation {
 
             duration:
                 duration
+        )
+    }
+
+    func blinkLights(
+        color: UIColor,
+        duration: TimeInterval = 1.2
+    ) {
+        startBlinkingLights(
+            color: color,
+            duration: duration
         )
     }
 
@@ -759,20 +820,10 @@ final class EduardSimulation {
                 axis: SIMD3<Float>(0, 1, 0)
             )
 
-        let backward =
-            rotation.act(
-                SIMD3<Float>(
-                    0,
-                    0,
-                    1
-                )
-            )
-
-        // Place visible model relative to the logical robot pose.
-        entity.position =
-            pose.position
-            + backward
-            * EduardModelAlignment.backwardOffset
+        // The imported child has already been centered around this wrapper.
+        // Keeping the wrapper exactly at the logical pose makes both the
+        // driven AR model and every ghost rotate around the same center.
+        entity.position = pose.position
 
         // Rotate around vertical Y axis.
         entity.orientation =
@@ -879,7 +930,7 @@ final class EduardSimulation {
             speed:
                 backLeft,
             direction:
-                1
+                -1
         )
 
         rotateWheel(
@@ -887,7 +938,7 @@ final class EduardSimulation {
             speed:
                 backRight,
             direction:
-                1
+                -1
         )
     }
 
@@ -942,6 +993,8 @@ final class EduardOccluder {
     private(set) var entity:
         Entity?
 
+    private var visualPivotOffset: SIMD3<Float> = .zero
+
 
     func show(
         entity: Entity
@@ -949,6 +1002,16 @@ final class EduardOccluder {
 
         self.entity =
             entity
+
+        let bounds = entity.visualBounds(relativeTo: entity)
+        visualPivotOffset = SIMD3<Float>(
+            bounds.center.x,
+            0,
+            bounds.center.z
+        )
+        for child in entity.children {
+            child.position -= visualPivotOffset
+        }
 
         // MARK - Occluder Material is invisible
         applyOcclusionMaterial(
@@ -995,19 +1058,7 @@ final class EduardOccluder {
                     )
             )
 
-        let backward =
-            rotation.act(
-                SIMD3<Float>(
-                    0,
-                    0,
-                    1
-                )
-            )
-
-        entity.position =
-            pose.position
-            + backward
-            * EduardModelAlignment.backwardOffset
+        entity.position = pose.position
 
         entity.orientation =
             rotation

@@ -4,6 +4,10 @@ final class ConsumentaDriveRecorder {
     private let minimumSampleInterval: TimeInterval = 0.2
     private let maximumPlausibleSpeed: Float = 0.75
     private let positionTolerance: Float = 0.06
+    // AprilTag pose estimation can occasionally return the equally valid
+    // 180-degree solution. Eduard cannot rotate 90 degrees between two 5 Hz
+    // samples, so keep the equivalent heading nearest to the previous sample.
+    private let aprilTagFlipThreshold: Float = 1.2
     // Keep observing Eduard after crossing the finish line. The robot can
     // continue rolling while AprilTag detection briefly catches up.
     private let maximumPostFinishDuration: TimeInterval = 3.5
@@ -211,12 +215,36 @@ final class ConsumentaDriveRecorder {
             }
         }
 
+        let stabilizedRotation: Float
+        if let lastSample = samples.last {
+            var bestDelta = atan2(
+                sin(pose.rotation - lastSample.rotation),
+                cos(pose.rotation - lastSample.rotation)
+            )
+
+            // Only consider the planar AprilTag ambiguity for an impossible
+            // single-frame jump. Normal turns, including crossing ±π, keep
+            // their direction and can accumulate beyond a full revolution.
+            if abs(bestDelta) > aprilTagFlipThreshold {
+                let flippedDelta = atan2(
+                    sin(pose.rotation + .pi - lastSample.rotation),
+                    cos(pose.rotation + .pi - lastSample.rotation)
+                )
+                if abs(flippedDelta) < abs(bestDelta) {
+                    bestDelta = flippedDelta
+                }
+            }
+            stabilizedRotation = lastSample.rotation + bestDelta
+        } else {
+            stabilizedRotation = pose.rotation
+        }
+
         samples.append(
             ConsumentaDriveSample(
                 time: time,
                 x: pose.position.x,
                 z: pose.position.z,
-                rotation: pose.rotation
+                rotation: stabilizedRotation
             )
         )
         lastSampleTime = time

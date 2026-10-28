@@ -213,7 +213,9 @@ struct GameView: View {
             arView
             savedMapView
                 .allowsHitTesting(false)
-            preRaceGuidance
+            if ghostReplayController.phase == .inactive {
+                preRaceGuidance
+            }
             restartIconButton
             arRobotControl
                 .opacity(
@@ -1837,7 +1839,9 @@ struct GameView: View {
         }
 
         activeGhostRecordingURL = recordingURL
-        controller.ghostSimulation.setOpacity(0.5)
+        controller.ghostSimulation.setOpacity(
+            mode == .liveRaceGhost ? 0.5 : 1
+        )
 
         stopJoystickInput()
 
@@ -1881,13 +1885,46 @@ struct GameView: View {
 
         ghostReplayController.start(
             simulation: controller.ghostSimulation,
+            onPoseUpdated: { pose in
+                gameController.updateGhostPlaybackPose(pose)
+            },
             onEvent: { event in
                 gameController.applyGhostEvent(event)
+                applyGhostVisualEffect(event)
             },
             onFinished: {
                 gameController.endGhostPlayback()
             }
         )
+    }
+
+    private func applyGhostVisualEffect(_ event: ConsumentaGhostEvent) {
+        switch event.kind {
+        case .objectExited:
+            break
+
+        case .coinCollected:
+            controller.ghostSimulation.blinkLights(
+                color: .systemYellow,
+                duration: 0.8
+            )
+
+        case .objectEntered:
+            switch event.objectType {
+            case .shit:
+                controller.ghostSimulation.startShitEffect(duration: 5)
+            case .oil:
+                controller.ghostSimulation.startOilEffect(duration: 5)
+            case .itembox:
+                controller.ghostSimulation.blinkLights(color: .systemGreen)
+            case .eggs, .eggCup:
+                controller.ghostSimulation.blinkLights(color: .systemYellow)
+            case .tree, .treeTrigger:
+                controller.ghostSimulation.blinkLights(color: .systemOrange)
+            case .water, .rock, .none:
+                break
+            }
+        }
     }
 
 

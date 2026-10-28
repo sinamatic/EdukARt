@@ -1001,7 +1001,6 @@ final class GameController:
         switch event.kind {
         case .coinCollected:
             coins.removeAll { $0.id == event.objectID }
-            onCoinCollected?()
 
         case .objectExited:
             if event.objectType == .water {
@@ -1018,6 +1017,8 @@ final class GameController:
             return
         }
 
+        shitEffectTask?.cancel()
+        shitEffectTask = nil
         activeMapObjects = snapshot.activeMapObjects
         coins = snapshot.coins
         revealedTreeIDs = snapshot.revealedTreeIDs
@@ -1042,24 +1043,22 @@ final class GameController:
                     state: .carried(slot: carriedEggCount)
                 )
             )
-            onEggCollected?()
 
         case .itembox:
             activeMapObjects.removeAll { $0.id == event.objectID }
-            onItemboxCollected?()
 
         case .shit:
             activeMapObjects.removeAll { $0.id == event.objectID }
-            onShitEffectStarted?(shitEffectDuration)
+            startShitTrail(actor: .simulation)
 
         case .oil:
-            onOilEffectStarted?(oilCooldownDuration)
+            break
 
         case .water:
-            onWaterModeChanged?(true)
+            break
 
         case .tree:
-            onTreeEffectStarted?(treeLightEffectDuration)
+            break
 
         case .treeTrigger:
             let triggerPosition = SIMD2<Float>(event.x, event.z)
@@ -1071,7 +1070,6 @@ final class GameController:
                 }) {
                 revealedTreeIDs.insert(tree.id)
                 activeMapObjects.removeAll { $0.id == event.objectID }
-                onTreeEffectStarted?(treeLightEffectDuration)
             }
 
         case .eggCup:
@@ -1086,11 +1084,19 @@ final class GameController:
                 )
                 deliveredSlot += 1
             }
-            onEggsDelivered?()
 
         case .rock:
             break
         }
+    }
+
+    /// Updates effects that follow the replay robot without running gameplay
+    /// collisions, scoring, or recording a second drive.
+    func updateGhostPlaybackPose(_ pose: RobotPose) {
+        guard ghostStateSnapshot != nil else {
+            return
+        }
+        latestRobotPoses[.simulation] = pose
     }
 
 

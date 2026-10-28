@@ -59,6 +59,7 @@ final class ConsumentaGhostReplayController: ObservableObject {
 
     func start(
         simulation: EduardSimulation,
+        onPoseUpdated: @escaping (RobotPose) -> Void = { _ in },
         onEvent: @escaping (ConsumentaGhostEvent) -> Void,
         onFinished: @escaping () -> Void
     ) {
@@ -78,6 +79,7 @@ final class ConsumentaGhostReplayController: ObservableObject {
             }
 
             simulation.setPose(recording.samples[0].robotPose)
+            onPoseUpdated(recording.samples[0].robotPose)
             var eventIndex = 0
 
             func emitEvents(upTo time: TimeInterval) {
@@ -105,6 +107,7 @@ final class ConsumentaGhostReplayController: ObservableObject {
                     from: previous,
                     to: current,
                     simulation: simulation,
+                    onPoseUpdated: onPoseUpdated,
                     onTimeUpdated: emitEvents
                 )
             }
@@ -131,15 +134,26 @@ final class ConsumentaGhostReplayController: ObservableObject {
         from start: ConsumentaDriveSample,
         to end: ConsumentaDriveSample,
         simulation: EduardSimulation,
+        onPoseUpdated: (RobotPose) -> Void,
         onTimeUpdated: (TimeInterval) -> Void
     ) async {
         let duration = max(0, end.time - start.time)
         let steps = max(1, Int(ceil(duration * 30)))
         let stepDuration = duration / Double(steps)
-        let rotationDelta = atan2(
-            sin(end.rotation - start.rotation),
-            cos(end.rotation - start.rotation)
+        let startRotation = simulation.pose.rotation
+        var rotationDelta = atan2(
+            sin(end.rotation - startRotation),
+            cos(end.rotation - startRotation)
         )
+        if abs(rotationDelta) > 1.2 {
+            let flippedDelta = atan2(
+                sin(end.rotation + .pi - startRotation),
+                cos(end.rotation + .pi - startRotation)
+            )
+            if abs(flippedDelta) < abs(rotationDelta) {
+                rotationDelta = flippedDelta
+            }
+        }
 
         for step in 1...steps {
             guard Task.isCancelled == false else {
@@ -153,10 +167,11 @@ final class ConsumentaGhostReplayController: ObservableObject {
                     0,
                     start.z + (end.z - start.z) * progress
                 ),
-                rotation: start.rotation + rotationDelta * progress
+                rotation: startRotation + rotationDelta * progress
             )
 
-            simulation.setPose(pose)
+            simulation.setPose(pose, animateMovement: true)
+            onPoseUpdated(pose)
             onTimeUpdated(
                 start.time + (end.time - start.time) * Double(progress)
             )
