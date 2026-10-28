@@ -2098,11 +2098,21 @@ final class RobotController:
 
 
     func toggleSimulationVisibility() {
+        setSimulationVisible(
+            isSimulationVisible == false
+        )
+    }
 
-        isSimulationVisible.toggle()
+
+    func setSimulationVisible(
+        _ visible: Bool
+    ) {
+
+        isSimulationVisible =
+            visible
 
         eduardSimulation.setVisible(
-            isSimulationVisible
+            visible
         )
     }
 

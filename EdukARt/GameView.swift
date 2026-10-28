@@ -25,6 +25,9 @@ struct GameView: View {
     @StateObject private var gameController:
         GameController
 
+    @StateObject private var ghostReplayController =
+        ConsumentaGhostReplayController()
+
     @State private var isMapLocalized =
         false
 
@@ -59,6 +62,15 @@ struct GameView: View {
         false
 
     @State private var didDisableEduardAfterFinish =
+        false
+
+    @State private var localizationResetID =
+        0
+
+    @State private var wasSimulationVisibleBeforeGhost =
+        false
+
+    @State private var wasLiveSyncEnabledBeforeGhost =
         false
 
     private let collisionTimer =
@@ -134,6 +146,17 @@ struct GameView: View {
             }
             .onDisappear {
 
+                if ghostReplayController.phase != .inactive {
+                    controller.setSimulationVisible(
+                        wasSimulationVisibleBeforeGhost
+                    )
+
+                    controller.isLiveSyncEnabled =
+                        wasLiveSyncEnabledBeforeGhost
+                }
+
+                ghostReplayController.reset()
+
                 controller.setGameplayInputLocked(
                     false
                 )
@@ -154,11 +177,20 @@ struct GameView: View {
             preRaceGuidance
             restartIconButton
             arRobotControl
+                .opacity(
+                    ghostReplayController.phase == .inactive
+                    ? 1
+                    : 0
+                )
+                .allowsHitTesting(
+                    ghostReplayController.phase == .inactive
+                )
             startNewGameButton
             joystickControl
             timerDisplay
                 .allowsHitTesting(false)
             gameplayOverlay
+            ghostReplayOverlay
 
         }
     }
@@ -191,6 +223,9 @@ struct GameView: View {
             gameMap:
                 map,
 
+            localizationResetID:
+                localizationResetID,
+
             requiredReferenceTagID:
                 map.referenceTagID,
 
@@ -206,6 +241,15 @@ struct GameView: View {
                     isMapLocalized =
                         true
                 }
+
+                if ghostReplayController.phase == .awaitingReference {
+                    controller.setSimulationVisible(
+                        true
+                    )
+                }
+
+                ghostReplayController
+                    .referenceLocalized()
             },
 
             onRobotPoseUpdated: { pose in
@@ -898,7 +942,8 @@ struct GameView: View {
         if isMapLocalized,
            hasStartedGameplay,
            countdownText == nil,
-           gameController.phase == .freeDrive {
+           gameController.phase == .freeDrive,
+           ghostReplayController.phase == .inactive {
 
             Button {
 
@@ -945,7 +990,8 @@ struct GameView: View {
     @ViewBuilder
     private var joystickControl: some View {
 
-        if isMapLocalized {
+        if isMapLocalized,
+           ghostReplayController.phase == .inactive {
 
             VStack {
 
@@ -1386,7 +1432,8 @@ struct GameView: View {
 
         guard isNoDebugMode,
               hasStartedGameplay,
-              gameController.phase != .finished
+              gameController.phase != .finished,
+              ghostReplayController.phase == .inactive
         else {
             return
         }
@@ -1619,6 +1666,121 @@ struct GameView: View {
                     -50
             )
         }
+    }
+
+
+    private var ghostReplayOverlay: some View {
+
+        ConsumentaGhostReplayView(
+            phase:
+                ghostReplayController.phase,
+
+            referenceTagID:
+                map.referenceTagID,
+
+            onStart: {
+                startGhostReplay()
+            },
+
+            onReplay: {
+                if let recordingURL =
+                    gameController.latestDriveRecordingURL {
+
+                    prepareGhostReplay(
+                        recordingURL:
+                            recordingURL
+                    )
+                }
+            },
+
+            onClose: {
+                finishGhostReplay()
+            }
+        )
+    }
+
+
+    private func prepareGhostReplay(
+        recordingURL: URL
+    ) {
+
+        let isStartingNewGhostSession =
+            ghostReplayController.phase == .inactive
+
+        ghostReplayController.prepare(
+            recordingURL:
+                recordingURL,
+
+            simulation:
+                controller.eduardSimulation
+        )
+
+        guard ghostReplayController.phase != .failed
+        else {
+            return
+        }
+
+        if isStartingNewGhostSession {
+            closeFinishedOverlay()
+        }
+
+        stopJoystickInput()
+
+        controller.sendDisable()
+        controller.setGameplayInputLocked(
+            true
+        )
+
+        if isStartingNewGhostSession {
+            wasSimulationVisibleBeforeGhost =
+                controller.isSimulationVisible
+
+            wasLiveSyncEnabledBeforeGhost =
+                controller.isLiveSyncEnabled
+        }
+
+        controller.isLiveSyncEnabled =
+            false
+
+        controller.setSimulationVisible(
+            false
+        )
+
+        isMapLocalized =
+            false
+
+        localizationResetID +=
+            1
+    }
+
+
+    private func startGhostReplay() {
+
+        controller.setGameplayInputLocked(
+            true
+        )
+
+        ghostReplayController.start(
+            simulation:
+                controller.eduardSimulation
+        )
+    }
+
+
+    private func finishGhostReplay() {
+
+        ghostReplayController.reset()
+
+        controller.setSimulationVisible(
+            wasSimulationVisibleBeforeGhost
+        )
+
+        controller.isLiveSyncEnabled =
+            wasLiveSyncEnabledBeforeGhost
+
+        controller.setGameplayInputLocked(
+            false
+        )
     }
 
 
@@ -1883,33 +2045,26 @@ struct GameView: View {
                     hasSavedFinishedResult
                 )
 
+                leaderboardView
+
                 if let recordingURL =
                     gameController.latestDriveRecordingURL {
 
-                    Text(
-                        "Share your drive with the EdukARt team so it can be evaluated as a ghost drive."
-                    )
-                    .font(
-                        .caption
-                    )
-                    .multilineTextAlignment(
-                        .center
-                    )
-                    .foregroundStyle(
-                        .white.opacity(
-                            0.76
-                        )
-                    )
-
-                    ShareLink(
-                        item:
+                    ConsumentaDriveSharingView(
+                        recordingURL:
                             recordingURL
-                    ) {
+                    )
 
+                    Button {
+                        prepareGhostReplay(
+                            recordingURL:
+                                recordingURL
+                        )
+                    } label: {
                         Label(
-                            "Share Drive",
+                            "Show Ghost Race Again",
                             systemImage:
-                                "square.and.arrow.up"
+                                "car.side"
                         )
                         .frame(
                             maxWidth:
@@ -1920,8 +2075,6 @@ struct GameView: View {
                         ResultSaveButtonStyle()
                     )
                 }
-
-                leaderboardView
             }
             .padding(
                 18
