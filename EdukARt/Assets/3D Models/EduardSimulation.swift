@@ -39,6 +39,10 @@ final class EduardSimulation {
     private(set) var pose:
         RobotPose = .zero
 
+    private var activeDriveCommand: RobotDriveCommand = .stop
+    private var movementTask: Task<Void, Never>?
+    private var lastMovementUpdate: Date?
+
     /// Center of the imported model relative to its authored origin. The USD
     /// model's origin is near the front, so rotating the wrapper directly
     /// otherwise makes Eduard orbit around that point.
@@ -88,10 +92,6 @@ final class EduardSimulation {
 
     private var oilLightEffectTask:
         Task<Void, Never>?
-
-    private var oilSpinTask:
-        Task<Void, Never>?
-
 
     // MARK: - Settings
 
@@ -224,8 +224,7 @@ final class EduardSimulation {
         oilLightEffectTask?
             .cancel()
 
-        oilSpinTask?
-            .cancel()
+        stopMovement()
     }
 
 
@@ -305,75 +304,69 @@ final class EduardSimulation {
         _ command:
             RobotDriveCommand
     ) {
+        updateMovement()
+        activeDriveCommand = command
+        lastMovementUpdate = Date()
 
-        // ----------------------------------------------
-        // Update lightweight simulation state
-        // ----------------------------------------------
-
-        pose.rotation -=
-            Float(
-                command.rotation
-            )
-            * movementUpdateInterval
-
-
-        // Robot-relative movement.
-
-        let forward =
-            Float(
-                command.forward
-            )
-            * movementUpdateInterval
-
-        let sideways =
-            -Float(
-                command.sideways
-            )
-            * movementUpdateInterval
-
-
-        let sinRotation =
-            sin(
-                pose.rotation
-            )
-
-        let cosRotation =
-            cos(
-                pose.rotation
-            )
-
-
-        pose.position.x +=
-            sideways
-                * cosRotation
-            +
-            forward
-                * -sinRotation
-
-
-        pose.position.z +=
-            forward
-                * -cosRotation
-            -
-            sideways
-                * sinRotation
-
-
-        // ----------------------------------------------
-        // Nothing else required if AR robot is hidden.
-        // ----------------------------------------------
-
-        guard entity != nil
-        else {
+        guard hasMovement(command) else {
+            stopMovement()
             return
         }
 
+        guard movementTask == nil else {
+            return
+        }
 
+        movementTask = Task { @MainActor [weak self] in
+            while Task.isCancelled == false {
+                try? await Task.sleep(for: .seconds(1.0 / 60.0))
+                guard Task.isCancelled == false else {
+                    return
+                }
+                self?.updateMovement()
+            }
+        }
+    }
+
+    private func updateMovement() {
+        guard let lastMovementUpdate else {
+            return
+        }
+
+        let elapsed = min(Float(Date().timeIntervalSince(lastMovementUpdate)), 0.1)
+        self.lastMovementUpdate = Date()
+        pose.rotation -= Float(activeDriveCommand.rotation) * elapsed
+
+        let forward = Float(activeDriveCommand.forward) * elapsed
+        let sideways = -Float(activeDriveCommand.sideways) * elapsed
+        let sinRotation = sin(pose.rotation)
+        let cosRotation = cos(pose.rotation)
+
+        pose.position.x += sideways * cosRotation - forward * sinRotation
+        pose.position.z += -forward * cosRotation - sideways * sinRotation
         applyPose()
 
+        let wheelScale = elapsed / movementUpdateInterval
         animateWheels(
-            command
+            RobotDriveCommand(
+                forward: activeDriveCommand.forward * Double(wheelScale),
+                sideways: activeDriveCommand.sideways * Double(wheelScale),
+                rotation: activeDriveCommand.rotation * Double(wheelScale)
+            )
         )
+    }
+
+    private func hasMovement(_ command: RobotDriveCommand) -> Bool {
+        abs(command.forward) > 0.0001
+            || abs(command.sideways) > 0.0001
+            || abs(command.rotation) > 0.0001
+    }
+
+    private func stopMovement() {
+        movementTask?.cancel()
+        movementTask = nil
+        activeDriveCommand = .stop
+        lastMovementUpdate = nil
     }
 
 
@@ -389,6 +382,8 @@ final class EduardSimulation {
         //
         // Therefore this function only animates
         // the visible representation.
+
+        stopMovement()
 
         guard entity != nil
         else {
@@ -556,62 +551,6 @@ final class EduardSimulation {
             color: color,
             duration: duration
         )
-    }
-
-
-    // MARK: - Oil Effect
-
-    func startOilSpinEffect(
-        duration: TimeInterval = 5.0
-    ) {
-
-        oilSpinTask?
-            .cancel()
-
-        oilSpinTask =
-            Task { @MainActor [weak self] in
-
-                guard let self
-                else {
-                    return
-                }
-
-                let updateInterval:
-                    Float = 0.02
-
-                // About one full 360 degree spin.
-                let rotationSpeed:
-                    Float = 4.0
-
-                let endTime =
-                    Date()
-                    .addingTimeInterval(
-                        duration
-                    )
-
-                while Date() < endTime {
-
-                    guard Task.isCancelled == false
-                    else {
-                        return
-                    }
-
-                    self.pose.rotation +=
-                        rotationSpeed
-                        * updateInterval
-
-                    self.applyPose()
-
-                    try? await Task.sleep(
-                        for:
-                            .seconds(
-                                Double(
-                                    updateInterval
-                                )
-                            )
-                    )
-                }
-            }
     }
 
 

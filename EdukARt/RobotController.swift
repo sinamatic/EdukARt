@@ -212,6 +212,9 @@ final class RobotController:
     private let commandRepeatInterval =
         0.05
 
+    private let normalSimulationSpeedMultiplier =
+        0.2
+
     private let connectionCheckInterval =
         2.0
 
@@ -265,6 +268,9 @@ final class RobotController:
 
     private var oilEffectTask:
         Task<Void, Never>?
+
+    private var simulationOilRotationSpeed:
+        Double?
 
     private var treeLightEffectTask:
         Task<Void, Never>?
@@ -1945,6 +1951,8 @@ final class RobotController:
         oilEffectTask?
             .cancel()
 
+        gameplayDriveCommand = nil
+
         eduardSimulation.startOilEffect(
             duration:
                 duration
@@ -1967,13 +1975,14 @@ final class RobotController:
 
         sendCurrentCommand()
 
-        eduardSimulation.startOilSpinEffect(
-            duration:
-                duration
-        )
+        gameplayDriveCommand =
+            RobotDriveCommand(
+                forward: 0,
+                sideways: 0,
+                rotation: maxAngularSpeed * gameplaySpeedMultiplier
+            )
 
-        mechanumRotationInput =
-            1
+        simulationOilRotationSpeed = 2 * .pi / duration
 
         eduard.setAllLightsColor(
             red:
@@ -2015,17 +2024,23 @@ final class RobotController:
                 }
 
 
-                self.mechanumRotationInput =
-                    0
+                self.gameplayDriveCommand =
+                    .stop
+
+                self.simulationOilRotationSpeed = nil
 
                 self.isGameplayInputLocked =
                     false
 
                 self.sendCurrentCommand()
 
+                self.gameplayDriveCommand = nil
+
                 self.eduard.setLightMode(
                     .enabled
                 )
+
+                self.oilEffectTask = nil
             }
     }
 
@@ -2269,6 +2284,20 @@ final class RobotController:
         }
 
 
+        let simulationMultiplier =
+            gameplayDriveCommand == nil
+                && oilEffectTask == nil
+            ? normalSimulationSpeedMultiplier
+            : 1
+
+        let simulationCommand =
+            RobotDriveCommand(
+                forward: command.forward * simulationMultiplier,
+                sideways: command.sideways * simulationMultiplier,
+                rotation: simulationOilRotationSpeed
+                    ?? command.rotation * simulationMultiplier
+            )
+
         switch effectiveControlMode {
 
         // --------------------------------------------------
@@ -2281,15 +2310,22 @@ final class RobotController:
                 command
             )
 
+            if isSimulationVisible == false {
+                eduardSimulation.drive(.stop)
+            } else if isLiveSyncEnabled {
+                eduardSimulation.animate(simulationCommand)
+            } else {
+                eduardSimulation.drive(simulationCommand)
+            }
+
 
         // --------------------------------------------------
         // Simulation only
         // --------------------------------------------------
 
         case .simulation:
-
             eduardSimulation.drive(
-                command
+                simulationCommand
             )
 
 
@@ -2308,7 +2344,7 @@ final class RobotController:
             // Only animate the wheels here.
 
             eduardSimulation.animate(
-                command
+                simulationCommand
             )
         }
     }
