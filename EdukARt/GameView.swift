@@ -163,6 +163,12 @@ struct GameView: View {
 
                 controller.resetGameplayEffects()
 
+                // RobotController survives navigation and can therefore still
+                // contain the AR simulation pose from the previous race.
+                // Reset only the simulated "Show AR" Eduard. The physical
+                // Eduard pose and all real-robot communication stay untouched.
+                resetARSimulationToStart()
+
                 configureGameController()
 
                 if let initialGhostRecordingURL,
@@ -771,23 +777,6 @@ struct GameView: View {
                     Button {
 
                         controller
-                            .placeSimulationAtReference()
-
-                    } label: {
-
-                        arMenuRow(
-                            icon:
-                                "scope",
-
-                            title:
-                                "Place"
-                        )
-                    }
-
-
-                    Button {
-
-                        controller
                             .synchronizeSimulationToEduard()
 
                     } label: {
@@ -830,6 +819,10 @@ struct GameView: View {
 
                     Button {
 
+                        if controller.isSimulationVisible == false {
+                            resetARSimulationToStart()
+                        }
+
                         controller
                             .toggleSimulationVisibility()
 
@@ -853,7 +846,7 @@ struct GameView: View {
                     } label: {
                         arMenuRow(
                             icon: "car.side.fill",
-                            title: "Show Best Ghost",
+                            title: "Show Ghost",
                             statusIcon: isBestGhostEnabled
                                 ? "checkmark.circle.fill"
                                 : "xmark.circle.fill",
@@ -1362,7 +1355,13 @@ struct GameView: View {
             )
             / length
 
-        return forwardProjection <= 0
+        let startClearance: Float =
+            controller.realRobotPose == nil
+                && controller.isSimulationVisible
+            ? 0.10
+            : 0
+
+        return forwardProjection <= -startClearance
     }
 
 
@@ -1438,6 +1437,8 @@ struct GameView: View {
         controller
             .resetGameplayEffects()
 
+        resetARSimulationToStart()
+
         gameController
             .reset(
                 map:
@@ -1472,6 +1473,38 @@ struct GameView: View {
         print(
             "# GAME | New race started without relocalization"
         )
+    }
+
+
+    private func resetARSimulationToStart() {
+        controller.eduardSimulation.setPose(.zero)
+        simulationRobotPose = .zero
+
+        guard map.trackPoints.count >= 2 else {
+            return
+        }
+
+        let start = map.trackPoints[0]
+        let next = map.trackPoints[1]
+        let directionX = next.x - start.x
+        let directionZ = next.z - start.z
+        let length = sqrt(directionX * directionX + directionZ * directionZ)
+
+        guard length > 0.001 else {
+            return
+        }
+
+        let startPose = RobotPose(
+            position: SIMD3<Float>(
+                -directionX / length * 0.25,
+                0,
+                -directionZ / length * 0.25
+            ),
+            rotation: 0
+        )
+
+        controller.eduardSimulation.setPose(startPose)
+        simulationRobotPose = startPose
     }
 
 

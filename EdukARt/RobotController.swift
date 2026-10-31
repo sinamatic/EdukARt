@@ -2097,16 +2097,6 @@ final class RobotController:
             }
     }
 
-    // MARK: - Place Simulation at Map Reference
-
-    func placeSimulationAtReference() {
-
-        eduardSimulation.setPose(
-            .zero
-        )
-    }
-
-
     func toggleSimulationVisibility() {
         setSimulationVisible(
             isSimulationVisible == false
