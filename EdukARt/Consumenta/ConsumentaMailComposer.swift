@@ -9,7 +9,7 @@ struct ConsumentaDriveSharingView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("Teile deine gefahrene Strecke per Mail an hello@sinamatic.de, um sie am Bildschirm anzeigen zu lassen.")
+            Text("Teile deine gefahrene Strecke per Mail, um sie am Bildschirm anzeigen zu lassen.")
                 .font(.callout)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
@@ -43,7 +43,7 @@ struct ConsumentaDriveSharingView: View {
 
         var components = URLComponents()
         components.scheme = "mailto"
-        components.path = "hello@sinamatic.de"
+        components.path = ""
         components.queryItems = [
             URLQueryItem(
                 name: "subject",
@@ -67,7 +67,7 @@ private struct ConsumentaMailComposer: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> MFMailComposeViewController {
         let composer = MFMailComposeViewController()
         composer.mailComposeDelegate = context.coordinator
-        composer.setToRecipients(["hello@sinamatic.de"])
+        composer.setToRecipients(nil)
         composer.setSubject("EdukARt Ghost at Consumenta")
         composer.setMessageBody(
             "Hallo Sina,\n\nim Anhang findest du meine Ghost Fahrt von der Consumenta.\n",

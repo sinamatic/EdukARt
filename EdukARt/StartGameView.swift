@@ -13,6 +13,8 @@ struct StartGameView: View {
     @ObservedObject var controller: RobotController
     @ObservedObject var gameMapStore: GameMapStore
 
+    var onTutorialGameStart: ((GameMap) -> Void)? = nil
+
     @State private var selectedMapID: GameMap.ID?
 
     private var selectedMap: GameMap? {
@@ -50,7 +52,14 @@ struct StartGameView: View {
                     }
                     .buttonStyle(MapMenuButtonStyle(color: Color("BlackOverlay")))
 
-                    if let selectedMap {
+                    if let selectedMap,
+                       let onTutorialGameStart {
+                        Button("Start Game") {
+                            onTutorialGameStart(selectedMap)
+                        }
+                        .buttonStyle(MapMenuButtonStyle(color: Color("BrandGreen")))
+                        .accessibilityLabel("Start Game with \(selectedMap.name)")
+                    } else if let selectedMap {
                         NavigationLink {
                             GameView(
                                 map:

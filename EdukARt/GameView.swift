@@ -25,6 +25,9 @@ struct GameView: View {
     private let initialGhostRecordingURL:
         URL?
 
+    private let onTutorialMapLocalized:
+        (() -> Void)?
+
     @StateObject private var gameController:
         GameController
 
@@ -122,7 +125,8 @@ struct GameView: View {
         map: GameMap,
         eduardModelStore: EduardModelStore,
         controller: RobotController,
-        initialGhostRecordingURL: URL? = nil
+        initialGhostRecordingURL: URL? = nil,
+        onTutorialMapLocalized: (() -> Void)? = nil
     ) {
 
         self.map =
@@ -136,6 +140,9 @@ struct GameView: View {
 
         self.initialGhostRecordingURL =
             initialGhostRecordingURL
+
+        self.onTutorialMapLocalized =
+            onTutorialMapLocalized
 
         _gameController =
             StateObject(
@@ -285,9 +292,11 @@ struct GameView: View {
                     )
                 ) {
 
-                    isMapLocalized =
+                isMapLocalized =
                         true
                 }
+
+                onTutorialMapLocalized?()
 
                 if ghostReplayController.phase == .awaitingReference {
                     controller.ghostSimulation.setVisible(

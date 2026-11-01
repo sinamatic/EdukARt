@@ -11,6 +11,7 @@ struct MainMenuView: View {
     @ObservedObject var eduardModelStore: EduardModelStore
     @ObservedObject var controller: RobotController
     @ObservedObject var gameMapStore: GameMapStore
+    var onShowTutorial: () -> Void = {}
     
     
     
@@ -38,27 +39,9 @@ struct MainMenuView: View {
                     .buttonStyle(MenuButtonStyle(color: Color("BrandGreen")))
                 
                 NavigationLink{
-                    ConsumentaCourseAccessView(
-                        eduardModelStore: eduardModelStore,
-                        controller: controller,
-                        gameMapStore: gameMapStore
-                    )
-                } label: {Text("Courses")}
-                    .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
-                
-                NavigationLink{
                     RobotRemoteView(controller: controller)}
                 label: {Text("Robot Remote")}
                 
-                    .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
-                
-                NavigationLink
-                {
-                    SettingsView(
-                        controller:
-                            controller
-                    )
-                } label: {Text("Settings")}
                     .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
 
                 NavigationLink {
@@ -82,23 +65,62 @@ struct MainMenuView: View {
                 }
                 .buttonStyle(
                     MenuButtonStyle(
-                        color:
-                            Color(
-                                "BlackOverlay"
-                            )
-                            .opacity(
-                                0.72
-                            )
+                        color: Color("BlackOverlay")
                     )
                 )
-                .padding(
-                    .top,
-                    18
-                )
+
+                Spacer()
+                    .frame(height: 18)
+
+                NavigationLink{
+                    ConsumentaCourseAccessView(
+                        eduardModelStore: eduardModelStore,
+                        controller: controller,
+                        gameMapStore: gameMapStore
+                    )
+                } label: {Text("Courses")}
+                    .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay").opacity(0.2)))
+
+                NavigationLink
+                {
+                    SettingsView(
+                        controller:
+                            controller
+                    )
+                } label: {Text("Debugging")}
+                    .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay").opacity(0.2)))
                 }
             .padding(30)
 
                 }
+        .overlay(alignment: .topLeading) {
+            Button(action: onShowTutorial) {
+                Image(systemName: "questionmark")
+                    .font(.title2.bold())
+                    .foregroundStyle(.white)
+                    .frame(width: 58, height: 58)
+                    .background(.black.opacity(0.72))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(.white.opacity(0.65), lineWidth: 1)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+            }
+            .accessibilityLabel("Einführung öffnen")
+            .padding(.top, 58)
+            .padding(.leading, 30)
+        }
+        .overlay(alignment: .bottom) {
+            Text(verbatim: "www.sinamatic.de")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(.black.opacity(0.45))
+                .clipShape(Capsule())
+                .padding(.bottom, 8)
+                .allowsHitTesting(false)
+        }
         .onAppear {
 
             controller.resetForManualControl()

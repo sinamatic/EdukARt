@@ -25,7 +25,9 @@ struct ConsumentaCourseAccessView: View {
         MapMenuBackground {
             MapMenuPanel {
                 Text("Course creation disabled")
-                    .mapMenuTitleStyle()
+                    .font(.title2.bold())
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text("Course creation and editing are disabled during Consumenta so that you can focus on testing the game. If you are interested in creating courses or have ideas for better tracks, please fill out our survey.")
                     .mapMenuSubtitleStyle()
