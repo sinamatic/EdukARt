@@ -69,6 +69,17 @@ struct MainMenuView: View {
                     )
                 )
 
+                NavigationLink {
+                    InfoView()
+                } label: {
+                    Text("Infos")
+                }
+                .buttonStyle(
+                    MenuButtonStyle(
+                        color: Color("BlackOverlay")
+                    )
+                )
+
                 Spacer()
                     .frame(height: 18)
 
@@ -112,14 +123,8 @@ struct MainMenuView: View {
             .padding(.leading, 30)
         }
         .overlay(alignment: .bottom) {
-            Text(verbatim: "www.sinamatic.de")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.green)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(.black.opacity(0.45))
-                .clipShape(Capsule())
-                .padding(.bottom, 8)
+            MainMenuFooter()
+                .padding(.bottom, 14)
                 .allowsHitTesting(false)
         }
         .onAppear {
@@ -137,6 +142,20 @@ struct MainMenuView: View {
 //        }
         
         
+    }
+
+    private struct MainMenuFooter: View {
+        var body: some View {
+            VStack(spacing: 4) {
+                Text(verbatim: "© Sina Steinmüller | v1.0 | 2026")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.8))
+
+                Text(verbatim: "www.sinamatic.de")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+        }
     }
     
     
