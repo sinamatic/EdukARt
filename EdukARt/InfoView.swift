@@ -35,7 +35,9 @@ struct InfoView: View {
 
                     InfoTextSection(
                         title: "Ausprobieren und Feedback geben",
-                        primaryText: "Übernimm die Steuerung und erlebe, wie ein echter Roboter auf virtuelle Spielelemente reagiert! Wenn du anschließend die Umfrage ausfüllst, unterstützt du die weitere Forschung und Entwicklung. Was macht Spaß? Was fehlt? Was würdest du dir wünschen? Auch Anregungen direkt am Stand sind willkommen."
+                        primaryText: "Übernimm die Steuerung und erlebe, wie ein echter Roboter auf virtuelle Spielelemente reagiert! Wenn du anschließend die Umfrage ausfüllst, unterstützt du die weitere Forschung und Entwicklung. Was macht Spaß? Was fehlt? Was würdest du dir wünschen? Auch Anregungen direkt am Stand sind willkommen.",
+                        linkTitle: "Zur Umfrage",
+                        linkURLString: "https://www.umfrageonline.com/c/btxxap4r"
                     )
 
                     InfoTextSection(
@@ -45,6 +47,8 @@ struct InfoView: View {
                     )
 
                     InfoContactSection()
+
+                    InfoPrivacyLink()
                 }
                 .padding(24)
             }
@@ -64,6 +68,14 @@ private struct InfoHeader: View {
             Text("Echte Roboter. Virtuelle Abenteuer.")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
+
+            if let websiteURL = URL(string: "https://www.sinamatic.de/edukart/") {
+                Link(destination: websiteURL) {
+                    Text(verbatim: "www.sinamatic.de/edukart")
+                }
+                .font(.headline)
+                .foregroundStyle(Color("BrandGreen"))
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -73,6 +85,8 @@ private struct InfoTextSection: View {
     let title: LocalizedStringResource
     let primaryText: LocalizedStringResource
     var secondaryText: LocalizedStringResource? = nil
+    var linkTitle: LocalizedStringResource? = nil
+    var linkURLString: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -91,10 +105,37 @@ private struct InfoTextSection: View {
                     .foregroundStyle(.white.opacity(0.9))
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            if let linkTitle,
+               let linkURLString,
+               let linkURL = URL(string: linkURLString) {
+                Link(linkTitle, destination: linkURL)
+                    .font(.headline)
+                    .foregroundStyle(Color("BrandGreen"))
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
+    }
+}
+
+private struct InfoPrivacyLink: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            if let privacyPolicyURL = URL(string: "https://www.sinamatic.de/edukart/datenschutz/") {
+                Link("Datenschutzerklärung", destination: privacyPolicyURL)
+            }
+
+            if let websiteURL = URL(string: "https://www.sinamatic.de/edukart/") {
+                Link(destination: websiteURL) {
+                    Text(verbatim: "www.sinamatic.de/edukart")
+                }
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(Color("BrandGreen"))
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
