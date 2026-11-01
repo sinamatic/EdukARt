@@ -9,6 +9,9 @@ import SwiftUI
 
 struct SettingsView: View {
 
+    @AppStorage("showLocalizationBypassButton")
+    private var showLocalizationBypassButton = false
+
     @ObservedObject var eduardModelStore:
         EduardModelStore
 
@@ -75,6 +78,22 @@ struct SettingsView: View {
                 }
                 .buttonStyle(
                     SettingsMenuButtonStyle()
+                )
+
+                Toggle(
+                    "Show “Weiter ohne Lokalisierung”",
+                    isOn: $showLocalizationBypassButton
+                )
+                .font(.headline)
+                .foregroundStyle(.white)
+                .tint(Color("BrandGreen"))
+                .padding()
+                .background(Color.white.opacity(0.08))
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
                 )
 
                 VStack(
@@ -327,7 +346,19 @@ struct ScoresView: View {
                         }
                     }
                 }
+                .frame(
+                    maxWidth:
+                        .infinity,
+
+                    alignment:
+                        .leading
+                )
                 .padding(
+                    .horizontal,
+                    20
+                )
+                .padding(
+                    .vertical,
                     24
                 )
             }

@@ -11,12 +11,6 @@ enum ConsumentaTutorialStep: Equatable {
     case arStart
     case arControls
     case gameGoal
-
-    var usesInteractiveBackground: Bool {
-        self == .courseSelection
-            || self == .mapLocalization
-            || self == .emergencyStop
-    }
 }
 
 struct ConsumentaTutorialView: View {
@@ -28,14 +22,13 @@ struct ConsumentaTutorialView: View {
 
     var body: some View {
         ZStack {
-            if step.usesInteractiveBackground == false {
-                Color.black.opacity(0.72)
-                    .ignoresSafeArea()
-            }
+            Color.black.opacity(step == .mapLocalization ? 0.82 : 0.72)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
 
             VStack {
-                if step == .emergencyStop {
-                    Spacer()
+                if step != .mapLocalization {
+                    Spacer(minLength: 0)
                 }
 
                 ConsumentaTutorialCard(
@@ -46,12 +39,12 @@ struct ConsumentaTutorialView: View {
                     onClose: onClose
                 )
 
-                if step != .emergencyStop {
-                    Spacer()
+                if step == .mapLocalization {
+                    Spacer(minLength: 0)
                 }
             }
             .padding(.horizontal, 24)
-            .padding(.vertical, step.usesInteractiveBackground ? 28 : 90)
+            .padding(.vertical, 28)
         }
     }
 }
@@ -221,18 +214,24 @@ private struct ConsumentaTutorialCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
 
-                if step != .courseSelection && canAdvance {
+                if canAdvance {
                     Button(action: onNext) {
                         Text(step == .gameGoal ? "Tutorial beenden" : "Weiter")
                             .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .frame(
+                                maxWidth: .infinity,
+                                minHeight: 46,
+                                alignment: .center
+                            )
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.white)
                     .background(Color("BrandGreen"))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
+            }
+            .transaction { transaction in
+                transaction.animation = nil
             }
         }
         .padding(20)

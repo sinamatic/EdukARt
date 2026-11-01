@@ -14,6 +14,7 @@ struct StartGameView: View {
     @ObservedObject var gameMapStore: GameMapStore
 
     var onTutorialGameStart: ((GameMap) -> Void)? = nil
+    var onTutorialMapSelection: ((GameMap) -> Void)? = nil
 
     @State private var selectedMapID: GameMap.ID?
 
@@ -34,7 +35,10 @@ struct StartGameView: View {
                     SavedMapsListView(
                         gameMapStore: gameMapStore,
                         selectedMapID: selectedMapID,
-                        onSelect: { selectedMapID = $0.id }
+                        onSelect: { map in
+                            selectedMapID = map.id
+                            onTutorialMapSelection?(map)
+                        }
                     )
                 }
 
@@ -51,6 +55,8 @@ struct StartGameView: View {
                         Text("Edit Courses")
                     }
                     .buttonStyle(MapMenuButtonStyle(color: Color("BlackOverlay")))
+                    .opacity(onTutorialGameStart == nil ? 1 : 0.28)
+                    .disabled(onTutorialGameStart != nil)
 
                     if let selectedMap,
                        let onTutorialGameStart {
@@ -97,7 +103,12 @@ struct StartGameView: View {
             return
         }
 
-        selectedMapID = gameMapStore.maps.last?.id
+        let initialMap = gameMapStore.maps.last
+        selectedMapID = initialMap?.id
+
+        if let initialMap {
+            onTutorialMapSelection?(initialMap)
+        }
     }
 }
 

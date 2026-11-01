@@ -13,6 +13,9 @@ import Combine
 
 struct GameView: View {
 
+    @AppStorage("showLocalizationBypassButton")
+    private var showLocalizationBypassButton = false
+
     let map:
         GameMap
 
@@ -237,15 +240,17 @@ struct GameView: View {
                 preRaceGuidance
             }
             restartIconButton
-            arRobotControl
-                .opacity(
-                    isBlockingGhostReplayActive == false
-                    ? 1
-                    : 0
-                )
-                .allowsHitTesting(
-                    isBlockingGhostReplayActive == false
-                )
+            if isMapLocalized {
+                arRobotControl
+                    .opacity(
+                        isBlockingGhostReplayActive == false
+                        ? 1
+                        : 0
+                    )
+                    .allowsHitTesting(
+                        isBlockingGhostReplayActive == false
+                    )
+            }
             startNewGameButton
             joystickControl
             timerDisplay
@@ -301,6 +306,7 @@ struct GameView: View {
 
                 isMapLocalized =
                         true
+
                 }
 
                 onTutorialMapLocalized?()
@@ -411,7 +417,7 @@ struct GameView: View {
             alignment:
                 isMapLocalized
                 ? .topTrailing
-                : .center
+                : .bottom
         )
         .padding(
             .top,
@@ -424,6 +430,12 @@ struct GameView: View {
             isMapLocalized
             ? 20
             : 0
+        )
+        .padding(
+            .bottom,
+            isMapLocalized
+            ? 0
+            : 40
         )
         .animation(
             .easeInOut(
@@ -502,36 +514,22 @@ struct GameView: View {
                             320
                     )
 
+
+                    if showLocalizationBypassButton {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.45)) {
+                                isMapLocalized = true
+                            }
+                        } label: {
+                            Text("Weiter ohne Lokalisierung")
+                                .font(.headline.bold())
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color("BrandGreen"))
+                        .padding(.top, 8)
+                    }
+
                 } else {
-
-                    Text(
-                        "Connect to robot"
-                    )
-                    .font(
-                        .largeTitle.bold()
-                    )
-                    .foregroundStyle(
-                        .white
-                    )
-
-
-                    Text(
-                        "Connect to robot (top right corner) and place it on the reference AprilTag. Or insert AR model of robot (top left corner)."
-                    )
-                    .font(
-                        .headline
-                    )
-                    .multilineTextAlignment(
-                        .center
-                    )
-                    .foregroundStyle(
-                        .white.opacity(0.84)
-                    )
-                    .frame(
-                        maxWidth:
-                            340
-                    )
-
 
                     if isRobotReadyForRace {
 
@@ -581,17 +579,19 @@ struct GameView: View {
                     .infinity,
 
                 alignment:
-                    .top
+                    isMapLocalized
+                    ? .center
+                    : .top
             )
             .padding(
                 .top,
                 isMapLocalized
-                ? 220
+                ? 0
                 : 70
             )
             .allowsHitTesting(
-                isMapLocalized
-                && isRobotReadyForRace
+                isMapLocalized == false
+                || isRobotReadyForRace
             )
         }
     }
@@ -1064,21 +1064,6 @@ struct GameView: View {
                 Spacer()
 
                 joystickView
-
-
-                Text(
-                    joystickDebugText
-                )
-                .font(
-                    .caption
-                )
-                .foregroundStyle(
-                    .white
-                )
-                .frame(
-                    maxWidth:
-                        .infinity
-                )
             }
         }
     }
@@ -1714,20 +1699,6 @@ struct GameView: View {
         radians * 180 / .pi
     }
 
-
-    private var joystickDebugText:
-        String {
-
-        String(
-            format:
-                "Forward: %.2f   Sideways: %.2f   Turn: %.2f",
-            joystickMonitor.xyPoint.y,
-            joystickMonitor.xyPoint.x,
-            turnJoystickMonitor.xyPoint.x
-        )
-    }
-
-
     // MARK: - Gameplay UI
 
     @ViewBuilder
@@ -2040,13 +2011,13 @@ struct GameView: View {
         .font(
             .system(
                 size:
-                    168,
+                    120,
 
                 weight:
                     .bold,
 
                 design:
-                    .rounded
+                    .default
             )
         )
         .foregroundStyle(

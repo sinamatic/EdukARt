@@ -25,6 +25,8 @@ struct ContentView: View {
 
     @State private var tutorialMap: GameMap?
 
+    @State private var selectedTutorialMap: GameMap?
+
     @State private var isTutorialMapLocalized = false
 
 
@@ -32,6 +34,9 @@ struct ContentView: View {
 
         ZStack {
         if showLogo {
+
+            Color.black
+                .ignoresSafeArea()
 
             Image(
                 "EduArtSinamaticIcon"
@@ -77,7 +82,7 @@ struct ContentView: View {
             if let tutorialStep {
                 ConsumentaTutorialView(
                     step: tutorialStep,
-                    canAdvance: tutorialStep != .mapLocalization || isTutorialMapLocalized,
+                    canAdvance: canAdvanceTutorial,
                     onNext: advanceTutorial,
                     onBack: goBackInTutorial,
                     onClose: closeTutorial
@@ -97,7 +102,8 @@ struct ContentView: View {
                     eduardModelStore: eduardModelStore,
                     controller: robotController,
                     gameMapStore: gameMapStore,
-                    onTutorialGameStart: startTutorialGame
+                    onTutorialGameStart: startTutorialGame,
+                    onTutorialMapSelection: { selectedTutorialMap = $0 }
                 )
             }
             .preferredColorScheme(.dark)
@@ -129,12 +135,14 @@ struct ContentView: View {
 
     private func startTutorial() {
         tutorialMap = nil
+        selectedTutorialMap = nil
         isTutorialMapLocalized = false
         tutorialStep = .welcome
     }
 
     private func closeTutorial() {
         tutorialMap = nil
+        selectedTutorialMap = nil
         isTutorialMapLocalized = false
         tutorialStep = nil
     }
@@ -153,6 +161,17 @@ struct ContentView: View {
         }
     }
 
+    private var canAdvanceTutorial: Bool {
+        switch tutorialStep {
+        case .mapLocalization:
+            isTutorialMapLocalized
+        case .courseSelection:
+            selectedTutorialMap != nil
+        default:
+            true
+        }
+    }
+
     private func advanceTutorial() {
         switch tutorialStep {
         case .welcome: tutorialStep = .wifi
@@ -160,11 +179,15 @@ struct ContentView: View {
         case .robotRemote: tutorialStep = .emergencyStop
         case .emergencyStop: tutorialStep = .courses
         case .courses: tutorialStep = .courseSelection
+        case .courseSelection:
+            if let selectedTutorialMap {
+                startTutorialGame(selectedTutorialMap)
+            }
         case .mapLocalization: tutorialStep = .arStart
         case .arStart: tutorialStep = .arControls
         case .arControls: tutorialStep = .gameGoal
         case .gameGoal: closeTutorial()
-        case .courseSelection, nil: break
+        case nil: break
         }
     }
 
