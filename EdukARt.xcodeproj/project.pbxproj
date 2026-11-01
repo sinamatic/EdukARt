@@ -16,9 +16,22 @@
 		90092AA13037942B00D9DE91 /* EdukARt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EdukARt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		90F6AE8F309792C500627659 /* Exceptions for "EdukARt" folder in "EdukARt" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 90092AA03037942B00D9DE91 /* EdukARt */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		90092AA33037942B00D9DE91 /* EdukARt */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				90F6AE8F309792C500627659 /* Exceptions for "EdukARt" folder in "EdukARt" target */,
+			);
 			path = EdukARt;
 			sourceTree = "<group>";
 		};
@@ -268,13 +281,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = EdukARt/Helpers;
 				DEVELOPMENT_TEAM = 5T22GTY4KZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = EdukARt/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = EdukARt;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.racing-games";
-				INFOPLIST_KEY_NSCameraUsageDescription = "EdukARt uses the camera to show the robot environment.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "EdukARt uses the camera to show the AR environment.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -294,7 +311,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -303,13 +320,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = EdukARt/Helpers;
 				DEVELOPMENT_TEAM = 5T22GTY4KZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = EdukARt/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = EdukARt;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.racing-games";
-				INFOPLIST_KEY_NSCameraUsageDescription = "EdukARt uses the camera to show the robot environment.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "EdukARt uses the camera to show the AR environment.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -329,7 +350,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
