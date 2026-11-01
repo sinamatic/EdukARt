@@ -66,7 +66,8 @@ struct ContentView: View {
                 )
             }
             
-            if showLogo == false {
+            if showLogo == false
+                && robotController.isSpectatorModeActive == false {
                 RobotControlOverlay(
                                controller:
                                    robotController
@@ -105,14 +106,13 @@ struct ContentView: View {
                     || tutorialStep == .arStart
                     || tutorialStep == .arControls
                     || tutorialStep == .gameGoal {
-            NavigationStack {
-                GameView(
-                    map: tutorialMap,
-                    eduardModelStore: eduardModelStore,
-                    controller: robotController,
-                    onTutorialMapLocalized: tutorialMapLocalized
-                )
-            }
+            GameView(
+                map: tutorialMap,
+                eduardModelStore: eduardModelStore,
+                controller: robotController,
+                onTutorialMapLocalized: tutorialMapLocalized,
+                tutorialTopPadding: 44
+            )
             .preferredColorScheme(.dark)
         } else {
             NavigationStack {

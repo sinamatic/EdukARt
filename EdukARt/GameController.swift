@@ -365,7 +365,7 @@ final class GameController:
     private let treeLightEffectDuration:
         TimeInterval = 3.0
 
-    private let map:
+    private var map:
         GameMap
 
     private let consumentaDriveRecorder =
@@ -797,7 +797,10 @@ final class GameController:
         do {
             savedRecordingURL = try consumentaDriveRecorder.save(
                 playerName: resolvedName,
-                recordingID: ghostID
+                recordingID: ghostID,
+                eduardType: finishActor == .real
+                    ? .physicalEduard
+                    : .arEduard
             )
             latestDriveRecordingURL = savedRecordingURL
         } catch {
@@ -1979,6 +1982,8 @@ final class GameController:
         map:
             GameMap
     ) {
+
+        self.map = map
 
         consumentaDriveRecorder.reset()
 

@@ -9,8 +9,14 @@ import SwiftUI
 
 struct SettingsView: View {
 
+    @ObservedObject var eduardModelStore:
+        EduardModelStore
+
     @ObservedObject var controller:
         RobotController
+
+    @ObservedObject var gameMapStore:
+        GameMapStore
 
 
     var body: some View {
@@ -20,7 +26,8 @@ struct SettingsView: View {
             Color.black
                 .ignoresSafeArea()
 
-            VStack(
+            ScrollView {
+                VStack(
                 alignment:
                     .leading,
 
@@ -29,7 +36,7 @@ struct SettingsView: View {
             ) {
 
                 Text(
-                    "Settings"
+                    "Debugging"
                 )
                 .font(
                     .largeTitle.bold()
@@ -172,6 +179,24 @@ struct SettingsView: View {
                     SettingsMenuButtonStyle()
                 )
 
+                if UIDevice.current.userInterfaceIdiom == .pad {
+                    NavigationLink {
+                        SpectatorGhostLibraryView(
+                            eduardModelStore: eduardModelStore,
+                            controller: controller,
+                            gameMapStore: gameMapStore
+                        )
+                    } label: {
+                        Label(
+                            "Start Spectator Mode",
+                            systemImage: "rectangle.inset.filled.and.person.filled"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(SettingsMenuButtonStyle())
+                    .padding(.top, 8)
+                }
+
                 Text(
                     controller.statusMessage
                 )
@@ -186,9 +211,10 @@ struct SettingsView: View {
 
                 Spacer()
             }
-            .padding(
-                30
-            )
+                .padding(
+                    30
+                )
+            }
         }
     }
 }
@@ -419,8 +445,9 @@ private struct SettingsMenuButtonStyle: ButtonStyle {
     NavigationStack {
 
         SettingsView(
-            controller:
-                RobotController()
+            eduardModelStore: EduardModelStore(),
+            controller: RobotController(),
+            gameMapStore: GameMapStore()
         )
     }
 }

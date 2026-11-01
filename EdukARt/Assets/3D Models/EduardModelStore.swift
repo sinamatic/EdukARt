@@ -24,9 +24,12 @@ final class EduardModelStore: ObservableObject {
         )
 
         do {
-            model = try await Entity(
-                named: "eduard-mecanum"
-            )
+            for try await loadedModel in Entity
+                .loadAsync(named: "eduard-mecanum")
+                .values {
+                model = loadedModel
+                break
+            }
 
             print(
                 "✅ Preload finished, model exists:",

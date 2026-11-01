@@ -84,8 +84,9 @@ struct MainMenuView: View {
                 NavigationLink
                 {
                     SettingsView(
-                        controller:
-                            controller
+                        eduardModelStore: eduardModelStore,
+                        controller: controller,
+                        gameMapStore: gameMapStore
                     )
                 } label: {Text("Debugging")}
                     .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay").opacity(0.2)))

@@ -571,7 +571,7 @@ final class FloorMiniMapCoordinateSystemViewController: UIViewController, ARSess
             let color: UIColor = isReference ? .systemGreen : .systemYellow
             let radius: Float = isReference ? 0.018 : 0.014
 
-            let mesh = MeshResource.generateCylinder(height: 0.006, radius: radius)
+            let mesh = MeshResource.compatibleCylinder(height: 0.006, radius: radius)
             let material = SimpleMaterial(color: color, isMetallic: false)
             let marker = ModelEntity(mesh: mesh, materials: [material])
             marker.name = "AprilTag #\(tag.id) minimap marker"

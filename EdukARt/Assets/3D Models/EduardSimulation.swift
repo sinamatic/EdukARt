@@ -243,11 +243,58 @@ final class EduardSimulation {
         _ opacity: Float
     ) {
 
-        entity?.components.set(
-            OpacityComponent(
-                opacity: max(0, min(1, opacity))
-            )
+        guard let entity else {
+            return
+        }
+
+        applyOpacity(
+            max(0, min(1, opacity)),
+            to: entity
         )
+    }
+
+
+    private func applyOpacity(
+        _ opacity: Float,
+        to entity: Entity
+    ) {
+        if var modelComponent = entity.components[ModelComponent.self] {
+            modelComponent.materials = modelComponent.materials.map { material in
+                if var material = material as? PhysicallyBasedMaterial {
+                    material.blending = opacity >= 0.999
+                        ? .opaque
+                        : .transparent(
+                            opacity: .init(floatLiteral: opacity)
+                        )
+                    return material
+                }
+
+                if var material = material as? UnlitMaterial {
+                    material.blending = opacity >= 0.999
+                        ? .opaque
+                        : .transparent(
+                            opacity: .init(floatLiteral: opacity)
+                        )
+                    return material
+                }
+
+                if var material = material as? CustomMaterial {
+                    material.blending = opacity >= 0.999
+                        ? .opaque
+                        : .transparent(
+                            opacity: .init(floatLiteral: opacity)
+                        )
+                    return material
+                }
+
+                return material
+            }
+            entity.components.set(modelComponent)
+        }
+
+        for child in entity.children {
+            applyOpacity(opacity, to: child)
+        }
     }
 
 

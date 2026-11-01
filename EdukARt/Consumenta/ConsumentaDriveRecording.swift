@@ -6,6 +6,7 @@ struct ConsumentaDriveRecording: Codable, Identifiable {
     let mapID: UUID
     let mapName: String
     let playerName: String
+    let eduardType: ConsumentaEduardType?
     let startedAt: Date
     let duration: TimeInterval
     let samples: [ConsumentaDriveSample]
@@ -40,6 +41,20 @@ struct ConsumentaGhostEvent: Codable, Identifiable {
     let objectType: MapObjectType?
     let x: Float
     let z: Float
+}
+
+enum ConsumentaEduardType: String, Codable {
+    case physicalEduard
+    case arEduard
+
+    var displayName: String {
+        switch self {
+        case .physicalEduard:
+            "Physical Eduard"
+        case .arEduard:
+            "AR Eduard"
+        }
+    }
 }
 
 enum GhostPlaybackMode: String, Codable {

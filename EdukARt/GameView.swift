@@ -28,6 +28,9 @@ struct GameView: View {
     private let onTutorialMapLocalized:
         (() -> Void)?
 
+    private let tutorialTopPadding:
+        CGFloat
+
     @StateObject private var gameController:
         GameController
 
@@ -126,7 +129,8 @@ struct GameView: View {
         eduardModelStore: EduardModelStore,
         controller: RobotController,
         initialGhostRecordingURL: URL? = nil,
-        onTutorialMapLocalized: (() -> Void)? = nil
+        onTutorialMapLocalized: (() -> Void)? = nil,
+        tutorialTopPadding: CGFloat = 0
     ) {
 
         self.map =
@@ -143,6 +147,9 @@ struct GameView: View {
 
         self.onTutorialMapLocalized =
             onTutorialMapLocalized
+
+        self.tutorialTopPadding =
+            tutorialTopPadding
 
         _gameController =
             StateObject(
@@ -409,7 +416,7 @@ struct GameView: View {
         .padding(
             .top,
             isMapLocalized
-            ? 20
+            ? 20 + tutorialTopPadding
             : 0
         )
         .padding(
@@ -909,8 +916,8 @@ struct GameView: View {
         .padding(
             .top,
             shouldShowTopRestartButton
-            ? 84
-            : 28
+            ? 84 + tutorialTopPadding
+            : 28 + tutorialTopPadding
         )
         .padding(
             .leading,

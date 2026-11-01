@@ -40,6 +40,83 @@ import SwiftUIJoystick
 import UIKit
 
 
+extension MeshResource {
+
+    static func compatibleCylinder(
+        height: Float,
+        radius: Float,
+        segments: Int = 32
+    ) -> MeshResource {
+
+        let segmentCount = max(3, segments)
+        let halfHeight = height / 2
+        var positions: [SIMD3<Float>] = []
+        var normals: [SIMD3<Float>] = []
+        var indices: [UInt32] = []
+
+        func appendTriangle(
+            _ first: SIMD3<Float>,
+            _ second: SIMD3<Float>,
+            _ third: SIMD3<Float>,
+            normal: SIMD3<Float>
+        ) {
+            let baseIndex = UInt32(positions.count)
+            positions.append(contentsOf: [first, second, third])
+            normals.append(contentsOf: [normal, normal, normal])
+            indices.append(contentsOf: [baseIndex, baseIndex + 1, baseIndex + 2])
+        }
+
+        for segment in 0..<segmentCount {
+            let firstAngle = Float(segment) / Float(segmentCount) * 2 * .pi
+            let secondAngle = Float(segment + 1) / Float(segmentCount) * 2 * .pi
+            let firstNormal = SIMD3<Float>(cos(firstAngle), 0, sin(firstAngle))
+            let secondNormal = SIMD3<Float>(cos(secondAngle), 0, sin(secondAngle))
+            let bottomFirst = SIMD3<Float>(radius * firstNormal.x, -halfHeight, radius * firstNormal.z)
+            let bottomSecond = SIMD3<Float>(radius * secondNormal.x, -halfHeight, radius * secondNormal.z)
+            let topFirst = SIMD3<Float>(bottomFirst.x, halfHeight, bottomFirst.z)
+            let topSecond = SIMD3<Float>(bottomSecond.x, halfHeight, bottomSecond.z)
+
+            let sideBaseIndex = UInt32(positions.count)
+            positions.append(contentsOf: [bottomFirst, bottomSecond, topFirst, topSecond])
+            normals.append(contentsOf: [firstNormal, secondNormal, firstNormal, secondNormal])
+            indices.append(contentsOf: [
+                sideBaseIndex, sideBaseIndex + 1, sideBaseIndex + 2,
+                sideBaseIndex + 2, sideBaseIndex + 1, sideBaseIndex + 3
+            ])
+
+            appendTriangle(
+                SIMD3<Float>(0, halfHeight, 0),
+                topFirst,
+                topSecond,
+                normal: SIMD3<Float>(0, 1, 0)
+            )
+            appendTriangle(
+                SIMD3<Float>(0, -halfHeight, 0),
+                bottomSecond,
+                bottomFirst,
+                normal: SIMD3<Float>(0, -1, 0)
+            )
+        }
+
+        var descriptor = MeshDescriptor(name: "iOS17CompatibleCylinder")
+        descriptor.positions = MeshBuffers.Positions(positions)
+        descriptor.normals = MeshBuffers.Normals(normals)
+        descriptor.primitives = .triangles(indices)
+
+        do {
+            return try MeshResource.generate(from: [descriptor])
+        } catch {
+            print("Could not create cylinder mesh:", error)
+            return MeshResource.generateBox(
+                width: radius * 2,
+                height: height,
+                depth: radius * 2
+            )
+        }
+    }
+}
+
+
 final class ARCoinRenderer {
 
     private var coinEntities:
@@ -172,7 +249,7 @@ final class ARCoinRenderer {
             } catch {
 
                 let mesh =
-                    MeshResource.generateCylinder(
+                    MeshResource.compatibleCylinder(
                         height:
                             0.008,
 
@@ -762,6 +839,8 @@ struct CameraARView: UIViewRepresentable {
         context: Context
     ) {
 
+        context.coordinator.updateGameMap(gameMap)
+
         if context.coordinator.lastLocalizationResetID
             != localizationResetID {
 
@@ -1019,7 +1098,7 @@ struct CameraARView: UIViewRepresentable {
         let mapBuilder: AprilTagMapBuilder
         let controller:
             RobotController
-        let gameMap:
+        var gameMap:
             GameMap?
         let requiredReferenceTagID:
             Int
@@ -1171,6 +1250,20 @@ struct CameraARView: UIViewRepresentable {
 
             frameCounter += 1
 
+            if frameCounter == 1 || frameCounter % 120 == 0 {
+                let image = frame.capturedImage
+                print(
+                    "# AR FRAME |",
+                    CVPixelBufferGetWidth(image),
+                    "x",
+                    CVPixelBufferGetHeight(image),
+                    "| format",
+                    CVPixelBufferGetPixelFormatType(image),
+                    "| tracking",
+                    frame.camera.trackingState
+                )
+            }
+
             guard frameCounter % 6 == 0
             else {
                 return
@@ -1215,6 +1308,13 @@ struct CameraARView: UIViewRepresentable {
                         pixelBuffer:
                             pixelBuffer
                     )
+
+                if detections.isEmpty == false {
+                    print(
+                        "# APRILTAG DETECTIONS |",
+                        detections.map(\.id)
+                    )
+                }
 
 
                 // ----------------------------------------------
@@ -1584,6 +1684,35 @@ struct CameraARView: UIViewRepresentable {
                     error
                 )
             }
+        }
+
+
+        func session(
+            _ session: ARSession,
+            didFailWithError error: Error
+        ) {
+            print(
+                "# AR SESSION FAILED:",
+                error
+            )
+        }
+
+
+        func sessionWasInterrupted(
+            _ session: ARSession
+        ) {
+            print(
+                "# AR SESSION INTERRUPTED"
+            )
+        }
+
+
+        func sessionInterruptionEnded(
+            _ session: ARSession
+        ) {
+            print(
+                "# AR SESSION INTERRUPTION ENDED"
+            )
         }
 
 
@@ -2368,6 +2497,30 @@ struct CameraARView: UIViewRepresentable {
         }
 
 
+        // MARK: - Switch Rendered Game Map
+
+        func updateGameMap(
+            _ newMap: GameMap?
+        ) {
+            guard gameMap?.id != newMap?.id else {
+                return
+            }
+
+            gameMap = newMap
+            hasRenderedTrack = false
+            hasRenderedMapObjects = false
+            clearRuntimeGameARContent()
+
+            mapRoot?
+                .findEntity(named: "ARTrack")?
+                .removeFromParent()
+
+            if let mapRoot {
+                renderTrackIfNeeded(in: mapRoot)
+            }
+        }
+
+
         // MARK: - Update Runtime Map Objects
 
         func updateRuntimeMapObjects(
@@ -2714,7 +2867,7 @@ struct CameraARView: UIViewRepresentable {
         ) -> Entity {
 
             let mesh =
-                MeshResource.generateCylinder(
+            MeshResource.compatibleCylinder(
                     height:
                         0.004,
                     radius:
@@ -2938,7 +3091,7 @@ struct CameraARView: UIViewRepresentable {
         ) -> Entity {
 
             let mesh =
-                MeshResource.generateCylinder(
+            MeshResource.compatibleCylinder(
                     height:
                         0.003,
 
@@ -3059,7 +3212,7 @@ struct CameraARView: UIViewRepresentable {
 
 
                 let mesh =
-                    MeshResource.generateCylinder(
+            MeshResource.compatibleCylinder(
                         height:
                             0.003,
 

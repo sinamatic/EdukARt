@@ -86,6 +86,9 @@ final class RobotController:
     @Published var driveMode:
         RobotDriveMode = .mechanum
 
+    @Published var isSpectatorModeActive =
+        false
+
 
     // MARK: - AR Synchronization
 

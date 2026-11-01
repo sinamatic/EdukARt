@@ -105,7 +105,11 @@ final class ConsumentaDriveRecorder {
         )
     }
 
-    func save(playerName: String, recordingID: UUID) throws -> URL {
+    func save(
+        playerName: String,
+        recordingID: UUID,
+        eduardType: ConsumentaEduardType
+    ) throws -> URL {
         guard let mapID,
               let startedAt,
               raceDuration != nil else {
@@ -118,11 +122,12 @@ final class ConsumentaDriveRecorder {
         let trimmedName = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedName = trimmedName.isEmpty ? "Player" : trimmedName
         let recording = ConsumentaDriveRecording(
-            formatVersion: 2,
+            formatVersion: 3,
             id: recordingID,
             mapID: mapID,
             mapName: mapName,
             playerName: resolvedName,
+            eduardType: eduardType,
             startedAt: startedAt,
             duration: duration,
             samples: exportSamples,
