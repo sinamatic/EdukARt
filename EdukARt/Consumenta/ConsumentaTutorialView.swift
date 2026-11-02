@@ -141,7 +141,7 @@ private struct ConsumentaTutorialCard: View {
                     )
                 }
 
-                Text("Los geht’s!")
+                Text("Nach dem Tutorial kehrst du ins Menü zurück. Dort kannst du deine Strecke wählen und loslegen.")
                     .font(.headline.bold())
                     .foregroundStyle(Color("BrandGreen"))
                     .fixedSize(horizontal: false, vertical: true)
@@ -251,7 +251,7 @@ private struct ConsumentaTutorialCard: View {
         case .robotRemote: "Robot Remote"
         case .emergencyStop: "Not-Aus"
         case .courses: "Courses"
-        case .courseSelection: "Wähle eine Strecke"
+        case .courseSelection: "Eine Strecke als Beispiel"
         case .mapLocalization: "Karte anzeigen"
         case .arStart: "Start des Spiels"
         case .arControls: "AR-Menü"
@@ -285,9 +285,9 @@ private struct ConsumentaTutorialCard: View {
         case .courses:
             "Die Erstellung von Strecken ist aktuell deaktiviert. Für Vorschläge melde dich bitte bei uns."
         case .courseSelection:
-            "Wähle jetzt eine der vorbereiteten Strecken aus und tippe auf „Start Game“."
+            "Für das Tutorial haben wir automatisch eine Beispielstrecke ausgewählt. An dieser Strecke zeigen wir dir die nächsten Schritte. Tippe auf „Weiter“. Nach dem Tutorial kehrst du ins Menü zurück und kannst dort selbst eine Strecke wählen."
         case .mapLocalization:
-            "Um die AR-Strecke anzuzeigen, scanne den schwarz-weißen Referenz-AprilTag. Er ist mit rotem Klebeband hervorgehoben. Stelle dich auf die Seite des Pfeils. Der Tag muss nicht das gesamte Rechteck füllen; zeige den Code einfach im Stehen im Fenster an. Falls nichts passiert, gehe etwas näher heran oder weiter weg."
+            "Stell dich nun über den rot markierten Referenz-AprilTag auf die Seite des Pfeils. Falls nach wenigen Sekunden nichts passiert, ändere den Abstand etwas."
         case .arStart:
             ""
         case .arControls:

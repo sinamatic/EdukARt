@@ -239,6 +239,9 @@ final class RobotController:
     private let waterStrokeSpeed:
         Double = 0.30
 
+    private let minimumGameplaySpeedMultiplier:
+        Double = 0.20
+
     private let baseGameplaySpeedMultiplier:
         Double = 0.80
 
@@ -487,7 +490,7 @@ final class RobotController:
 
         normalGameplaySpeedMultiplier =
             max(
-                0,
+                minimumGameplaySpeedMultiplier,
                 normalGameplaySpeedMultiplier
                 - obstacleDamageStep
             )

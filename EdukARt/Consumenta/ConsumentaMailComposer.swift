@@ -43,11 +43,11 @@ struct ConsumentaDriveSharingView: View {
 
         var components = URLComponents()
         components.scheme = "mailto"
-        components.path = ""
+        components.path = "hello@sinamatic.de"
         components.queryItems = [
             URLQueryItem(
                 name: "subject",
-                value: "EdukARt Ghost at Consumenta"
+                value: "Consumenta Ghost"
             )
         ]
 
@@ -67,8 +67,8 @@ private struct ConsumentaMailComposer: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> MFMailComposeViewController {
         let composer = MFMailComposeViewController()
         composer.mailComposeDelegate = context.coordinator
-        composer.setToRecipients(nil)
-        composer.setSubject("EdukARt Ghost at Consumenta")
+        composer.setToRecipients(["hello@sinamatic.de"])
+        composer.setSubject("Consumenta Ghost")
         composer.setMessageBody(
             "Hallo Sina,\n\nim Anhang findest du meine Ghost Fahrt von der Consumenta.\n",
             isHTML: false
