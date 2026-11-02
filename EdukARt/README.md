@@ -55,7 +55,7 @@ In the tested setup, a Siemens SIMATIC IOT2000 runs the Debian host system, whil
 
 | Parameter | Tested configuration |
 | --- | --- |
-| Robot / Wi-Fi network | `Eduard_Blue3` |
+| Wi-Fi network | `Eduard_Green` |
 | Kinematics | Mecanum |
 | Onboard computer | Siemens SIMATIC IOT2000 |
 | Robot address | `192.168.0.100` |
@@ -129,7 +129,7 @@ The final race time is the elapsed time **plus 5 s for each uncollected coin, mi
 
 ## Playing the prototype
 
-1. Connect the iPhone to `Eduard_Blue3`. Use **Robot Remote** to check connectivity, enable the robot, and test movement and lighting.
+1. Connect the iPhone to `Eduard_Green`. Use **Robot Remote** to check connectivity, enable the robot, and test movement and lighting.
 2. Arrange `tag36h11` AprilTags on the floor and mount **tag 0** on Eduard. The documented markers have a 12 cm outer dimension and a 9.6 cm black detection boundary. Floor markers must remain in their recorded positions.
 3. Open **Courses → Create Course**. Scan the floor markers to create the map. Tag 0 is reserved for robot localization and excluded from floor-map creation. The reference uses 20 valid pose estimates within 1.2 m of the camera; additional markers use ten measurements and must lie within 3 m of an already mapped marker.
 4. In **Draw Road**, draw one continuous track from start to finish. In **Items / Obstacles**, drag elements onto the map, then name and save the course.

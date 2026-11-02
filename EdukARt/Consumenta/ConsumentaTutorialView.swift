@@ -3,9 +3,7 @@ import SwiftUI
 enum ConsumentaTutorialStep: Equatable {
     case welcome
     case wifi
-    case robotRemote
     case emergencyStop
-    case courses
     case courseSelection
     case mapLocalization
     case arStart
@@ -22,7 +20,7 @@ struct ConsumentaTutorialView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(step == .mapLocalization ? 0.82 : 0.72)
+            Color.black.opacity(step == .mapLocalization ? 0 : 0.72)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
@@ -248,9 +246,7 @@ private struct ConsumentaTutorialCard: View {
         switch step {
         case .welcome: "Willkommen bei EdukARt"
         case .wifi: "Mit Eduard verbinden"
-        case .robotRemote: "Robot Remote"
         case .emergencyStop: "Not-Aus"
-        case .courses: "Courses"
         case .courseSelection: "Eine Strecke als Beispiel"
         case .mapLocalization: "Karte anzeigen"
         case .arStart: "Start des Spiels"
@@ -263,9 +259,8 @@ private struct ConsumentaTutorialCard: View {
         switch step {
         case .welcome: "flag.checkered"
         case .wifi: "wifi"
-        case .robotRemote: "gamecontroller"
         case .emergencyStop: "power"
-        case .courses, .courseSelection: "map"
+        case .courseSelection: "map"
         case .mapLocalization, .arStart: "camera.viewfinder"
         case .arControls: "cube.transparent"
         case .gameGoal: "trophy.fill"
@@ -277,17 +272,13 @@ private struct ConsumentaTutorialCard: View {
         case .welcome:
             "Consumenta Edition – Halle 1, Stand B41 bei EduArt Robotik.\n\nSteuere hier auf der Consumenta mit dieser App unseren Roboter Eduard durch eine AR-Strecke und spiele um die Bestzeit. EdukARt ist ein Prototyp – bitte verzeih, wenn noch nicht alles perfekt funktioniert."
         case .wifi:
-            "Verbinde dein iPhone zuerst mit dem WLAN „Eduard_Blue3“. Das Passwort lautet wie das WLAN selbst: „Eduard_Blue3“ – achte dabei auf die Groß- und Kleinschreibung.\n\nWenn du gerade keinen echten Eduard zur Verfügung hast, kannst du im Spiel selbst einen AR-Roboter einblenden."
-        case .robotRemote:
-            "„Robot Remote“ ist die Fernsteuerung für den Roboter. Hier findest du einen Joystick, kannst die Lichter steuern, die Verbindung prüfen und Bildschirmaufnahmen von der Steuerung des Roboters machen."
+            "Verbinde dein iPhone zuerst mit dem WLAN „Eduard_Green“. Das Passwort lautet wie das WLAN selbst: „Eduard_Green“ – achte dabei auf die Groß- und Kleinschreibung.\n\nWenn du gerade keinen echten Eduard zur Verfügung hast, kannst du im Spiel selbst einen AR-Roboter einblenden."
         case .emergencyStop:
             "Der Not-Aus oben rechts stoppt Eduard jederzeit sofort. Drücke den Knopf nun einmal. Daneben zeigt dir die Ampel den aktuellen Verbindungsstatus des Roboters an."
-        case .courses:
-            "Die Erstellung von Strecken ist aktuell deaktiviert. Für Vorschläge melde dich bitte bei uns."
         case .courseSelection:
-            "Für das Tutorial haben wir automatisch eine Beispielstrecke ausgewählt. An dieser Strecke zeigen wir dir die nächsten Schritte. Tippe auf „Weiter“. Nach dem Tutorial kehrst du ins Menü zurück und kannst dort selbst eine Strecke wählen."
+            "Für das Tutorial wurde automatisch eine Beispielstrecke ausgewählt. An dieser Strecke werden dir die nächsten Schritte gezeigt. Tippe auf „Weiter“. Nach dem Tutorial kehrst du ins Menü zurück und kannst dort selbst eine Strecke wählen."
         case .mapLocalization:
-            "Stell dich nun über den rot markierten Referenz-AprilTag auf die Seite des Pfeils. Falls nach wenigen Sekunden nichts passiert, ändere den Abstand etwas."
+            "Stell dich nun über den rot markierten Referenz-AprilTag auf die Seite des Pfeils, sodass der Referenz-AprilTag im untenstehenden weißen Rechteck sichtbar ist. Falls nach wenigen Sekunden nichts passiert, ändere den Abstand etwas."
         case .arStart:
             ""
         case .arControls:

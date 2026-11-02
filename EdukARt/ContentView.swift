@@ -175,10 +175,8 @@ struct ContentView: View {
     private func advanceTutorial() {
         switch tutorialStep {
         case .welcome: tutorialStep = .wifi
-        case .wifi: tutorialStep = .robotRemote
-        case .robotRemote: tutorialStep = .emergencyStop
-        case .emergencyStop: tutorialStep = .courses
-        case .courses: tutorialStep = .courseSelection
+        case .wifi: tutorialStep = .emergencyStop
+        case .emergencyStop: tutorialStep = .courseSelection
         case .courseSelection:
             if let selectedTutorialMap {
                 startTutorialGame(selectedTutorialMap)
@@ -194,10 +192,8 @@ struct ContentView: View {
     private func goBackInTutorial() {
         switch tutorialStep {
         case .wifi: tutorialStep = .welcome
-        case .robotRemote: tutorialStep = .wifi
-        case .emergencyStop: tutorialStep = .robotRemote
-        case .courses: tutorialStep = .emergencyStop
-        case .courseSelection: tutorialStep = .courses
+        case .emergencyStop: tutorialStep = .wifi
+        case .courseSelection: tutorialStep = .emergencyStop
         case .mapLocalization: tutorialStep = .courseSelection
         case .arStart: tutorialStep = .mapLocalization
         case .arControls: tutorialStep = .arStart
