@@ -147,7 +147,7 @@ struct MainMenuView: View {
     private struct MainMenuFooter: View {
         var body: some View {
             VStack(spacing: 4) {
-                Text(verbatim: "© Sina Steinmüller | v1.0 | 2026")
+                Text(verbatim: "© Sina Steinmüller | v1.1 | 2026")
                     .font(.caption2)
                     .foregroundStyle(.white.opacity(0.8))
 
