@@ -65,6 +65,34 @@ final class RobotController:
 
     // MARK: - Robots
 
+    func selectRobotProfile(_ id: UUID) {
+        let profiles = RobotProfileStore.shared
+        guard profiles.profiles.contains(where: { $0.id == id }),
+              profiles.selectedID != id else { return }
+        prepareForRobotProfileChange()
+        profiles.select(id)
+        bridgeStatus = ""
+        eduard.reconnect()
+        statusMessage = "Selected \(profiles.selectedProfile?.name ?? "robot"). Ready to enable."
+    }
+
+    func deleteRobotProfile(_ id: UUID) {
+        let profiles = RobotProfileStore.shared
+        if profiles.selectedID == id {
+            prepareForRobotProfileChange()
+        }
+        profiles.delete(id)
+        eduard.reconnect()
+        statusMessage = profiles.selectedProfile.map { "Selected \($0.name). Ready to enable." }
+            ?? "Add a robot to start."
+    }
+
+    func prepareForRobotProfileChange() {
+        resetGameplayState()
+        sendDisable()
+        eduard.stopLightAnimation()
+    }
+
     let eduard:
         Eduard
 
@@ -702,7 +730,24 @@ final class RobotController:
         }
     }
     
+    var driveDebugState: [String: String] {
+        ["enabled": String(isEnabled), "connected": String(isConnected),
+         "wifiReachable": String(isWifiReachable), "controlMode": controlMode.rawValue,
+         "effectiveControlMode": effectiveControlMode.rawValue,
+         "enablePending": String(bridgeEnableRequest != nil),
+         "profile": RobotProfileStore.shared.selectedProfile?.name ?? "",
+         "status": bridgeStatus]
+    }
+
+    @Published var bridgeStatus = ""
+    private var bridgeEnableRequest: UUID?
+
     func sendEnable() {
+        guard bridgeEnableRequest == nil else { return }
+        guard RobotProfileStore.shared.selectedProfile != nil else {
+            statusMessage = "Add a robot to start."
+            return
+        }
 
         // Recreate the UDP connection.
         //
@@ -712,6 +757,32 @@ final class RobotController:
 
         eduard.reconnect()
 
+        if eduard.usesConfiguredBridge {
+            isEnabled = false
+            stopCommandLoop()
+            let request = UUID()
+            bridgeEnableRequest = request
+            bridgeStatus = "Warte auf ROS-Motorfreigabe …"
+            eduard.onBridgeStatus = { [weak self] message in self?.bridgeStatus = message }
+            eduard.enableConfiguredRobot { [weak self] result in
+                guard let self, self.bridgeEnableRequest == request else { return }
+                self.bridgeEnableRequest = nil
+                switch result {
+                case .success:
+                    self.isConnected = true
+                    self.isWifiReachable = true
+                    self.isEnabled = true
+                    self.bridgeStatus = "ROS-Freigabe bestätigt."
+                    self.statusMessage = self.bridgeStatus
+                    self.startCommandLoop()
+                case .failure(let error):
+                    self.isEnabled = false
+                    self.bridgeStatus = "Freigabe fehlgeschlagen: " + error.localizedDescription
+                    self.statusMessage = self.bridgeStatus
+                }
+            }
+            return
+        }
 
         eduard.setEnabled(
             true,
@@ -739,6 +810,7 @@ final class RobotController:
 
 
     func sendDisable() {
+        bridgeEnableRequest = nil
         stopJoystick()
         stopMechanumRotation()
         stopCommandLoop()
@@ -755,6 +827,9 @@ final class RobotController:
 
         setDisabledLightState()
 
+        if eduard.usesConfiguredBridge {
+            bridgeStatus = "Motorfreigabe deaktiviert. Zum Fahren erneut Enable drücken."
+        }
         statusMessage =
             "Disable sent."
     }

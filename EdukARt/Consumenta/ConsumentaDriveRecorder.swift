@@ -1,13 +1,7 @@
 import Foundation
 
 final class ConsumentaDriveRecorder {
-    private let minimumSampleInterval: TimeInterval = 0.2
-    private let maximumPlausibleSpeed: Float = 0.75
-    private let positionTolerance: Float = 0.06
-    // AprilTag pose estimation can occasionally return the equally valid
-    // 180-degree solution. Eduard cannot rotate 90 degrees between two 5 Hz
-    // samples, so keep the equivalent heading nearest to the previous sample.
-    private let aprilTagFlipThreshold: Float = 1.2
+    private let minimumSampleInterval: TimeInterval = 0.1
     // Keep observing Eduard after crossing the finish line. The robot can
     // continue rolling while AprilTag detection briefly catches up.
     private let maximumPostFinishDuration: TimeInterval = 3.5
@@ -122,7 +116,7 @@ final class ConsumentaDriveRecorder {
         let trimmedName = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedName = trimmedName.isEmpty ? "Player" : trimmedName
         let recording = ConsumentaDriveRecording(
-            formatVersion: 3,
+            formatVersion: 4,
             id: recordingID,
             mapID: mapID,
             mapName: mapName,
@@ -205,43 +199,13 @@ final class ConsumentaDriveRecorder {
             return
         }
 
-        if force == false,
-           let lastSample = samples.last {
-            let elapsed = max(0, Float(time - lastSample.time))
-            let distance = hypot(
-                pose.position.x - lastSample.x,
-                pose.position.z - lastSample.z
-            )
-            let maximumDistance = positionTolerance
-                + maximumPlausibleSpeed * elapsed
-
-            guard distance <= maximumDistance else {
-                return
-            }
-        }
-
-        let stabilizedRotation: Float
-        if let lastSample = samples.last {
-            var bestDelta = atan2(
-                sin(pose.rotation - lastSample.rotation),
-                cos(pose.rotation - lastSample.rotation)
-            )
-
-            // Only consider the planar AprilTag ambiguity for an impossible
-            // single-frame jump. Normal turns, including crossing ±π, keep
-            // their direction and can accumulate beyond a full revolution.
-            if abs(bestDelta) > aprilTagFlipThreshold {
-                let flippedDelta = atan2(
-                    sin(pose.rotation + .pi - lastSample.rotation),
-                    cos(pose.rotation + .pi - lastSample.rotation)
-                )
-                if abs(flippedDelta) < abs(bestDelta) {
-                    bestDelta = flippedDelta
-                }
-            }
-            stabilizedRotation = lastSample.rotation + bestDelta
-        } else {
-            stabilizedRotation = pose.rotation
+        // Store the supplied live pose unchanged. Rejecting movement here can
+        // create long gaps; isolated spikes are handled with both neighbours
+        // available during playback instead.
+        guard time.isFinite, pose.position.x.isFinite,
+              pose.position.z.isFinite, pose.rotation.isFinite,
+              time > (lastSampleTime ?? -.infinity) else {
+            return
         }
 
         samples.append(
@@ -249,7 +213,7 @@ final class ConsumentaDriveRecorder {
                 time: time,
                 x: pose.position.x,
                 z: pose.position.z,
-                rotation: stabilizedRotation
+                rotation: pose.rotation
             )
         )
         lastSampleTime = time

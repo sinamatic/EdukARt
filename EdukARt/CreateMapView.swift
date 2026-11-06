@@ -274,9 +274,6 @@ struct CreateMapView: View {
             }
         }
         .ignoresSafeArea()
-        .background(
-            SwipeBackDisabler()
-        )
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {

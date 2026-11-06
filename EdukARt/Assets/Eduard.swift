@@ -190,6 +190,17 @@ final class Eduard {
         case pulsation = 3
         case rotation = 4
         case running = 5
+
+        var configuredValue: Int {
+            switch self {
+            case .off: return RobotROSSettings.NumberField.lightOff.value
+            case .dim: return RobotROSSettings.NumberField.lightDim.value
+            case .flash: return RobotROSSettings.NumberField.lightFlash.value
+            case .pulsation: return RobotROSSettings.NumberField.lightPulsation.value
+            case .rotation: return RobotROSSettings.NumberField.lightRotation.value
+            case .running: return RobotROSSettings.NumberField.lightRunning.value
+            }
+        }
     }
 
 
@@ -210,14 +221,17 @@ final class Eduard {
 
     private enum LightingGroup {
 
-        static let all =
-            "all"
+        static var all: String {
+            RobotROSSettings.TextField.allLights.value
+        }
 
-        static let leftSide =
-            "left_side"
+        static var leftSide: String {
+            RobotROSSettings.TextField.leftLights.value
+        }
 
-        static let rightSide =
-            "right_side"
+        static var rightSide: String {
+            RobotROSSettings.TextField.rightLights.value
+        }
     }
 
 
@@ -225,17 +239,21 @@ final class Eduard {
     // MARK: - ROS
     // ======================================================
 
-    private let setModeService =
-        "set_mode"
+    private var setModeService: String {
+        RobotROSSettings.resolvedName(RobotROSSettings.TextField.modeService.value)
+    }
 
-    private let driveVelocityTopic =
-        "cmd_vel"
+    private var driveVelocityTopic: String {
+        RobotROSSettings.resolvedName(RobotROSSettings.TextField.driveTopic.value)
+    }
 
-    private let lightingTopic =
-        "/eduard/blue3/set_lighting_color"
+    private var lightingTopic: String {
+        RobotROSSettings.resolvedName(RobotROSSettings.TextField.lightingTopic.value)
+    }
 
-    private let lightingMessageType =
-        "edu_robot/msg/SetLightingColor"
+    private var lightingMessageType: String {
+        RobotROSSettings.TextField.lightingMessageType.value
+    }
 
 
     
@@ -327,11 +345,13 @@ final class Eduard {
     // MARK: - Values
     // ======================================================
 
-    private let remoteControlledModeValue =
-        2.0
+    private var remoteControlledModeValue: Double {
+        Double(RobotROSSettings.NumberField.enabledMode.value)
+    }
 
-    private let disabledModeValue =
-        0.0
+    private var disabledModeValue: Double {
+        Double(RobotROSSettings.NumberField.disabledMode.value)
+    }
 
 
     // ======================================================
@@ -382,6 +402,9 @@ final class Eduard {
     // MARK: - Init
 
     init() {
+        robotConfiguration = RobotROSSettings.activeStore.flatMap { RobotSetupConfiguration.load(from: $0) }
+        targetHost = robotConfiguration?.host ?? "192.168.0.100"
+        targetPort = robotConfiguration.flatMap { UInt16($0.udpPort) } ?? 50505
 
         let endpointHost =
             NWEndpoint.Host(
@@ -423,11 +446,12 @@ final class Eduard {
     // MARK: - UDP Transport
     // ======================================================
 
-    private let targetHost =
-        "192.168.0.100"
-
-    private let targetPort:
-        UInt16 = 50505
+    var onBridgeStatus: ((String) -> Void)?
+    var usesConfiguredBridge: Bool { robotConfiguration != nil }
+    private var pendingEnable: (id: String, completion: (Result<Void, Error>) -> Void)?
+    private var robotConfiguration: RobotSetupConfiguration?
+    private var targetHost = "192.168.0.100"
+    private var targetPort: UInt16 = 50505
 
     private var connection:
         NWConnection
@@ -461,44 +485,54 @@ final class Eduard {
         }
 
 
-        call(
-            service:
-                setModeService,
+        if let config = robotConfiguration {
+            if let data = try? config.actionData(enabled ? config.enableAction : config.disableAction) {
+                sendConfiguredData(data)
+            }
+            if enabled { stop() }
+            return
+        }
 
-            serviceType:
-                "edu_robot/srv/SetMode",
+        if RobotROSSettings.Block.operatingMode.isEnabled {
+            call(
+                service:
+                    setModeService,
 
-            request: [
+                serviceType:
+                    RobotROSSettings.TextField.modeServiceType.value,
 
-                "mode":
-                    .object([
+                request: [
 
-                        "mode":
-                            .double(
-                                enabled
-                                ? remoteControlledModeValue
-                                : disabledModeValue
-                            ),
+                    "mode":
+                        .object([
 
-                        "drive_kinematic":
-                            .double(
-                                driveMode
-                                    .driveKinematicValue
-                            ),
+                            "mode":
+                                .double(
+                                    enabled
+                                    ? remoteControlledModeValue
+                                    : disabledModeValue
+                                ),
 
-                        "feature_mode":
-                            .double(0)
-                    ]),
+                            "drive_kinematic":
+                                .double(
+                                    driveMode
+                                        .driveKinematicValue
+                                ),
 
-                "disable_feature":
-                    .double(
-                        enabled
-                        ? 0
-                        : 1
-                    )
-            ]
-        )
+                            "feature_mode":
+                                .double(Double(RobotROSSettings.NumberField.featureMode.value))
+                        ]),
 
+                    "disable_feature":
+                        .double(
+                            enabled
+                            ? Double(RobotROSSettings.NumberField.enabledDisableFeature.value)
+                            : Double(RobotROSSettings.NumberField.disabledDisableFeature.value)
+                        )
+                ]
+            )
+
+        }
 
         if enabled {
             stop()
@@ -513,13 +547,17 @@ final class Eduard {
         _ command:
             RobotDriveCommand
     ) {
+        if let config = robotConfiguration {
+            if let data = try? config.driveData(command) { sendConfiguredData(data) }
+            return
+        }
 
         send(
             topic:
                 driveVelocityTopic,
 
             messageType:
-                "geometry_msgs/msg/Twist",
+                RobotROSSettings.TextField.driveMessageType.value,
 
             message: [
 
@@ -898,6 +936,14 @@ final class Eduard {
         _ command:
             LightingCommand
     ) {
+        if let config = robotConfiguration {
+            let values = ["$red": Double(command.red), "$green": Double(command.green),
+                          "$blue": Double(command.blue), "$brightness": command.brightness,
+                          "$mode": Double(command.mode.configuredValue)]
+            if let data = try? config.actionData(config.lightsAction, values: values) { sendConfiguredData(data) }
+            return
+        }
+        guard RobotROSSettings.Block.lights.isEnabled else { return }
 
         send(
             topic:
@@ -926,7 +972,7 @@ final class Eduard {
                 ]),
 
                 "mode":
-                    .int(command.mode.rawValue)
+                    .int(command.mode.configuredValue)
             ]
         )
     }
@@ -965,6 +1011,10 @@ final class Eduard {
             }
     }
 
+
+    func stopLightAnimation() {
+        stopRainbow()
+    }
 
     private func stopRainbow() {
 
@@ -1209,6 +1259,10 @@ final class Eduard {
     
 
     func reconnect() {
+        pendingEnable = nil
+        robotConfiguration = RobotROSSettings.activeStore.flatMap { RobotSetupConfiguration.load(from: $0) }
+        targetHost = robotConfiguration?.host ?? "192.168.0.100"
+        targetPort = robotConfiguration.flatMap { UInt16($0.udpPort) } ?? 50505
 
         connection.cancel()
 
@@ -1222,6 +1276,60 @@ final class Eduard {
                         .userInitiated
                 )
         )
+    }
+
+    func enableConfiguredRobot(completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let config = robotConfiguration else { return }
+        receiveBridgeReply(on: connection)
+        do {
+            guard let data = try config.actionData(config.enableAction),
+                  var packet = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw RobotSetupError("Keine Freigabe-Aktion konfiguriert.")
+            }
+            let id = UUID().uuidString
+            packet["id"] = id
+            pendingEnable = (id, completion)
+            sendConfiguredData(try JSONSerialization.data(withJSONObject: packet, options: [.withoutEscapingSlashes]))
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(7))
+                guard let self, let pending = self.pendingEnable, pending.id == id else { return }
+                self.pendingEnable = nil
+                pending.completion(.failure(RobotSetupError("Keine Antwort auf die Motorfreigabe. Bridge-Start, IP und UDP-Port prüfen.")))
+            }
+        } catch {
+            completion(.failure(error))
+        }
+    }
+
+    private func receiveBridgeReply(on channel: NWConnection) {
+        channel.receiveMessage { [weak self] data, _, _, error in
+            Task { @MainActor [weak self] in
+                guard let self, self.connection === channel else { return }
+                if let error {
+                    self.onBridgeStatus?("Bridge-Verbindung: " + error.localizedDescription)
+                    return
+                }
+                if let data,
+                   let packet = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let response = packet["response"] as? [String: Any]
+                    let failed = packet["ok"] as? Bool == false || response?["success"] as? Bool == false
+                    let detail = packet["error"] as? String ?? response?["message"] as? String ?? ""
+                    if let pending = self.pendingEnable, packet["id"] as? String == pending.id {
+                        self.pendingEnable = nil
+                        if failed {
+                            pending.completion(.failure(RobotSetupError(detail.isEmpty ? "ROS-Service hat die Freigabe abgelehnt." : detail)))
+                        } else if packet["ok"] as? Bool == true {
+                            pending.completion(.success(()))
+                        } else {
+                            pending.completion(.failure(RobotSetupError("Unbekannte Antwort auf die Freigabe.")))
+                        }
+                    } else if failed {
+                        self.onBridgeStatus?("ROS-Fehler: " + detail)
+                    }
+                }
+                self.receiveBridgeReply(on: channel)
+            }
+        }
     }
 
     func checkConnection(timeout: TimeInterval = 1, completion: @escaping (Bool) -> Void) {
@@ -1299,6 +1407,8 @@ final class Eduard {
         _ command: Command
     ) {
 
+        guard RobotProfileStore.shared.selectedProfile != nil else { return }
+
         guard let encodedCommand =
             try? encoder.encode(
                 command
@@ -1357,6 +1467,13 @@ final class Eduard {
         )
     }
 
+
+    private func sendConfiguredData(_ data: Data) {
+        guard RobotProfileStore.shared.selectedProfile != nil else { return }
+        connection.send(content: data, completion: .contentProcessed { error in
+            if let error { print("ROS bridge send failed: \(error)") }
+        })
+    }
 
     // MARK: - Create Connection
 

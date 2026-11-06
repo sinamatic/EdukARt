@@ -10,6 +10,7 @@
 		90819FA8303A106D00090B99 /* SwiftAprilTag in Frameworks */ = {isa = PBXBuildFile; productRef = 90819FA7303A106D00090B99 /* SwiftAprilTag */; };
 		90B4CBC6303846AE005FB20C /* SwiftUIJoystick in Frameworks */ = {isa = PBXBuildFile; productRef = 90B4CBC5303846AE005FB20C /* SwiftUIJoystick */; };
 		90EDCBCB303F56C6008E7D2E /* pingx in Frameworks */ = {isa = PBXBuildFile; productRef = 90EDCBCA303F56C6008E7D2E /* pingx */; };
+		A11000000000000000000001 /* Citadel in Frameworks */ = {isa = PBXBuildFile; productRef = A11000000000000000000003 /* Citadel */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A11000000000000000000001 /* Citadel in Frameworks */,
 				90EDCBCB303F56C6008E7D2E /* pingx in Frameworks */,
 				90819FA8303A106D00090B99 /* SwiftAprilTag in Frameworks */,
 				90B4CBC6303846AE005FB20C /* SwiftUIJoystick in Frameworks */,
@@ -87,6 +89,7 @@
 			);
 			name = EdukARt;
 			packageProductDependencies = (
+				A11000000000000000000003 /* Citadel */,
 				90B4CBC5303846AE005FB20C /* SwiftUIJoystick */,
 				90819FA7303A106D00090B99 /* SwiftAprilTag */,
 				90EDCBCA303F56C6008E7D2E /* pingx */,
@@ -120,6 +123,7 @@
 			mainGroup = 90092A983037942B00D9DE91;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A11000000000000000000002 /* XCRemoteSwiftPackageReference "Citadel" */,
 				90B4CBC4303846AE005FB20C /* XCRemoteSwiftPackageReference "SwiftUIJoystick" */,
 				90819FA6303A106D00090B99 /* XCRemoteSwiftPackageReference "SwiftAprilTag" */,
 				90EDCBC9303F56C6008E7D2E /* XCRemoteSwiftPackageReference "pingx" */,
@@ -315,7 +319,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -356,7 +360,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -408,6 +412,14 @@
 				minimumVersion = 1.1.0;
 			};
 		};
+		A11000000000000000000002 /* XCRemoteSwiftPackageReference "Citadel" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/orlandos-nl/Citadel.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.12.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -425,6 +437,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 90EDCBC9303F56C6008E7D2E /* XCRemoteSwiftPackageReference "pingx" */;
 			productName = pingx;
+		};
+		A11000000000000000000003 /* Citadel */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A11000000000000000000002 /* XCRemoteSwiftPackageReference "Citadel" */;
+			productName = Citadel;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

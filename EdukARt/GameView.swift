@@ -167,9 +167,6 @@ struct GameView: View {
     var body: some View {
 
         gameContent
-            .background(
-                SwipeBackDisabler()
-            )
             .onReceive(
                 collisionTimer
             ) { _ in
@@ -3315,55 +3312,5 @@ private struct ResultSaveButtonStyle: ButtonStyle {
                 value:
                     configuration.isPressed
             )
-    }
-}
-
-
-struct SwipeBackDisabler:
-    UIViewControllerRepresentable {
-
-    func makeUIViewController(
-        context: Context
-    ) -> UIViewController {
-
-        SwipeBackDisablingViewController()
-    }
-
-
-    func updateUIViewController(
-        _ uiViewController: UIViewController,
-        context: Context
-    ) {
-
-        (uiViewController as? SwipeBackDisablingViewController)?
-            .disableSwipeBack()
-    }
-
-
-    static func dismantleUIViewController(
-        _ uiViewController: UIViewController,
-        coordinator: ()
-    ) {
-
-        uiViewController
-            .navigationController?
-            .interactivePopGestureRecognizer?
-            .isEnabled =
-            true
-    }
-}
-
-
-private final class SwipeBackDisablingViewController: UIViewController {
-
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        disableSwipeBack()
-    }
-
-    func disableSwipeBack() {
-        navigationController?
-            .interactivePopGestureRecognizer?
-            .isEnabled = false
     }
 }

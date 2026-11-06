@@ -46,10 +46,10 @@ enum RobotDriveMode:
         switch self {
 
         case .mechanum:
-            return 2.0
+            return Double(RobotROSSettings.NumberField.mecanum.value)
 
         case .offroad:
-            return 1.0
+            return Double(RobotROSSettings.NumberField.offroad.value)
         }
     }
 }

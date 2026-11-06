@@ -16,6 +16,7 @@ final class ConsumentaGhostReplayController: ObservableObject {
 
     private(set) var recording: ConsumentaDriveRecording?
     private(set) var mode: GhostPlaybackMode = .replay
+    private var playbackSamples: [ConsumentaDriveSample] = []
     private var replayTask: Task<Void, Never>?
 
     func prepare(
@@ -23,7 +24,7 @@ final class ConsumentaGhostReplayController: ObservableObject {
         mode: GhostPlaybackMode = .replay,
         simulation: EduardSimulation
     ) {
-        replayTask?.cancel()
+        reset()
 
         do {
             let data = try Data(contentsOf: recordingURL)
@@ -34,11 +35,14 @@ final class ConsumentaGhostReplayController: ObservableObject {
                 from: data
             )
 
-            guard let firstSample = recording.samples.first else {
+            let samples = Self.removingIsolatedOutliers(recording.samples)
+            guard recording.duration.isFinite, recording.duration >= 0,
+                  let firstSample = samples.first else {
                 phase = .failed
                 return
             }
 
+            self.playbackSamples = samples
             self.recording = recording
             self.mode = mode
             simulation.setPose(firstSample.robotPose)
@@ -65,21 +69,22 @@ final class ConsumentaGhostReplayController: ObservableObject {
     ) {
         guard phase == .ready,
               let recording,
-              recording.samples.isEmpty == false else {
+              playbackSamples.isEmpty == false else {
             return
         }
 
         replayTask?.cancel()
         phase = .playing
         let playbackMode = mode
+        let samples = playbackSamples
 
         replayTask = Task { @MainActor [weak self] in
             guard let self else {
                 return
             }
 
-            simulation.setPose(recording.samples[0].robotPose)
-            onPoseUpdated(recording.samples[0].robotPose)
+            simulation.setPose(samples[0].robotPose)
+            onPoseUpdated(samples[0].robotPose)
             var eventIndex = 0
 
             func emitEvents(upTo time: TimeInterval) {
@@ -94,29 +99,44 @@ final class ConsumentaGhostReplayController: ObservableObject {
                 }
             }
 
-            emitEvents(upTo: recording.samples[0].time)
-
-            for index in 1..<recording.samples.count {
-                guard Task.isCancelled == false else {
-                    return
+            // Always evaluate against elapsed time, so rendering delays cannot
+            // accumulate into a progressively slower replay.
+            let startedAt = ProcessInfo.processInfo.systemUptime
+            let endTime = max(recording.duration, samples.last?.time ?? 0)
+            var index = 0
+            while Task.isCancelled == false {
+                let time = min(ProcessInfo.processInfo.systemUptime - startedAt, endTime)
+                while index + 1 < samples.count, samples[index + 1].time <= time {
+                    index += 1
                 }
 
-                let previous = recording.samples[index - 1]
-                let current = recording.samples[index]
-                await animate(
-                    from: previous,
-                    to: current,
-                    simulation: simulation,
-                    onPoseUpdated: onPoseUpdated,
-                    onTimeUpdated: emitEvents
-                )
+                let pose: RobotPose
+                if time < samples[0].time || index + 1 == samples.count {
+                    pose = samples[index].robotPose
+                } else {
+                    pose = Self.interpolate(
+                        from: samples[index],
+                        to: samples[index + 1],
+                        at: time
+                    ).robotPose
+                }
+                simulation.setPose(pose, animateMovement: true)
+                onPoseUpdated(pose)
+                emitEvents(upTo: time)
+
+                if time >= endTime {
+                    break
+                }
+                do {
+                    try await Task.sleep(for: .seconds(1.0 / 60.0))
+                } catch {
+                    return
+                }
             }
 
             guard Task.isCancelled == false else {
                 return
             }
-
-            emitEvents(upTo: recording.duration)
             phase = .finished
             onFinished()
         }
@@ -126,62 +146,78 @@ final class ConsumentaGhostReplayController: ObservableObject {
         replayTask?.cancel()
         replayTask = nil
         recording = nil
+        playbackSamples = []
         mode = .replay
         phase = .inactive
     }
 
-    private func animate(
+    private static func angleDelta(from start: Float, to end: Float) -> Float {
+        atan2(sin(end - start), cos(end - start))
+    }
+
+    static func interpolate(
         from start: ConsumentaDriveSample,
         to end: ConsumentaDriveSample,
-        simulation: EduardSimulation,
-        onPoseUpdated: (RobotPose) -> Void,
-        onTimeUpdated: (TimeInterval) -> Void
-    ) async {
-        let duration = max(0, end.time - start.time)
-        let steps = max(1, Int(ceil(duration * 30)))
-        let stepDuration = duration / Double(steps)
-        let startRotation = simulation.pose.rotation
-        var rotationDelta = atan2(
-            sin(end.rotation - startRotation),
-            cos(end.rotation - startRotation)
+        at time: TimeInterval
+    ) -> ConsumentaDriveSample {
+        let progress = Float(max(0, min(1, (time - start.time) / (end.time - start.time))))
+        return ConsumentaDriveSample(
+            time: time,
+            x: start.x + (end.x - start.x) * progress,
+            z: start.z + (end.z - start.z) * progress,
+            rotation: start.rotation
+                + angleDelta(from: start.rotation, to: end.rotation) * progress
         )
-        if abs(rotationDelta) > 1.2 {
-            let flippedDelta = atan2(
-                sin(end.rotation + .pi - startRotation),
-                cos(end.rotation + .pi - startRotation)
-            )
-            if abs(flippedDelta) < abs(rotationDelta) {
-                rotationDelta = flippedDelta
+    }
+
+    static func removingIsolatedOutliers(
+        _ samples: [ConsumentaDriveSample]
+    ) -> [ConsumentaDriveSample] {
+        var valid: [ConsumentaDriveSample] = []
+        for sample in samples {
+            guard sample.time.isFinite, sample.time >= 0,
+                  sample.x.isFinite, sample.z.isFinite, sample.rotation.isFinite,
+                  sample.time > (valid.last?.time ?? -.infinity) else {
+                continue
             }
+            valid.append(sample)
+        }
+        guard valid.count >= 3 else {
+            return valid
         }
 
-        for step in 1...steps {
-            guard Task.isCancelled == false else {
-                return
+        var result = valid
+        // Only repair a brief excursion that returns to consistent neighbours.
+        // Never infer heading from motion: reversing, strafing and sustained
+        // turns must retain their recorded orientation. Do not bridge long gaps
+        // or cascade corrections through already modified samples.
+        for index in 1..<(valid.count - 1) {
+            let before = valid[index - 1]
+            let sample = valid[index]
+            let after = valid[index + 1]
+            let duration = after.time - before.time
+            guard duration <= 1 else {
+                continue
             }
-
-            let progress = Float(step) / Float(steps)
-            let pose = RobotPose(
-                position: SIMD3<Float>(
-                    start.x + (end.x - start.x) * progress,
-                    0,
-                    start.z + (end.z - start.z) * progress
-                ),
-                rotation: startRotation + rotationDelta * progress
+            let expected = interpolate(from: before, to: after, at: sample.time)
+            let angularSpike =
+                abs(angleDelta(from: before.rotation, to: after.rotation)) < 0.35
+                && abs(angleDelta(from: before.rotation, to: sample.rotation)) > 0.75
+                && abs(angleDelta(from: after.rotation, to: sample.rotation)) > 0.75
+            let positionSpike =
+                hypot(sample.x - before.x, sample.z - before.z)
+                    > 0.1 + 1.5 * Float(sample.time - before.time)
+                && hypot(after.x - sample.x, after.z - sample.z)
+                    > 0.1 + 1.5 * Float(after.time - sample.time)
+                && hypot(after.x - before.x, after.z - before.z) <= 0.1 + 0.75 * Float(duration)
+            result[index] = ConsumentaDriveSample(
+                time: sample.time,
+                x: positionSpike ? expected.x : sample.x,
+                z: positionSpike ? expected.z : sample.z,
+                rotation: angularSpike ? expected.rotation : sample.rotation
             )
-
-            simulation.setPose(pose, animateMovement: true)
-            onPoseUpdated(pose)
-            onTimeUpdated(
-                start.time + (end.time - start.time) * Double(progress)
-            )
-
-            if stepDuration > 0 {
-                try? await Task.sleep(
-                    for: .seconds(stepDuration)
-                )
-            }
         }
+        return result
     }
 }
 

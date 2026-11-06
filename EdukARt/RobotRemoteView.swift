@@ -37,6 +37,8 @@ struct RobotRemoteView: View {
                 VStack(spacing: 12) {
                     
                     settingsSection
+
+                    RobotProfilesView(controller: controller)
                     
                     lightsSection
                     
@@ -89,7 +91,7 @@ private extension RobotRemoteView {
             if settingsExpanded {
                 VStack(alignment: .leading, spacing: 12) {
                     
-                    Text("Connect your device to Eduard's WiFi network.")
+                    Text("Connect your device to the selected robot's WiFi network.")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.72))
                     // ToDo Ping Robot and check active WiFi Connection
@@ -216,7 +218,27 @@ private extension RobotRemoteView {
                 .buttonStyle(.plain)
             
             if driveExpanded {
+                if controller.eduard.usesConfiguredBridge {
+                    HStack {
+                        Text(controller.isEnabled ? "ROS-Freigabe aktiv" : "Keine Motorfreigabe")
+                            .foregroundStyle(controller.isEnabled ? Color.green : Color.orange)
+                        Spacer()
+                        Button(controller.isEnabled ? "Disable" : "Enable") {
+                            controller.toggleEnabled()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    if !controller.isEnabled {
+                        Text("Enable drücken und die ROS-Bestätigung abwarten. Das Öffnen der ROS Settings deaktiviert die Freigabe.")
+                            .font(.caption)
+                    }
+                    Text(controller.bridgeStatus)
+                        .font(.caption)
+                        .textSelection(.enabled)
+                }
                 remoteJoystickControls
+                    .allowsHitTesting(!controller.eduard.usesConfiguredBridge || controller.isEnabled)
+                    .opacity(controller.eduard.usesConfiguredBridge && !controller.isEnabled ? 0.4 : 1)
                         
             }
             

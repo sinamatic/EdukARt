@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
 
@@ -105,6 +106,7 @@ struct ContentView: View {
                     onTutorialGameStart: startTutorialGame,
                     onTutorialMapSelection: { selectedTutorialMap = $0 }
                 )
+                .background(SwipeBackDisabler())
             }
             .preferredColorScheme(.dark)
         } else if let tutorialMap,
@@ -128,6 +130,7 @@ struct ContentView: View {
                     gameMapStore: gameMapStore,
                     onShowTutorial: startTutorial
                 )
+                .background(SwipeBackDisabler())
             }
             .preferredColorScheme(.dark)
         }
@@ -203,6 +206,58 @@ struct ContentView: View {
     }
 }
 
+
+// Install at each navigation root so the policy covers every pushed screen.
+private struct SwipeBackDisabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> SwipeBackDisablingViewController {
+        SwipeBackDisablingViewController()
+    }
+
+    func updateUIViewController(_ uiViewController: SwipeBackDisablingViewController, context: Context) {
+        uiViewController.disableSwipeBack()
+    }
+}
+
+private final class SwipeBackDisablingViewController: UIViewController {
+    override func didMove(toParent parent: UIViewController?) {
+        super.didMove(toParent: parent)
+        disableSwipeBack()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        disableSwipeBack()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        disableSwipeBack()
+    }
+
+    func disableSwipeBack() {
+        guard let navigationController else { return }
+        block(navigationController.interactivePopGestureRecognizer)
+        if #available(iOS 26.0, *) {
+            block(navigationController.interactiveContentPopGestureRecognizer)
+        }
+    }
+
+    private func block(_ gestureRecognizer: UIGestureRecognizer?) {
+        // UIKit may re-enable recognizers after a push/pop. The delegate also
+        // rejects recognition, while the standard back button remains usable.
+        gestureRecognizer?.delegate = SwipeBackGestureBlocker.shared
+        gestureRecognizer?.isEnabled = false
+    }
+}
+
+private final class SwipeBackGestureBlocker: NSObject, UIGestureRecognizerDelegate {
+    // Gesture delegates are weak; retain this policy for the app's lifetime.
+    static let shared = SwipeBackGestureBlocker()
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        false
+    }
+}
 
 #Preview {
 
