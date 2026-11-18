@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct CoursesView: View {
 
@@ -17,8 +18,11 @@ struct CoursesView: View {
 
     @State private var editingMap: GameMap?
     @State private var isShowingEditView = false
-    @State private var consumentaExportURL: URL?
-    @State private var consumentaExportError = false
+    @State private var courseExportURL: URL?
+    @State private var courseExportError = false
+    @State private var isShowingImporter = false
+    @State private var showsImportResult = false
+    @State private var importMessage = ""
 
     var body: some View {
         MapMenuBackground {
@@ -53,31 +57,47 @@ struct CoursesView: View {
                     onDelete: gameMapStore.delete
                 )
 
-                if ConsumentaConfiguration.isEnabled {
-                    Button("Prepare Consumenta Course Export") {
-                        prepareConsumentaExport()
-                    }
-                    .buttonStyle(MapMenuButtonStyle(color: Color("BlackOverlay")))
-
-                    if let consumentaExportURL {
-                        ShareLink(item: consumentaExportURL) {
-                            Label("Share Consumenta Courses", systemImage: "square.and.arrow.up")
-                        }
-                        .buttonStyle(MapMenuButtonStyle(color: Color("BrandGreen")))
-                    }
-
-                    if consumentaExportError {
-                        Text("The course export could not be prepared.")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
+                Button("Export all courses") {
+                    prepareCourseExport()
                 }
+                .buttonStyle(MapMenuButtonStyle(color: Color("BlackOverlay")))
+
+                if let courseExportURL {
+                    ShareLink(item: courseExportURL) {
+                        Label("Share courses", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(MapMenuButtonStyle(color: Color("BrandGreen")))
+                }
+
+                if courseExportError {
+                    Text("The course export could not be prepared.")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                Button("Import courses") {
+                    isShowingImporter = true
+                }
+                .buttonStyle(MapMenuButtonStyle(color: Color("BlackOverlay")))
+
             }
             .padding(.bottom, 50)
         }
         .onAppear {
 
             controller.resetForManualControl()
+        }
+        .fileImporter(
+            isPresented: $isShowingImporter,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            importCourses(result)
+        }
+        .alert("Import courses", isPresented: $showsImportResult) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(importMessage)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -121,13 +141,30 @@ struct CoursesView: View {
             true
     }
 
-    private func prepareConsumentaExport() {
+    private func importCourses(_ result: Result<[URL], Error>) {
         do {
-            consumentaExportURL = try gameMapStore.exportConsumentaCourses()
-            consumentaExportError = false
+            guard let url = try result.get().first else { return }
+            let hasAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if hasAccess { url.stopAccessingSecurityScopedResource() }
+            }
+
+            let summary = try gameMapStore.importCourses(from: url)
+            courseExportURL = nil
+            importMessage = "Imported: \(summary.imported). Already present: \(summary.skipped)."
         } catch {
-            consumentaExportURL = nil
-            consumentaExportError = true
+            importMessage = "The courses could not be imported. Please select an exported course JSON file.\n\n" + error.localizedDescription
+        }
+        showsImportResult = true
+    }
+
+    private func prepareCourseExport() {
+        do {
+            courseExportURL = try gameMapStore.exportAllCourses()
+            courseExportError = false
+        } catch {
+            courseExportURL = nil
+            courseExportError = true
         }
     }
 }

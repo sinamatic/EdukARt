@@ -44,13 +44,13 @@ final class GameMapStore:
 
 
         load()
-        installBundledConsumentaCoursesIfNeeded()
+        removeBundledConsumentaCoursesIfNeeded()
     }
 
 
-    // MARK: - Consumenta Export
+    // MARK: - Course Export and Import
 
-    func exportConsumentaCourses() throws -> URL {
+    func exportAllCourses() throws -> URL {
 
         let encoder =
             JSONEncoder()
@@ -69,7 +69,7 @@ final class GameMapStore:
         let exportURL =
             FileManager.default.temporaryDirectory
                 .appendingPathComponent(
-                    "ConsumentaCourses.json"
+                    "EdukARtCourses.json"
                 )
 
         try data.write(
@@ -78,6 +78,26 @@ final class GameMapStore:
         )
 
         return exportURL
+    }
+
+
+    /// Imports new courses without replacing existing courses or their scores.
+    /// Decode and persist the complete result before publishing any changes.
+    func importCourses(from url: URL) throws -> (imported: Int, skipped: Int) {
+        let data = try Data(contentsOf: url)
+        let incoming = try JSONDecoder().decode([GameMap].self, from: data)
+        var knownIDs = Set(maps.map(\.id))
+        let additions = incoming.filter { knownIDs.insert($0.id).inserted }
+
+        guard !additions.isEmpty else {
+            return (0, incoming.count)
+        }
+
+        let updatedMaps = maps + additions
+        let encoded = try JSONEncoder().encode(updatedMaps)
+        try encoded.write(to: fileURL, options: .atomic)
+        maps = updatedMaps
+        return (additions.count, incoming.count - additions.count)
     }
 
 
@@ -178,34 +198,32 @@ final class GameMapStore:
     }
 
 
-    // MARK: - Consumenta Bundled Courses
+    // MARK: - Post-Consumenta Migration
 
-    private func installBundledConsumentaCoursesIfNeeded() {
+    private func removeBundledConsumentaCoursesIfNeeded() {
+        let migrationKey = "consumentaCoursesRemovedForVersion12"
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
 
-        guard ConsumentaConfiguration.isEnabled,
-              UserDefaults.standard.integer(
-                forKey: "consumentaBundledCourseVersion"
-              ) != ConsumentaConfiguration.bundledCourseVersion,
-              let bundledURL = Bundle.main.url(
-                forResource: ConsumentaConfiguration.bundledCourseResourceName,
-                withExtension: "json"
-              ),
-              let data = try? Data(contentsOf: bundledURL),
-              let bundledMaps = try? JSONDecoder().decode(
-                [GameMap].self,
-                from: data
-              ),
-              bundledMaps.isEmpty == false
-        else {
-            return
+        // Match only the bundled course IDs, never user-chosen course names.
+        let bundledIDs: Set<UUID> = Set([
+            "38A628E6-26E2-430D-A8DC-586898B0F249",
+            "3C734ADA-2445-495B-A13B-9E14A1B9C80E",
+            "F54CEEF4-92AB-4306-84EC-04AB43B8875C"
+        ].compactMap { UUID(uuidString: $0) })
+        let remainingMaps = maps.filter { !bundledIDs.contains($0.id) }
+
+        if remainingMaps.count != maps.count {
+            do {
+                let data = try JSONEncoder().encode(remainingMaps)
+                try data.write(to: fileURL, options: .atomic)
+                maps = remainingMaps
+            } catch {
+                // Retry next launch if persistence fails.
+                return
+            }
         }
 
-        maps = bundledMaps
-        saveToDisk()
-
-        UserDefaults.standard.set(
-            ConsumentaConfiguration.bundledCourseVersion,
-            forKey: "consumentaBundledCourseVersion"
-        )
+        UserDefaults.standard.set(true, forKey: migrationKey)
+        UserDefaults.standard.removeObject(forKey: "consumentaBundledCourseVersion")
     }
 }

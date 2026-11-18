@@ -9,6 +9,8 @@ import SwiftUI
 
 struct RobotControlOverlay: View {
     @ObservedObject var controller: RobotController
+    var showsTutorialHint = false
+    var onControlInteraction: () -> Void = {}
 
     var body: some View {
         let wifiStatus = controller.isWifiReachable ? "reachable" : "not reachable"
@@ -17,6 +19,7 @@ struct RobotControlOverlay: View {
         HStack(spacing: 7) {
             Button {
                 controller.toggleEnabled()
+                onControlInteraction()
             } label: {
                 Image(systemName: "power")
                     .font(.subheadline.weight(.bold))
@@ -37,6 +40,16 @@ struct RobotControlOverlay: View {
         .padding(.vertical, 5)
         .background(.black.opacity(0.58))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(alignment: .topLeading) {
+            if showsTutorialHint {
+                Image(systemName: "arrow.up")
+                    .font(.largeTitle.bold())
+                    .foregroundStyle(Color("BrandGreen"))
+                    .offset(x: 8, y: 48)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .padding(20)
         .offset(y: -20)

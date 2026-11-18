@@ -17,6 +17,8 @@ struct InfoView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     InfoHeader()
 
+                    InfoGameItems()
+
                     InfoTextSection(
                         title: "EdukARt – echte Roboter, virtuelle Abenteuer",
                         primaryText: "Steuere einen echten Roboter durch eine Rennstrecke mit virtuellen Hindernissen und Items: EdukARt verbindet Robotik mit Augmented Reality. Auf dem iPhone verschmelzen die reale Umgebung und digitale Spielelemente – virtuelle Ereignisse beeinflussen dabei die Bewegung und Beleuchtung des echten Roboters.",
@@ -55,6 +57,52 @@ struct InfoView: View {
         }
         .navigationTitle("Infos")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+
+private struct InfoGameItems: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Items und Hindernisse")
+                .font(.title2.bold())
+                .foregroundStyle(Color("BrandGreen"))
+
+            InfoGameItemRow(icon: "🪙", title: "Münze", effect: "Kurzzeitiger Geschwindigkeitsschub. Jede fehlende Münze addiert 5 Sekunden zur Endzeit.")
+            InfoGameItemRow(icon: "🎁", title: "Itembox", effect: "Einsammeln zieht 20 Sekunden von der Endzeit ab.")
+            InfoGameItemRow(icon: "💧", title: "Wasser", effect: "Bewege dich mit vielen kurzen Joystick-Inputs durch das Wasser. Lass den Joystick zwischen den Schwimmzügen in die Mitte zurückkehren.")
+            InfoGameItemRow(icon: "🌳", title: "Baum", effect: "Ein Hindernis erscheint. Ein Zusammenstoß verursacht Schaden und verringert die Geschwindigkeit.")
+            InfoGameItemRow(icon: "🪨", title: "Stein", effect: "Blockiert den Weg. Ein Zusammenstoß verursacht Schaden und verringert die Geschwindigkeit.")
+            InfoGameItemRow(icon: "🛢️", title: "Öl", effect: "Eduard dreht sich vorübergehend automatisch. Das Fass blockiert den Weg.")
+            InfoGameItemRow(icon: "💩", title: "Shit", effect: "Eduard fährt vorübergehend automatisch im Zickzack und hinterlässt eine Schmutzspur.")
+            InfoGameItemRow(icon: "🥚", title: "Ei", effect: "Einsammeln und zum Nest transportieren.")
+            InfoGameItemRow(icon: "🪺", title: "Cup / Nest", effect: "Liefere gesammelte Eier ab, um Schaden zu reparieren und die normale Geschwindigkeit wiederherzustellen.")
+        }
+    }
+}
+
+private struct InfoGameItemRow: View {
+    let icon: String
+    let title: LocalizedStringResource
+    let effect: LocalizedStringResource
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(verbatim: icon)
+                .font(.title2)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                Text(effect)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 

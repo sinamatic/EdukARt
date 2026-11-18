@@ -39,6 +39,15 @@ struct MainMenuView: View {
                     .buttonStyle(MenuButtonStyle(color: Color("BrandGreen")))
                 
                 NavigationLink{
+                    ConsumentaCourseAccessView(
+                        eduardModelStore: eduardModelStore,
+                        controller: controller,
+                        gameMapStore: gameMapStore
+                    )
+                } label: {Text("Courses")}
+                    .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay")))
+
+                NavigationLink{
                     RobotRemoteView(controller: controller)}
                 label: {Text("Robot Remote")}
                 
@@ -82,15 +91,6 @@ struct MainMenuView: View {
 
                 Spacer()
                     .frame(height: 18)
-
-                NavigationLink{
-                    ConsumentaCourseAccessView(
-                        eduardModelStore: eduardModelStore,
-                        controller: controller,
-                        gameMapStore: gameMapStore
-                    )
-                } label: {Text("Courses")}
-                    .buttonStyle(MenuButtonStyle(color: Color("BlackOverlay").opacity(0.2)))
 
                 NavigationLink
                 {
@@ -147,7 +147,7 @@ struct MainMenuView: View {
     private struct MainMenuFooter: View {
         var body: some View {
             VStack(spacing: 4) {
-                Text(verbatim: "© Sina Steinmüller | v1.1 | 2026")
+                Text(verbatim: "© Sina Steinmüller | v1.2 | 2026")
                     .font(.caption2)
                     .foregroundStyle(.white.opacity(0.8))
 

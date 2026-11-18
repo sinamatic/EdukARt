@@ -12,6 +12,37 @@ The [accompanying thesis repository](https://github.com/sinamatic/Docu_EduK-AR-t
 
 This README describes the prototype documented in the thesis. Version numbers and behavior below reflect that development and test setup; they are not a declaration of minimum requirements or compatibility with other configurations.
 
+## Consumenta branch and TestFlight releases
+
+Compared with `main`, the `Consumenta` branch extends the thesis prototype for exhibition use. The following groups distinguish the two TestFlight releases from subsequent branch development.
+
+### TestFlight release 1.0 — Initial release
+
+- Added password-protected course editing, JSON course export, and loading of courses bundled with the app.
+- Added race recording, saved ghost runs linked to leaderboard entries, AR ghost replay, and sharing of recorded runs.
+- Implemented a spectator library and playback interface for presenting recorded runs on an iPad; the first TestFlight build targeted iPhone.
+- Added a guided introduction covering course selection, reference-marker scanning, robot positioning, and race controls, with access from the main menu.
+- Corrected start/finish alignment and virtual robot placement; refined ghost playback and the robot's animations for poop, oil, and water effects.
+- Prepared the app's build configuration and resources for TestFlight distribution.
+
+### TestFlight release 1.1 — Consumenta courses
+
+- Added the three exhibition courses **Consumenta1**, **Consumenta2**, and **Consumenta3**, replacing the bundled test course with the tracks used at Consumenta.
+- Revised the tutorial and its presentation for visitors.
+- Added an information page with project and website links, and updated the app icon.
+- Introduced a minimum gameplay speed of **20%**, so repeated obstacle damage no longer reduces the normal driving speed to zero.
+- Updated the oil model and adjusted the exhibition menu and course-editor access.
+
+In Git, release 1.0 is marked by `0389202` (“First Appstore TestFlight Version RELEASE”) and release 1.1 by `974c3e5` (“RELEASE 2 v1.1”). The Consumenta courses were added between them in `fec850a`.
+
+### Subsequent changes on Consumenta
+
+- Added support for **SML_Eduard** and multiple named robot profiles with separate connection and ROS2 settings.
+- Added configurable robot AprilTag IDs and excluded known robot markers from floor-map creation.
+- Added in-app robot setup over SSH, bridge deployment and reachability checks, and ROS2 debugging tools.
+- Added a revised Python bridge, remote setup scripts, setup documentation, and bridge tests.
+- Further revised ghost recording/replay and enabled iPad as a target device family.
+
 ## Software and versions
 
 | Software / platform | Documented version | Purpose |
@@ -148,4 +179,11 @@ The thesis demonstrates technical feasibility with the tested Eduard and iPhone 
 - Overlapping lighting effects can replace one another without restoring the previous effect. A consistent priority system remains future work.
 - The virtual Eduard supports testing and comparison, but some behavior, particularly swimming controls, still differs from the physical robot.
 - Gameplay balance, additional robot platforms, multiplayer, and cross-platform support remain areas for further development.
+
+## Releases
+
+- **1.2 — Post-Consumenta (in development):** Removed password protection from course creation and editing. Restored the Courses button below Start Game. The tutorial now opens only through the tutorial button and uses three pages with fixed navigation: print or email the bundled AprilTag PDF, connect to Eduard or choose the AR robot, and press the enable/disable button to finish. Added item explanations to Infos and updated the main-menu version label to 1.2.
+
+- **1.0 — Initial TestFlight release:** Mixed-reality robot racing with course editing, items and obstacles, local leaderboards, a guided tutorial, and recorded ghost runs with AR replay and sharing. Added protected course management and bundled-course loading for exhibition use.
+- **1.1 — Consumenta update:** Added the three exhibition courses Consumenta1, Consumenta2, and Consumenta3. Updated the tutorial, information page, app icon, oil model, and exhibition menu; introduced a 20% minimum gameplay speed after obstacle damage.
 
