@@ -39,6 +39,10 @@ def sample(config):
 
     def receive(key, message):
         value = message_to_ordereddict(message)
+        if key == "enabled":
+            # ROS byte fields can be represented as single-character strings.
+            value["data"] = [ord(item) if isinstance(item, str) and len(item) == 1
+                             else item for item in value.get("data", [])]
         record = report[key]
         record["count"] += 1
         record["last"] = value
@@ -66,6 +70,10 @@ def sample(config):
                          "type": item.topic_type, "qos": str(item.qos_profile)} for item in items]
             report[key]["publishers"] = endpoints(node.get_publishers_info_by_topic(name))
             report[key]["subscribers"] = endpoints(node.get_subscriptions_info_by_topic(name))
+        report["topics"] = [{"name": name, "types": types}
+                            for name, types in node.get_topic_names_and_types()]
+        report["services"] = [{"name": name, "types": types}
+                              for name, types in node.get_service_names_and_types()]
         report["durationSeconds"] = 12
         report["note"] = "Nur gelesen; keine Fahrbefehle, Services oder Container-Änderungen ausgeführt."
         return report

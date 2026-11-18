@@ -1018,6 +1018,8 @@ struct CameraARView: UIViewRepresentable {
 
         private var stabilizedRobotPose:
             RobotPose?
+        private var trackedRobotProfileID: UUID?
+        private var trackedRobotTagID: Int?
 
         private let robotPoseStabilizationFactor:
             Float = 0.35
@@ -1354,6 +1356,22 @@ struct CameraARView: UIViewRepresentable {
                 // Select reference tag
                 // --------------------------------------------------
 
+                let robotProfiles = RobotProfileStore.shared
+                let selectedProfileID = robotProfiles.selectedID
+                let selectedTagID = robotProfiles.selectedProfile?.aprilTagNumber
+                if trackedRobotProfileID != selectedProfileID || trackedRobotTagID != selectedTagID {
+                    stabilizedRobotPose = nil
+                    lastRobotPoseUpdate = .distantPast
+                    trackedRobotProfileID = selectedProfileID
+                    trackedRobotTagID = selectedTagID
+                    DispatchQueue.main.async {
+                        self.controller.clearRealRobotPose()
+                        self.onRobotPoseLost()
+                    }
+                }
+                aprilTagLocalization.robotTagID = selectedTagID
+                aprilTagLocalization.excludedRobotTagIDs = robotProfiles.robotTagIDs
+
                 if requiredReferenceTagID > 0 {
 
                     aprilTagLocalization
@@ -1420,10 +1438,10 @@ struct CameraARView: UIViewRepresentable {
 
 
                     // --------------------------------------------------
-                    // Robot tag #0
+                    // Selected robot marker
                     // --------------------------------------------------
 
-                    if detection.id == 0 {
+                    if detection.id == aprilTagLocalization.robotTagID {
 
                         robotDetection =
                             detection
@@ -1644,6 +1662,8 @@ struct CameraARView: UIViewRepresentable {
 
 
                         DispatchQueue.main.async {
+                            guard RobotProfileStore.shared.selectedID == selectedProfileID,
+                                  RobotProfileStore.shared.selectedProfile?.aprilTagNumber == selectedTagID else { return }
 
                             self.controller
                                 .eduardOccluder

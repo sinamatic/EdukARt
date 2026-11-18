@@ -49,7 +49,7 @@ class DeploymentChecks(unittest.TestCase):
         with patch.object(manager, "run", fake_run), patch.object(manager.shutil, "which", return_value="docker"):
             result = manager.main(payload)
         self.assertEqual(result["drive"]["nonzeroCount"], 10)
-        self.assertTrue(all(args[:2] in (["docker", "exec"], ["docker", "ps"]) for args in calls))
+        self.assertTrue(all(args[:2] in (["docker", "exec"], ["docker", "ps"], ["docker", "logs"]) for args in calls))
         self.assertFalse(any("stop" in args or "cp" in args or "restart" in args for args in calls))
 
     def test_discovery_is_read_only_and_returns_visible_drive(self):

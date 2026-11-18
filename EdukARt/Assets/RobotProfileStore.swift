@@ -4,6 +4,7 @@ import Observation
 struct RobotProfile: Codable, Identifiable {
     let id: UUID
     var name: String
+    var aprilTagNumber: Int? = nil
 }
 
 /// One selection shared by the remote and gameplay. ROS values live in isolated stores.
@@ -33,7 +34,7 @@ final class RobotProfileStore {
             selectedID = profiles.contains(where: { $0.id == saved.selectedID })
                 ? saved.selectedID : profiles.first?.id
         } else {
-            let initial = RobotProfile(id: UUID(), name: "Eduard")
+            let initial = RobotProfile(id: UUID(), name: "Eduard", aprilTagNumber: 0)
             profiles = [initial]
             selectedID = initial.id
             // Migrate the previous global configuration once, including JSON block flags.
@@ -53,6 +54,25 @@ final class RobotProfileStore {
             }
             defaults.set(true, forKey: storagePrefix + ".smlSeeded")
         }
+        if !defaults.bool(forKey: storagePrefix + ".tagNumberMigrated") {
+            if let index = profiles.firstIndex(where: { $0.name == "Eduard" }),
+               profiles[index].aprilTagNumber == nil {
+                profiles[index].aprilTagNumber = 0
+            }
+            defaults.set(true, forKey: storagePrefix + ".tagNumberMigrated")
+        }
+        persist()
+    }
+
+    /// Exclude all known robot markers, including robots not currently selected.
+    var robotTagIDs: Set<Int> {
+        Set(profiles.compactMap { $0.aprilTagNumber }).union([0])
+    }
+
+    func setAprilTagNumber(_ number: Int?, for id: UUID) {
+        guard number.map({ $0 >= 0 }) ?? true,
+              let index = profiles.firstIndex(where: { $0.id == id }) else { return }
+        profiles[index].aprilTagNumber = number
         persist()
     }
 
@@ -71,6 +91,18 @@ final class RobotProfileStore {
         guard !name.isEmpty else { return nil }
         let profile = RobotProfile(id: UUID(), name: name)
         profiles.append(profile)
+        // Only newly created profiles opt into the shared SSH/bridge workflow.
+        // Existing legacy profiles and their ROS configuration are left intact.
+        guard let store = settings(for: profile.id) else {
+            profiles.removeAll { $0.id == profile.id }
+            return nil
+        }
+        do {
+            try RobotSetupConfiguration.newRobot.save(to: store)
+        } catch {
+            profiles.removeAll { $0.id == profile.id }
+            return nil
+        }
         if selectedID == nil { selectedID = profile.id }
         persist()
         return profile

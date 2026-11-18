@@ -55,6 +55,18 @@ struct AprilTagMapPose {
 final class AprilTagLocalization {
 
     let tagSize: Double
+    var robotTagID: Int? = 0
+    var excludedRobotTagIDs: Set<Int> = [0] {
+        didSet {
+            if let referenceTagID, excludedRobotTagIDs.contains(referenceTagID) {
+                reset()
+            }
+        }
+    }
+
+    private func isMapTag(_ id: Int) -> Bool {
+        validMapTagIDs.contains(id) && !excludedRobotTagIDs.contains(id)
+    }
 
 
     // --------------------------------------------------
@@ -137,6 +149,8 @@ final class AprilTagLocalization {
         id: Int
     ) {
 
+        guard isMapTag(id) else { return }
+
         // Keep the currently selected reference
         // if it already matches.
         if referenceTagID == id {
@@ -171,9 +185,7 @@ final class AprilTagLocalization {
         // Only IDs 1...40 may define the map.
         let validDetections =
             detections.filter {
-                validMapTagIDs.contains(
-                    $0.id
-                )
+                isMapTag($0.id)
             }
 
 
@@ -211,9 +223,7 @@ final class AprilTagLocalization {
         // 1. Check tag ID
         // --------------------------------------------------
 
-        guard validMapTagIDs.contains(
-            detection.id
-        )
+        guard isMapTag(detection.id)
         else {
 
             print(
@@ -466,15 +476,15 @@ final class AprilTagLocalization {
         mapWorldTransform: simd_float4x4? = nil
     ) -> RobotPose? {
 
-        // Tag 0 belongs to the physical Eduard.
-        guard detection.id == 0
+        // Only the selected marker belongs to the controlled robot.
+        guard let robotTagID, detection.id == robotTagID
         else {
             return nil
         }
 
 
         // --------------------------------------------------
-        // Estimate AprilTag #0 pose relative to camera
+        // Estimate the robot AprilTag pose relative to camera
         // --------------------------------------------------
 
         guard let pose =

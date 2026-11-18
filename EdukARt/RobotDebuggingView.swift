@@ -23,6 +23,21 @@ struct RobotDebuggingView: View {
                 }
                 Text("Während der Aufzeichnung unten die Joysticks vorwärts und drehend bewegen. Die Diagnose liest nur ROS-Nachrichten und stoppt keinen Container.")
                     .font(.caption)
+                Button("Gespeicherte Einstellungen auslesen") {
+                    do {
+                        guard let config = RobotSetupConfiguration.load(from: store) else {
+                            throw RobotSetupError("Keine ROS-Konfiguration gespeichert.")
+                        }
+                        let snapshot = try configurationSnapshot(config)
+                        report = String(decoding: try JSONSerialization.data(withJSONObject: snapshot,
+                            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]), as: UTF8.self)
+                        summary = "Gespeicherte App-Einstellungen ausgelesen. Keine Verbindung zum Roboter erforderlich. SSH-Passwort ist nicht enthalten."
+                    } catch {
+                        summary = error.localizedDescription
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(recording)
                 Button("12 Sekunden ROS aufzeichnen") {
                     Task { await record() }
                 }
@@ -54,6 +69,23 @@ struct RobotDebuggingView: View {
         }
     }
 
+    private func configurationSnapshot(_ config: RobotSetupConfiguration) throws -> [String: Any] {
+        var values = try JSONSerialization.jsonObject(with: JSONEncoder().encode(config)) as? [String: Any] ?? [:]
+        // Arbitrary environment variables and free-form reports may contain credentials.
+        values.removeValue(forKey: "environment")
+        values.removeValue(forKey: "report")
+        values["environmentVariableNames"] = (try? RobotSetupConfiguration.object(config.environment).keys.sorted()) ?? []
+        values["resolvedDriveTopic"] = config.name(config.driveTopic)
+        values["enablePacket"] = try config.actionData(config.enableAction).map {
+            try JSONSerialization.jsonObject(with: $0)
+        }
+        let robot = RobotProfileStore.shared.profiles.first { $0.id == profile }
+        return ["robot": robot?.name ?? profile.uuidString,
+                "aprilTagNumber": robot?.aprilTagNumber as Any? ?? NSNull(),
+                "configuration": values,
+                "appState": controller.driveDebugState]
+    }
+
     @MainActor
     private func record() async {
         guard !recording else { return }
@@ -67,7 +99,10 @@ struct RobotDebuggingView: View {
                 throw RobotSetupError("Keine ROS-Konfiguration gespeichert.")
             }
             let password = RobotSecrets.read("password." + profile.uuidString) ?? "aut0n0hm"
+            report = ""
+            let snapshot = try configurationSnapshot(config)
             var result = try await RobotSSHSetup.run(action: "debug", config: config, password: password, profile: profile)
+            result["savedSettings"] = snapshot
             result["appStateAtStart"] = initialState
             result["appStateAtEnd"] = controller.driveDebugState
             result["appStateChanges"] = stateEvents
@@ -89,7 +124,7 @@ struct RobotDebuggingView: View {
             } else if nonzero == 0 {
                 summary = "\(count) Fahrnachrichten empfangen, aber nur Nullwerte. Joystick-Eingabe und Fahrvorlage prüfen."
             } else {
-                summary = "\(count) Fahrnachrichten, davon \(nonzero) mit Bewegung. Fahrwerte erreichen ROS; Treiber und Motorstatus prüfen."
+                summary = "\(count) Fahrnachrichten, davon \(nonzero) mit Bewegung. Fahrwerte erreichen ROS. Notaus, tatsächliche Motorfreigabe, Treiber-Empfänger/QoS und Motorversorgung prüfen. Eine erfolgreiche Enable-Antwort bestätigt allein noch keine Motorfreigabe."
             }
             summary += "\nJoystick-Topic: \(joyCount) Nachrichten. "
             summary += joyCount > 0

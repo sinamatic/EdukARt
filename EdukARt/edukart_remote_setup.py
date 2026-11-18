@@ -71,6 +71,12 @@ def main(payload):
                 report["containers"] = run(["docker", "ps", "--format", "{{.Names}}: {{.Status}}"], 5).splitlines()
             except Exception as error:
                 report["containerError"] = str(error)
+        if container:
+            try:
+                report["driverContainerLogs"] = run(
+                    ["docker", "logs", "--tail", "120", container], 5)[-16000:]
+            except Exception as error:
+                report["driverContainerLogsError"] = str(error)
         return report
     if action == "discover":
         candidates = [container]

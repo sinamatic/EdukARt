@@ -40,6 +40,8 @@ struct GameView: View {
     @StateObject private var ghostReplayController =
         ConsumentaGhostReplayController()
 
+    @State private var robotProfiles = RobotProfileStore.shared
+
     @State private var isMapLocalized =
         false
 
@@ -528,7 +530,7 @@ struct GameView: View {
 
                 } else {
 
-                    if isRobotReadyForRace {
+                    VStack(spacing: 10) {
 
                         Button {
 
@@ -537,7 +539,7 @@ struct GameView: View {
                         } label: {
 
                             Text(
-                                "I'm Ready"
+                                "Start Game with \(robotProfiles.selectedProfile?.name ?? "Simulation")"
                             )
                             .font(
                                 .headline.bold()
@@ -558,13 +560,17 @@ struct GameView: View {
                             : .red
                         )
                         .disabled(
-                            isRobotBehindStartLine
-                                == false
+                            !isRobotReadyForRace || !isRobotBehindStartLine
                         )
                         .padding(
                             .top,
                             4
                         )
+                        Text(raceStartGuidance)
+                            .font(.callout)
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
                 }
             }
@@ -1274,11 +1280,31 @@ struct GameView: View {
     }
 
 
+    private var raceStartGuidance: String {
+        let name = robotProfiles.selectedProfile?.name ?? "Robot"
+        if controller.isSimulationVisible && controller.realRobotPose == nil {
+            return isRobotBehindStartLine ? "Simulation ready." : "Move the simulation behind the start line."
+        }
+        guard let tag = robotProfiles.selectedProfile?.aprilTagNumber else {
+            return "Enter the April Tag Number for \(name) in Robot Settings."
+        }
+        if map.aprilTags.contains(where: { $0.id == tag }) || map.referenceTagID == tag {
+            return "AprilTag #\(tag) is also a map marker. Assign a separate robot tag in Robot Settings."
+        }
+        if controller.realRobotPose == nil {
+            return "Scan AprilTag #\(tag) on the front of \(name)."
+        }
+        return isRobotBehindStartLine ? "\(name) ready." : "Move \(name) behind the start line."
+    }
+
     private var isRobotReadyForRace:
         Bool {
 
-        controller.realRobotPose != nil
-            || controller.isSimulationVisible
+        if controller.isSimulationVisible && controller.realRobotPose == nil { return true }
+        guard let tag = robotProfiles.selectedProfile?.aprilTagNumber,
+              tag != map.referenceTagID,
+              !map.aprilTags.contains(where: { $0.id == tag }) else { return false }
+        return controller.realRobotPose != nil
     }
 
 

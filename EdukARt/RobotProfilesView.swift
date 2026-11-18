@@ -172,6 +172,11 @@ private struct RobotProfileDetails: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
     @State private var name = ""
+    @State private var aprilTagNumber = ""
+
+    private var validTagNumber: Bool {
+        aprilTagNumber.isEmpty || (Int(aprilTagNumber).map { $0 >= 0 } ?? false)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -182,6 +187,26 @@ private struct RobotProfileDetails: View {
                 Button("Save") { profiles.rename(profile.id, to: name) }
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name == profile.name)
             }
+            Text("April Tag Number")
+                .font(.caption)
+            HStack {
+                TextField("Not configured", text: $aprilTagNumber)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("April Tag Number")
+                Button("Save") {
+                    profiles.setAprilTagNumber(Int(aprilTagNumber), for: profile.id)
+                }
+                .disabled(!validTagNumber || aprilTagNumber == (profile.aprilTagNumber.map(String.init) ?? ""))
+            }
+            Text("Robot marker for localization. Excluded from map creation. Leave empty if no tag is assigned.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if !validTagNumber {
+                Text("Enter a whole number greater than or equal to 0.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
             Button(action: onEdit) {
                 Label("ROS Settings", systemImage: "slider.horizontal.3")
             }
@@ -190,6 +215,9 @@ private struct RobotProfileDetails: View {
             }
         }
         .buttonStyle(.bordered)
-        .onAppear { name = profile.name }
+        .onAppear {
+            name = profile.name
+            aprilTagNumber = profile.aprilTagNumber.map(String.init) ?? ""
+        }
     }
 }

@@ -30,6 +30,15 @@ struct RobotSetupConfiguration: Codable, Equatable {
 
     static let key = "robotSetup.configuration"
 
+    /// Share the working bridge protocol and editors, but discover each robot's runtime.
+    static var newRobot: Self {
+        var config = Self()
+        config.container = ""
+        config.setup = ""
+        config.namespace = ""
+        return config
+    }
+
     static func load(from store: UserDefaults) -> Self? {
         guard let data = store.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(Self.self, from: data)

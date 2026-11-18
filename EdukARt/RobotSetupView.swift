@@ -7,7 +7,7 @@ import Observation
 final class RobotSetupModel {
     var config = RobotSetupConfiguration()
     var password = ""
-    var status = "SML-Vorgaben aus der bisherigen Diagnose. Noch nicht per App geprüft."
+    var status = "Verbindungsdaten prüfen und mit „Automatisch ausfüllen“ die ROS-Konfiguration dieses Roboters ermitteln."
     var busy = false
     private var loaded = false
 

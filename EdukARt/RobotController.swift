@@ -2215,6 +2215,11 @@ final class RobotController:
 
     // MARK: - Real Robot Pose
 
+    func clearRealRobotPose() {
+        realRobotPose = nil
+        eduardOccluder.setEnabled(false)
+    }
+
     func updateRealRobotPose(
         _ pose:
             RobotPose
