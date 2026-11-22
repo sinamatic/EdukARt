@@ -197,6 +197,8 @@ struct SettingsView: View {
             .padding(
                 30
             )
+            .frame(maxWidth: DeviceLayout.isPad ? 680 : .infinity)
+            .frame(maxWidth: .infinity)
         }
     }
 }

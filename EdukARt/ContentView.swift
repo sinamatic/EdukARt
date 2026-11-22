@@ -11,18 +11,23 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             if showLogo {
-                Image("EduArtSinamaticIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .scaleEffect(0.6)
-                    .ignoresSafeArea()
-                    .task {
-                        Task {
-                            await eduardModelStore.load()
-                        }
-                        try? await Task.sleep(for: .seconds(2))
-                        showLogo = false
+                ZStack {
+                    Color.black
+                        .ignoresSafeArea()
+
+                    Image("EduArtSinamaticIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(0.6)
+                        .ignoresSafeArea()
+                }
+                .task {
+                    Task {
+                        await eduardModelStore.load()
                     }
+                    try? await Task.sleep(for: .seconds(2))
+                    showLogo = false
+                }
             } else {
                 NavigationStack {
                     MainMenuView(

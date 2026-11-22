@@ -98,18 +98,32 @@ struct MapMenuBackground<Content: View>: View {
 
     var body: some View {
         ZStack {
-            Image("Keyvisual")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
+            if DeviceLayout.isPad {
+                IPadKeyvisualBackground()
+                    .ignoresSafeArea()
+            } else {
+                Image("Keyvisual")
+                    .resizable()
+                    .scaledToFill()
+                    .ignoresSafeArea()
+            }
 
             Color.black
                 .opacity(0.58)
                 .ignoresSafeArea()
 
-            content
-                .padding(.horizontal, 30)
-                .padding(.top, 192)
+            if DeviceLayout.isPad {
+                content
+                    .frame(maxWidth: 680)
+                    .padding(.horizontal, 40)
+                    .padding(.top, 120)
+                    .padding(.bottom, 60)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            } else {
+                content
+                    .padding(.horizontal, 30)
+                    .padding(.top, 192)
+            }
         }
     }
 }

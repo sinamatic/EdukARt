@@ -8,9 +8,13 @@ struct MainMenuView: View {
 
     var body: some View {
         ZStack {
-            Image("Keyvisual")
-                .resizable()
-                .scaledToFill()
+            if DeviceLayout.isPad {
+                IPadKeyvisualBackground()
+            } else {
+                Image("Keyvisual")
+                    .resizable()
+                    .scaledToFill()
+            }
 
             VStack(spacing: 12) {
                 NavigationLink {
@@ -66,6 +70,7 @@ struct MainMenuView: View {
             }
             .padding(30)
             .padding(.bottom, 32)
+            .frame(maxWidth: DeviceLayout.isPad ? 560 : .infinity)
         }
         .overlay(alignment: .topLeading) {
             Button(action: onShowTutorial) {

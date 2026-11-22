@@ -47,6 +47,8 @@ struct RobotRemoteView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 30)
+                .frame(maxWidth: DeviceLayout.isPad ? 680 : .infinity)
+                .frame(maxWidth: .infinity)
             }
         }
         .navigationTitle("Robot Remote")
@@ -259,6 +261,10 @@ private extension RobotRemoteView {
 
             shape:
                 .circle
+        )
+        .frame(
+            width: DeviceLayout.isPad ? 360 : nil,
+            height: DeviceLayout.isPad ? 210 : nil
         )
         .frame(
             maxWidth:
