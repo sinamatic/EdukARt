@@ -581,14 +581,17 @@ final class AprilTagLocalization {
         // Robot rotation
         // --------------------------------------------------
 
-        let robotXAxis =
+        // SwiftAprilTag's local +Y points toward the tag's upper edge.
+        // Eduard's front faces the lower edge, so its forward axis is -Y.
+        // Forward travel is (-sin(yaw), -cos(yaw)) in map X/Z.
+        let tagYAxis =
             relativeTransform
-                .columns.0
+                .columns.1
 
         let rotation =
             atan2(
-                robotXAxis.z,
-                robotXAxis.x
+                tagYAxis.x,
+                tagYAxis.z
             )
 
 
