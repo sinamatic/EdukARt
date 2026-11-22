@@ -87,6 +87,11 @@ final class EduardSimulation {
     private var oilSpinTask:
         Task<Void, Never>?
 
+    // Visual rotation is separate from the pose supplied by driving or AprilTag.
+    private var oilSpinOffset: Float = 0
+
+    private var waterEffectActive = false
+
 
     // MARK: - Settings
 
@@ -217,6 +222,7 @@ final class EduardSimulation {
 
         oilSpinTask?
             .cancel()
+        oilSpinOffset = 0
 
         stopMovement()
     }
@@ -476,6 +482,29 @@ final class EduardSimulation {
         )
     }
 
+    func blinkLights(color: UIColor, duration: TimeInterval) {
+        startBlinkingLights(color: color, duration: duration)
+    }
+
+    func setWaterEffect(_ active: Bool) {
+        waterEffectActive = active
+        if active {
+            applyAllLightMaterials(color: UIColor(red: 0, green: 80 / 255, blue: 1, alpha: 1))
+        } else {
+            applyDefaultLightMaterials()
+        }
+    }
+
+    func stopItemEffects() {
+        shitLightEffectTask?.cancel()
+        shitLightEffectTask = nil
+        oilLightEffectTask?.cancel()
+        oilLightEffectTask = nil
+        stopOilSpinEffect()
+        waterEffectActive = false
+        applyDefaultLightMaterials()
+    }
+
 
     // MARK: - Oil Effect
 
@@ -483,8 +512,7 @@ final class EduardSimulation {
         duration: TimeInterval = 5.0
     ) {
 
-        oilSpinTask?
-            .cancel()
+        stopOilSpinEffect()
 
         oilSpinTask =
             Task { @MainActor [weak self] in
@@ -494,42 +522,38 @@ final class EduardSimulation {
                     return
                 }
 
-                let updateInterval:
-                    Float = 0.02
+                let startTime = Date()
+                let updateInterval = 0.02
 
-                // About one full 360 degree spin.
-                let rotationSpeed:
-                    Float = 4.0
-
-                let endTime =
-                    Date()
-                    .addingTimeInterval(
-                        duration
-                    )
-
-                while Date() < endTime {
+                while Date().timeIntervalSince(startTime) < duration {
 
                     guard Task.isCancelled == false
                     else {
                         return
                     }
 
-                    self.pose.rotation +=
-                        rotationSpeed
-                        * updateInterval
-
+                    let progress = Float(Date().timeIntervalSince(startTime) / duration)
+                    self.oilSpinOffset = 2 * .pi * progress
                     self.applyPose()
 
                     try? await Task.sleep(
                         for:
                             .seconds(
-                                Double(
-                                    updateInterval
-                                )
+                                updateInterval
                             )
                     )
                 }
+                self.oilSpinOffset = 0
+                self.applyPose()
+                self.oilSpinTask = nil
             }
+    }
+
+    func stopOilSpinEffect() {
+        oilSpinTask?.cancel()
+        oilSpinTask = nil
+        oilSpinOffset = 0
+        applyPose()
     }
 
 
@@ -732,7 +756,7 @@ final class EduardSimulation {
         let rotation =
             simd_quatf(
                 angle:
-                    pose.rotation
+                    pose.rotation + oilSpinOffset
                     + EduardModelAlignment.yawCorrection,
 
                 axis: SIMD3<Float>(0, 1, 0)

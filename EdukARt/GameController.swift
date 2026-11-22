@@ -303,6 +303,9 @@ final class GameController:
     private var latestRobotPoses:
         [CollisionActor: RobotPose] = [:]
 
+    // Set only while synchronous collision callbacks are dispatched.
+    private(set) var currentCollisionActor: CollisionActor?
+
     private var shitEffectActor:
         CollisionActor = .simulation
 
@@ -413,6 +416,11 @@ final class GameController:
 
         shitEffectTask?
             .cancel()
+    }
+
+    func stopSimulationItemEffects() {
+        shitEffectTask?.cancel()
+        shitEffectTask = nil
     }
 
 
@@ -575,6 +583,9 @@ final class GameController:
         actor:
             CollisionActor
     ) {
+
+        currentCollisionActor = actor
+        defer { currentCollisionActor = nil }
 
         latestRobotPoses[actor] =
             pose
@@ -1378,10 +1389,9 @@ final class GameController:
         )
 
 
-        startShitTrail(
-            actor:
-                actor
-        )
+        if actor == .simulation {
+            startShitTrail(actor: actor)
+        }
 
         onShitEffectStarted?(
             shitEffectDuration

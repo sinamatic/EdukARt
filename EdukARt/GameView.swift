@@ -728,6 +728,9 @@ struct GameView: View {
                     Button {
 
                         controller.isLiveSyncEnabled.toggle()
+                        if controller.isLiveSyncEnabled {
+                            gameController.stopSimulationItemEffects()
+                        }
 
                     } label: {
 
@@ -1079,59 +1082,70 @@ struct GameView: View {
 
     private func configureGameController() {
 
-        gameController.setShitEffectHandler { [weak controller] duration in
-
-            controller?.startShitEffect(
-                duration:
-                    duration
-            )
+        gameController.setShitEffectHandler { [weak controller, weak gameController] duration in
+            guard let controller, let gameController,
+                  gameController.currentCollisionActor == .simulation,
+                  controller.isSimulationDriveActive,
+                  controller.isLiveSyncEnabled == false else { return }
+            controller.startSimulationShitEffect(duration: duration)
         }
 
-        gameController.setOilEffectHandler { [weak controller] duration in
-
-            controller?.startOilEffect(
-                duration:
-                    duration
-            )
+        gameController.setOilEffectHandler { [weak controller, weak gameController] duration in
+            guard let controller, let gameController,
+                  gameController.currentCollisionActor == .simulation,
+                  controller.isSimulationDriveActive,
+                  controller.isLiveSyncEnabled == false else { return }
+            controller.startSimulationOilEffect(duration: duration)
         }
 
-        gameController.setTreeEffectHandler { [weak controller] duration in
-
-            controller?.startTreeEffect(
-                duration:
-                    duration
-            )
+        gameController.setTreeEffectHandler { [weak controller, weak gameController] duration in
+            guard let controller, let gameController,
+                  gameController.currentCollisionActor == .simulation,
+                  controller.isSimulationDriveActive,
+                  controller.isLiveSyncEnabled == false else { return }
+            controller.eduardSimulation.blinkLights(color: .green, duration: duration)
         }
 
-        gameController.setWaterModeHandler { [weak controller] active in
-
-            controller?.setWaterMode(
-                active
-            )
+        gameController.setWaterModeHandler { [weak controller, weak gameController] active in
+            guard let controller, let gameController,
+                  (gameController.currentCollisionActor == .simulation ||
+                   gameController.currentCollisionActor == nil),
+                  controller.isLiveSyncEnabled == false else { return }
+            controller.setSimulationWaterMode(active)
         }
 
-        gameController.setCoinCollectedHandler { [weak controller] in
-
-            controller?.applyCoinSpeedBoost()
-
-            controller?.blinkCoinCollectedLights()
+        gameController.setCoinCollectedHandler { [weak controller, weak gameController] in
+            guard let controller, let gameController,
+                  gameController.currentCollisionActor == .simulation,
+                  controller.isSimulationDriveActive,
+                  controller.isLiveSyncEnabled == false else { return }
+            controller.applyCoinSpeedBoost()
+            controller.eduardSimulation.blinkLights(color: .yellow, duration: 0.55)
         }
 
-        gameController.setItemboxCollectedHandler { [weak controller] in
-
-            controller?.blinkItemboxCollectedLights()
+        gameController.setItemboxCollectedHandler { [weak controller, weak gameController] in
+            guard let controller, let gameController,
+                  gameController.currentCollisionActor == .simulation,
+                  controller.isSimulationDriveActive,
+                  controller.isLiveSyncEnabled == false else { return }
+            controller.eduardSimulation.blinkLights(color: .purple, duration: 0.8)
         }
 
-        gameController.setEggCollectedHandler { [weak controller] in
-
-            controller?.blinkEggCollectedLights()
+        gameController.setEggCollectedHandler { [weak controller, weak gameController] in
+            guard let controller, let gameController,
+                  gameController.currentCollisionActor == .simulation,
+                  controller.isSimulationDriveActive,
+                  controller.isLiveSyncEnabled == false else { return }
+            controller.eduardSimulation.blinkLights(color: .green, duration: 0.55)
         }
 
-        gameController.setEggsDeliveredHandler { [weak controller] in
-
-            controller?.repairObstacleDamage()
-
-            controller?.blinkEggsDeliveredLights()
+        gameController.setEggsDeliveredHandler { [weak controller, weak gameController] in
+            guard let controller, let gameController,
+                  gameController.currentCollisionActor == .simulation,
+                  controller.isSimulationDriveActive,
+                  controller.isLiveSyncEnabled == false else { return }
+            controller.repairObstacleDamage()
+            controller.eduardSimulation.blinkLights(color: .green, duration: 1.5)
         }
 
         gameController.setCurrentSpeedPercentProvider { [weak controller] in
@@ -1382,15 +1396,13 @@ struct GameView: View {
             )
         }
 
-        updateGameCollision(
-            actor:
-                .simulation,
-
-            with:
-                controller
-                    .eduardSimulation
-                    .pose
-        )
+        if controller.isSimulationDriveActive,
+           controller.isLiveSyncEnabled == false {
+            updateGameCollision(
+                actor: .simulation,
+                with: controller.eduardSimulation.pose
+            )
+        }
     }
 
 

@@ -10,6 +10,7 @@
 
 import Combine
 import Foundation
+import UIKit
 
 
 final class RobotController:
@@ -78,7 +79,13 @@ final class RobotController:
     // MARK: - Control State
 
     @Published var controlMode:
-        RobotControlMode = .real
+        RobotControlMode = .real {
+            didSet {
+                if controlMode != .simulation {
+                    cancelSimulationItemEffects()
+                }
+            }
+        }
 
     @Published var driveMode:
         RobotDriveMode = .mechanum
@@ -87,7 +94,13 @@ final class RobotController:
     // MARK: - AR Synchronization
 
     @Published var isLiveSyncEnabled =
-        false
+        false {
+            didSet {
+                if isLiveSyncEnabled {
+                    cancelSimulationItemEffects()
+                }
+            }
+        }
 
 
     // MARK: - AR Robot Visibility
@@ -261,6 +274,9 @@ final class RobotController:
         Timer?
 
     private var oilEffectTask:
+        Task<Void, Never>?
+
+    private var simulationShitEffectTask:
         Task<Void, Never>?
 
     private var treeLightEffectTask:
@@ -480,7 +496,14 @@ final class RobotController:
 
         updateEffectiveGameplaySpeed()
 
-        blinkObstacleDamageLights()
+        if canRunSimulationItemEffects {
+            eduardSimulation.blinkLights(
+                color: UIColor(red: 120 / 255, green: 0, blue: 0, alpha: 1),
+                duration: 0.8
+            )
+        } else if isSimulationDriveActive == false {
+            blinkObstacleDamageLights()
+        }
     }
 
 
@@ -1518,7 +1541,8 @@ final class RobotController:
         y: Double
     ) {
 
-        guard waterStrokeTask == nil
+        guard canRunSimulationItemEffects,
+              waterStrokeTask == nil
         else {
             return
         }
@@ -1579,6 +1603,8 @@ final class RobotController:
                     return
                 }
 
+                guard self.canRunSimulationItemEffects else { return }
+
 
                 gameplayDriveCommand =
                     command
@@ -1592,7 +1618,8 @@ final class RobotController:
                         )
                 )
 
-                guard Task.isCancelled == false
+                guard Task.isCancelled == false,
+                      self.canRunSimulationItemEffects
                 else {
                     return
                 }
@@ -1651,7 +1678,8 @@ final class RobotController:
         x: Double
     ) {
 
-        guard waterStrokeTask == nil
+        guard canRunSimulationItemEffects,
+              waterStrokeTask == nil
         else {
             return
         }
@@ -1688,6 +1716,8 @@ final class RobotController:
                     return
                 }
 
+                guard self.canRunSimulationItemEffects else { return }
+
 
                 gameplayDriveCommand =
                     command
@@ -1701,7 +1731,8 @@ final class RobotController:
                         )
                 )
 
-                guard Task.isCancelled == false
+                guard Task.isCancelled == false,
+                      self.canRunSimulationItemEffects
                 else {
                     return
                 }
@@ -2092,6 +2123,97 @@ final class RobotController:
             }
     }
 
+    // MARK: - Simulation Item Effects
+
+    private var canRunSimulationItemEffects: Bool {
+        isSimulationDriveActive && isLiveSyncEnabled == false
+    }
+
+    private func cancelSimulationItemEffects() {
+        simulationShitEffectTask?.cancel()
+        simulationShitEffectTask = nil
+        oilEffectTask?.cancel()
+        oilEffectTask = nil
+        waterStrokeTask?.cancel()
+        waterStrokeTask = nil
+        gameplayDriveCommand = nil
+        isGameplayDriveLocked = false
+        isGameplayInputLocked = false
+        isWaterModeActive = false
+        waterStrokeArmed = false
+        eduardSimulation.stop()
+        eduardSimulation.stopItemEffects()
+    }
+
+    func setSimulationWaterMode(_ active: Bool) {
+        guard canRunSimulationItemEffects || active == false else { return }
+        guard isWaterModeActive != active else { return }
+        isWaterModeActive = active
+        waterStrokeArmed = false
+        eduardSimulation.setWaterEffect(active)
+
+        if active {
+            gameplayDriveCommand = .stop
+            eduardSimulation.drive(.stop)
+            gameplayDriveCommand = nil
+        } else {
+            waterStrokeTask?.cancel()
+            waterStrokeTask = nil
+            gameplayDriveCommand = nil
+            eduardSimulation.drive(.stop)
+        }
+    }
+
+    func startSimulationShitEffect(duration: TimeInterval) {
+        guard canRunSimulationItemEffects,
+              isGameplayDriveLocked == false else { return }
+        simulationShitEffectTask?.cancel()
+        isGameplayDriveLocked = true
+        joystickInput = (x: 0, y: 0)
+        mechanumRotationInput = 0
+        activeJoystickDirection = .idle
+        eduardSimulation.startShitEffect(duration: duration)
+
+        // Consumenta's four alternating diagonal commands, confined to AR.
+        let component = velocityScale * 0.10 / sqrt(2.0)
+        let commands = [
+            RobotDriveCommand(forward: component, sideways: component, rotation: 0),
+            RobotDriveCommand(forward: component, sideways: -component, rotation: 0),
+            RobotDriveCommand(forward: component, sideways: component, rotation: 0),
+            RobotDriveCommand(forward: component, sideways: -component, rotation: 0)
+        ]
+
+        simulationShitEffectTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            for command in commands {
+                guard Task.isCancelled == false,
+                      self.canRunSimulationItemEffects else { return }
+                self.gameplayDriveCommand = command
+                self.sendCurrentCommand()
+                try? await Task.sleep(for: .seconds(duration / Double(commands.count)))
+            }
+            guard Task.isCancelled == false,
+                  self.canRunSimulationItemEffects else { return }
+            self.gameplayDriveCommand = .stop
+            self.sendCurrentCommand()
+            self.gameplayDriveCommand = nil
+            self.isGameplayDriveLocked = false
+            self.simulationShitEffectTask = nil
+        }
+    }
+
+    func startSimulationOilEffect(duration: TimeInterval) {
+        guard canRunSimulationItemEffects else { return }
+        oilEffectTask?.cancel()
+        eduardSimulation.startOilEffect(duration: duration)
+        eduardSimulation.startOilSpinEffect(duration: duration)
+        oilEffectTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard Task.isCancelled == false, let self else { return }
+            self.oilEffectTask = nil
+        }
+    }
+
     // MARK: - Place Simulation at Start Line
 
     func placeSimulationAtStartLine(_ startLinePose: StartLinePose) {
@@ -2105,6 +2227,9 @@ final class RobotController:
     func toggleSimulationVisibility() {
 
         isSimulationVisible.toggle()
+        if isSimulationVisible == false {
+            cancelSimulationItemEffects()
+        }
 
         eduardSimulation.setVisible(
             isSimulationVisible
