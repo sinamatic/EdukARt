@@ -346,8 +346,10 @@ final class GameController:
     private let coinCollisionRadius:
         Float = 0.035
 
-    private let finishCollisionRadius:
-        Float = 0.35
+    private let finishTravelDistance: Float = 0.40
+
+    private var previousFinishPosition: SIMD2<Float>?
+    private var hasCrossedFinishLine = false
 
     private let startClearRadius:
         Float = 0.45
@@ -692,6 +694,8 @@ final class GameController:
 
         hasLeftStartArea =
             false
+        previousFinishPosition = nil
+        hasCrossedFinishLine = false
 
         bestTimeBonusEarned =
             false
@@ -1758,6 +1762,8 @@ final class GameController:
 
         hasLeftStartArea =
             false
+        previousFinishPosition = nil
+        hasCrossedFinishLine = false
 
         bestTimeBonusEarned =
             false
@@ -1869,19 +1875,39 @@ final class GameController:
             return
         }
 
-        let finishDistance =
-            distance(
-                from:
-                    robotPose,
-                to:
-                    finishPoint
-            )
+        guard map.trackPoints.count >= 2 else { return }
+        let previousPoint = map.trackPoints[map.trackPoints.count - 2]
+        let direction = SIMD2<Float>(
+            finishPoint.x - previousPoint.x,
+            finishPoint.z - previousPoint.z
+        )
+        let length = simd_length(direction)
+        guard length > 0.001 else { return }
 
-        guard finishDistance <= finishCollisionRadius
-        else {
-            return
+        let forward = direction / length
+        let finish = SIMD2<Float>(finishPoint.x, finishPoint.z)
+        let current = SIMD2<Float>(robotPose.position.x, robotPose.position.z)
+        let displacement = current - finish
+        let along = simd_dot(displacement, forward)
+        let lateral = abs(displacement.x * forward.y - displacement.y * forward.x)
+
+        if let previous = previousFinishPosition {
+            let previousAlong = simd_dot(previous - finish, forward)
+            if previousAlong <= 0, along > 0 {
+                let fraction = -previousAlong / (along - previousAlong)
+                let crossing = previous + (current - previous) * fraction
+                let crossingOffset = crossing - finish
+                let crossingLateral = abs(
+                    crossingOffset.x * forward.y - crossingOffset.y * forward.x
+                )
+                hasCrossedFinishLine = crossingLateral <= TrackRules.roadHalfWidth
+            }
         }
+        previousFinishPosition = current
 
+        guard hasCrossedFinishLine,
+              along >= finishTravelDistance,
+              lateral <= TrackRules.roadHalfWidth else { return }
         finishRace()
     }
 

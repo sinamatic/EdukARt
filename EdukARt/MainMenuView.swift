@@ -99,6 +99,9 @@ struct MainMenuView: View {
             VStack(spacing: 4) {
                 Text("© Sina Steinmüller")
                 Text("www.sinamatic.de")
+                if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+                    Text("Version \(version)")
+                }
             }
             .font(.caption2)
             .foregroundStyle(.white.opacity(0.8))

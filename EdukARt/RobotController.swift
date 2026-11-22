@@ -152,6 +152,8 @@ final class RobotController:
         false
 
 
+    var isGhostPlaybackActive = false
+
     private var gameplayDriveCommand:
         RobotDriveCommand?
 
@@ -778,9 +780,9 @@ final class RobotController:
 
         if isConnected {
 
-            eduard.drive(
-                .stop
-            )
+            if isGhostPlaybackActive == false {
+                eduard.drive(.stop)
+            }
 
             eduard.setEnabled(
                 false,
@@ -2302,6 +2304,7 @@ final class RobotController:
 
     private func sendCurrentCommand() {
 
+        guard isGhostPlaybackActive == false else { return }
         var command: RobotDriveCommand
 
         if let gameplayDriveCommand {

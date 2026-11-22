@@ -452,6 +452,7 @@ struct CameraARView: UIViewRepresentable {
         RobotController
     @ObservedObject var gameController:
         GameController
+    let ghostPlayback: GhostPlaybackController?
     let gameMap:
         GameMap?
     let localizationResetID:
@@ -472,6 +473,7 @@ struct CameraARView: UIViewRepresentable {
         mapBuilder: AprilTagMapBuilder,
         controller: RobotController,
         gameController: GameController,
+        ghostPlayback: GhostPlaybackController? = nil,
         gameMap: GameMap? = nil,
         localizationResetID: Int = 0,
         requiredReferenceTagID: Int = 0,
@@ -497,6 +499,7 @@ struct CameraARView: UIViewRepresentable {
 
         self.gameController =
             gameController
+        self.ghostPlayback = ghostPlayback
 
         self.gameMap =
             gameMap
@@ -687,6 +690,16 @@ struct CameraARView: UIViewRepresentable {
                 print(
                     "# EDUARD OCCLUDER LOAD FAILED | eduard_occlusion"
                 )
+            }
+
+            if let ghostPlayback {
+                let ghostRoot = Entity()
+                ghostRoot.components.set(OpacityComponent(opacity: 0.45))
+                let ghostModel = model.clone(recursive: true)
+                ghostRoot.addChild(ghostModel)
+                context.coordinator.ghostRoot = ghostRoot
+                ghostPlayback.simulation.show(entity: ghostRoot)
+                ghostPlayback.simulation.setVisible(false)
             }
 
             controller.eduardSimulation.setVisible(
@@ -924,6 +937,7 @@ struct CameraARView: UIViewRepresentable {
             Float = 0.35
 
         var simulationRoot: Entity?
+        var ghostRoot: Entity?
         var occlusionRoot: Entity?
         private let trackRenderer =
             ARTrackRenderer()
@@ -2280,6 +2294,7 @@ struct CameraARView: UIViewRepresentable {
                 to:
                     mapRoot
             )
+            attach(ghostRoot, to: mapRoot)
 
             attach(
                 occlusionRoot,

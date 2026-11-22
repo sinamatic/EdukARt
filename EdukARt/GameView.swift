@@ -26,6 +26,10 @@ struct GameView: View {
 
     @StateObject private var gameController:
         GameController
+    @StateObject private var driveRecorder = DriveRecorder()
+    @StateObject private var ghostPlayback = GhostPlaybackController()
+    @State private var recordedDrive: DriveRecording?
+    @State private var driveSaveError: String?
 
     @State private var isMapLocalized =
         false
@@ -139,6 +143,7 @@ struct GameView: View {
                 controller.resetGameplayEffects()
 
                 configureGameController()
+                recordedDrive = try? DriveRecorder.load(mapID: map.id)
 
                 if controller.isSimulationVisible && !hasPlacedAROnStart {
                     placeAROnStart()
@@ -146,9 +151,9 @@ struct GameView: View {
             }
             .onDisappear {
 
-                controller.setGameplayInputLocked(
-                    false
-                )
+                ghostPlayback.stop()
+                controller.isGhostPlaybackActive = false
+                controller.setGameplayInputLocked(false)
             }
     }
 
@@ -171,6 +176,16 @@ struct GameView: View {
             timerDisplay
                 .allowsHitTesting(false)
             gameplayOverlay
+            if ghostPlayback.isPlaying {
+                Button("Stop Ghost") {
+                    ghostPlayback.stop()
+                    controller.isGhostPlaybackActive = false
+                    controller.setGameplayInputLocked(false)
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.top, 60)
+                .padding(.leading, 24)
+            }
 
         }
     }
@@ -200,6 +215,8 @@ struct GameView: View {
             gameController:
                 gameController,
 
+            ghostPlayback: ghostPlayback,
+
             gameMap:
                 map,
 
@@ -225,6 +242,9 @@ struct GameView: View {
                 controller.updateRealRobotPose(
                     pose
                 )
+                if gameController.isRaceRunning && controller.isSimulationDriveActive == false {
+                    driveRecorder.record(pose, type: .physicalEduard)
+                }
             },
 
             onRobotPoseLost: {
@@ -350,6 +370,9 @@ struct GameView: View {
 
             simulationRobotPose =
                 controller.eduardSimulation.pose
+            if gameController.isRaceRunning && controller.isSimulationDriveActive {
+                driveRecorder.record(controller.eduardSimulation.pose, type: .arEduard)
+            }
 
             try? await Task.sleep(
                 nanoseconds:
@@ -433,6 +456,13 @@ struct GameView: View {
                             340
                     )
 
+
+                    if let recordedDrive, ghostPlayback.isPlaying == false {
+                        Button("Gespeicherten Ghost wiedergeben") {
+                            startGhostPlayback(recordedDrive)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
 
                     if isRobotReadyForRace {
 
@@ -1261,7 +1291,8 @@ struct GameView: View {
               isRobotReadyForRace,
               isRobotBehindStartLine,
               countdownText == nil,
-              hasStartedGameplay == false
+              hasStartedGameplay == false,
+              ghostPlayback.isPlaying == false
         else {
             return
         }
@@ -1310,6 +1341,10 @@ struct GameView: View {
             )
 
             gameController.startRace()
+            driveRecorder.start(
+                map: map,
+                type: controller.isSimulationDriveActive ? .arEduard : .physicalEduard
+            )
         }
     }
 
@@ -1330,6 +1365,10 @@ struct GameView: View {
                 map:
                     map
             )
+        driveRecorder.reset()
+        driveSaveError = nil
+        ghostPlayback.stop()
+        controller.isGhostPlaybackActive = false
 
         syncBlockingObjects()
 
@@ -1361,6 +1400,18 @@ struct GameView: View {
         )
     }
 
+
+    private func startGhostPlayback(_ recording: DriveRecording) {
+        if gameController.phase == .finished {
+            closeFinishedOverlay()
+        }
+        controller.setGameplayInputLocked(true)
+        controller.isGhostPlaybackActive = true
+        ghostPlayback.play(recording) {
+            controller.isGhostPlaybackActive = false
+            controller.setGameplayInputLocked(false)
+        }
+    }
 
     private func closeFinishedOverlay() {
 
@@ -1433,6 +1484,19 @@ struct GameView: View {
 
         if gameController.phase == .finished {
 
+            driveRecorder.record(
+                gameplayPose,
+                type: actor == .real ? .physicalEduard : .arEduard
+            )
+            if let recording = try? driveRecorder.finish() {
+                recordedDrive = recording
+                do {
+                    try DriveRecorder.save(recording)
+                    driveSaveError = nil
+                } catch {
+                    driveSaveError = "Fahrt konnte nicht gespeichert werden: \(error.localizedDescription)"
+                }
+            }
             controller.setGameplayInputLocked(
                 true
             )
@@ -1871,6 +1935,18 @@ struct GameView: View {
                 .disabled(
                     hasSavedFinishedResult
                 )
+
+                if let driveSaveError {
+                    Text(driveSaveError)
+                        .foregroundStyle(.red)
+                }
+
+                if let recordedDrive {
+                    Button("Ghost wiedergeben") {
+                        startGhostPlayback(recordedDrive)
+                    }
+                    .buttonStyle(ResultSaveButtonStyle())
+                }
 
                 leaderboardView
             }
