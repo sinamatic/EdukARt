@@ -32,6 +32,32 @@ import simd
 import UIKit
 
 
+struct StartLinePose {
+    static let startingClearance: Float = 0.35
+
+    let position: SIMD3<Float>
+    let forwardDirection: SIMD3<Float>
+
+    var robotRotation: Float {
+        // A positive drive command moves along (-sin(rotation), -cos(rotation)).
+        atan2(-forwardDirection.x, -forwardDirection.z)
+    }
+
+    func robotPose(behindBy distance: Float) -> RobotPose {
+        RobotPose(
+            position: position - forwardDirection * distance,
+            rotation: robotRotation
+        )
+    }
+
+    func isBehind(_ robotPose: RobotPose, by distance: Float) -> Bool {
+        let displacement = robotPose.position - position
+        // Allow a millimeter for floating-point projection at the placed pose.
+        return simd_dot(displacement, forwardDirection) <= -(distance - 0.001)
+    }
+}
+
+
 final class ARTrackRenderer {
 
     // ======================================================
@@ -123,6 +149,13 @@ final class ARTrackRenderer {
     /// Markings sit slightly above the road.
     private let lineOffset:
         Float = 0.001
+
+    func startLinePose(for trackPoints: [StoredTrackPoint]) -> StartLinePose? {
+        let rawPath = trackPoints.map {
+            SIMD3<Float>($0.x, floorOffset, $0.z)
+        }
+        return startLinePose(onPreparedPath: preparePath(rawPath))
+    }
 
 
     // ======================================================
@@ -1619,7 +1652,7 @@ final class ARTrackRenderer {
         parent: Entity
     ) {
 
-        guard path.count >= 2 else {
+        guard let startLinePose = startLinePose(onPreparedPath: path) else {
             return
         }
 
@@ -1628,41 +1661,10 @@ final class ARTrackRenderer {
         // START
         // ======================================================
 
-        let cumulativeDistances =
-            calculateCumulativeDistances(
-                for: path
-            )
-
-        guard let totalLength = cumulativeDistances.last,
-              totalLength > 0.001 else {
-            return
-        }
-
-        let startDistance = min(0.20, totalLength)
-        let startPosition = point(
-            atDistance: startDistance,
-            path: path,
-            cumulativeDistances: cumulativeDistances
-        )
-        let directionSampleDistance = min(pathSampleDistance, totalLength / 2)
-        let startDirection = normalizedDirection(
-            from: point(
-                atDistance: max(0, startDistance - directionSampleDistance),
-                path: path,
-                cumulativeDistances: cumulativeDistances
-            ),
-            to: point(
-                atDistance: min(totalLength, startDistance + directionSampleDistance),
-                path: path,
-                cumulativeDistances: cumulativeDistances
-            )
-        )
-
-
         makeMarker(
             imageName: "Start",
-            position: startPosition,
-            direction: -startDirection,
+            position: startLinePose.position,
+            direction: -startLinePose.forwardDirection,
             parent: parent
         )
 
@@ -1715,6 +1717,34 @@ final class ARTrackRenderer {
                )
            )
        }
+
+    private func startLinePose(onPreparedPath path: [SIMD3<Float>]) -> StartLinePose? {
+        guard path.count >= 2 else { return nil }
+
+        let cumulativeDistances = calculateCumulativeDistances(for: path)
+        guard let totalLength = cumulativeDistances.last,
+              totalLength > 0.001 else { return nil }
+
+        let startDistance = min(0.20, totalLength)
+        let sampleDistance = min(pathSampleDistance, totalLength / 2)
+        let position = point(
+            atDistance: startDistance,
+            path: path,
+            cumulativeDistances: cumulativeDistances
+        )
+        let before = point(
+            atDistance: max(0, startDistance - sampleDistance),
+            path: path,
+            cumulativeDistances: cumulativeDistances
+        )
+        let after = point(
+            atDistance: min(totalLength, startDistance + sampleDistance),
+            path: path,
+            cumulativeDistances: cumulativeDistances
+        )
+        let direction = normalizedDirection(from: before, to: after)
+        return StartLinePose(position: position, forwardDirection: direction)
+    }
 
 
     private func makeMarker(

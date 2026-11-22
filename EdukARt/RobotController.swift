@@ -2092,12 +2092,12 @@ final class RobotController:
             }
     }
 
-    // MARK: - Place Simulation at Map Reference
+    // MARK: - Place Simulation at Start Line
 
-    func placeSimulationAtReference() {
+    func placeSimulationAtStartLine(_ startLinePose: StartLinePose) {
 
         eduardSimulation.setPose(
-            .fromAprilTag(.zero, additionalRearOffset: 0.05)
+            startLinePose.robotPose(behindBy: StartLinePose.startingClearance)
         )
     }
 

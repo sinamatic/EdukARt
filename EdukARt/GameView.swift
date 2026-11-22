@@ -16,6 +16,8 @@ struct GameView: View {
     let map:
         GameMap
 
+    private let startLinePose: StartLinePose?
+
     @ObservedObject var eduardModelStore:
         EduardModelStore
 
@@ -29,6 +31,9 @@ struct GameView: View {
         false
 
     @State private var isARMenuOpen =
+        false
+
+    @State private var hasPlacedAROnStart =
         false
 
     @State private var simulationRobotPose =
@@ -98,6 +103,9 @@ struct GameView: View {
         self.map =
             map
 
+        self.startLinePose =
+            ARTrackRenderer().startLinePose(for: map.trackPoints)
+
         self.eduardModelStore =
             eduardModelStore
 
@@ -131,6 +139,10 @@ struct GameView: View {
                 controller.resetGameplayEffects()
 
                 configureGameController()
+
+                if controller.isSimulationVisible && !hasPlacedAROnStart {
+                    placeAROnStart()
+                }
             }
             .onDisappear {
 
@@ -681,8 +693,7 @@ struct GameView: View {
 
                     Button {
 
-                        controller
-                            .placeSimulationAtReference()
+                        placeAROnStart()
 
                     } label: {
 
@@ -694,6 +705,7 @@ struct GameView: View {
                                 "Place on Start"
                         )
                     }
+                    .disabled(startLinePose == nil)
 
 
                     Button {
@@ -741,8 +753,12 @@ struct GameView: View {
 
                     Button {
 
-                        controller
-                            .toggleSimulationVisibility()
+                        if controller.isSimulationVisible == false,
+                           hasPlacedAROnStart == false {
+                            placeAROnStart()
+                        } else {
+                            controller.toggleSimulationVisibility()
+                        }
 
                     } label: {
 
@@ -1196,65 +1212,31 @@ struct GameView: View {
     }
 
 
+    private func placeAROnStart() {
+        guard let startLinePose else { return }
+
+        let isFirstPlacement = hasPlacedAROnStart == false
+        controller.placeSimulationAtStartLine(startLinePose)
+        hasPlacedAROnStart = true
+
+        if isFirstPlacement && controller.isSimulationVisible == false {
+            controller.toggleSimulationVisibility()
+        }
+    }
+
+
     private var isRobotBehindStartLine:
         Bool {
 
-        guard let pose =
-            currentRaceStartPose,
-              map.trackPoints.count >= 2
+        guard let pose = currentRaceStartPose,
+              let startLinePose
         else {
             return false
         }
-
-        let start =
-            map.trackPoints[0]
-
-        let next =
-            map.trackPoints[1]
-
-        let directionX =
-            next.x
-            -
-            start.x
-
-        let directionZ =
-            next.z
-            -
-            start.z
-
-        let length =
-            sqrt(
-                directionX * directionX
-                +
-                directionZ * directionZ
-            )
-
-        guard length > 0.001
-        else {
-            return true
-        }
-
-        let robotX =
-            pose.position.x
-            -
-            start.x
-
-        let robotZ =
-            pose.position.z
-            -
-            start.z
-
-        let forwardProjection =
-            (
-                robotX
-                * directionX
-                +
-                robotZ
-                * directionZ
-            )
-            / length
-
-        return forwardProjection <= 0
+        return startLinePose.isBehind(
+            pose,
+            by: StartLinePose.startingClearance
+        )
     }
 
 
