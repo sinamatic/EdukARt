@@ -1048,7 +1048,9 @@ struct GameView: View {
                 180,
 
             shape:
-                .circle
+                .circle,
+            spreadsControls:
+                DeviceLayout.isPad
         )
         .frame(
             maxWidth:

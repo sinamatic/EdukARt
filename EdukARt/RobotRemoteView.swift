@@ -47,8 +47,15 @@ struct RobotRemoteView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 30)
-                .frame(maxWidth: DeviceLayout.isPad ? 680 : .infinity)
                 .frame(maxWidth: .infinity)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if DeviceLayout.isPad && driveExpanded {
+                remoteJoystickControls
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .background(Color.black.opacity(0.9))
             }
         }
         .navigationTitle("Robot Remote")
@@ -230,7 +237,7 @@ private extension RobotRemoteView {
             
                 .buttonStyle(.plain)
             
-            if driveExpanded {
+            if driveExpanded && !DeviceLayout.isPad {
                 remoteJoystickControls
                         
             }
@@ -260,11 +267,9 @@ private extension RobotRemoteView {
                 180,
 
             shape:
-                .circle
-        )
-        .frame(
-            width: DeviceLayout.isPad ? 360 : nil,
-            height: DeviceLayout.isPad ? 210 : nil
+                .circle,
+            spreadsControls:
+                DeviceLayout.isPad
         )
         .frame(
             maxWidth:

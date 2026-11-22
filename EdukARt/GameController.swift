@@ -346,7 +346,7 @@ final class GameController:
     private let coinCollisionRadius:
         Float = 0.035
 
-    private let finishTravelDistance: Float = 0.40
+    private let finishTravelDistance: Float = 0.30
 
     private var previousFinishPosition: SIMD2<Float>?
     private var hasCrossedFinishLine = false

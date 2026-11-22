@@ -25,17 +25,20 @@ public struct JoystickView: View {
     /// Rect will allow the user to access the four corners
     /// Circle will limit Joystick it's radius determined by `dragDiameter / 2`
     private let shape: JoystickShape
+    private let spreadsControls: Bool
     
     public init(
         joystickMonitor: JoystickMonitor,
         turnJoystickMonitor: JoystickMonitor,
         width: CGFloat,
-        shape: JoystickShape = .rect
+        shape: JoystickShape = .rect,
+        spreadsControls: Bool = false
     ) {
         self.joystickMonitor = joystickMonitor
         self.turnJoystickMonitor = turnJoystickMonitor
         self.dragDiameter = width
         self.shape = shape
+        self.spreadsControls = spreadsControls
     }
     
     public var body: some View {
@@ -72,7 +75,11 @@ public struct JoystickView: View {
                 }
             )
             .frame(width: 120, height: 70)
-            
+
+            if spreadsControls {
+                Spacer(minLength: 20)
+            }
+
             TranslationJoystickControl(
                 monitor: joystickMonitor,
                 width: dragDiameter,
@@ -114,7 +121,12 @@ public struct JoystickView: View {
                         )
                 }
             )
+            .frame(
+                width: spreadsControls ? dragDiameter : nil,
+                height: spreadsControls ? dragDiameter : nil
+            )
         }
+        .frame(maxWidth: spreadsControls ? .infinity : nil)
         .padding(.bottom, 10)
         .padding(.horizontal, 8)
     }
