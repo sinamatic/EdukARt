@@ -43,6 +43,7 @@ final class EduardSimulation {
 
     private(set) var entity:
         Entity?
+    private var lastPoseDiagnosticSecond = -1
 
 
     // MARK: - Wheels
@@ -110,6 +111,7 @@ final class EduardSimulation {
         for child in entity.children {
             child.position -= visualOffset
         }
+        print("# AR MODEL | visualBounds offset | \(visualOffset) | centered \(entity.visualBounds(relativeTo: entity).center)")
         
 
 
@@ -741,6 +743,14 @@ final class EduardSimulation {
         // Rotate around vertical Y axis.
         entity.orientation =
             rotation
+
+        let diagnosticSecond = Int(Date().timeIntervalSince1970)
+        if diagnosticSecond != lastPoseDiagnosticSecond {
+            lastPoseDiagnosticSecond = diagnosticSecond
+            let visualCenter = entity.visualBounds(relativeTo: entity).center
+            let visiblePosition = entity.position + rotation.act(visualCenter)
+            print("# AR MODEL | logical position \(pose.position) yaw \(pose.rotation) | visible position \(visiblePosition) yaw \(pose.rotation + EduardModelAlignment.yawCorrection)")
+        }
     }
 
 

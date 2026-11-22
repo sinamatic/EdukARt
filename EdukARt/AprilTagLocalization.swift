@@ -30,6 +30,7 @@
 /// Call `reset()` to discard the current reference and start a new localization.
 
 import ARKit
+import Foundation
 import SwiftAprilTag
 import simd
 
@@ -55,6 +56,7 @@ struct AprilTagMapPose {
 final class AprilTagLocalization {
 
     let tagSize: Double
+    private var lastRobotPoseDiagnosticSecond = -1
 
 
     // --------------------------------------------------
@@ -590,16 +592,20 @@ final class AprilTagLocalization {
             )
 
 
-        return RobotPose.fromAprilTag(RobotPose(
-            position:
-                SIMD3<Float>(
-                    mapX,
-                    0,
-                    mapZ
-                ),
-            rotation:
-                rotation
-        ))
+        let tagPose = RobotPose(
+            position: SIMD3<Float>(mapX, 0, mapZ),
+            rotation: rotation
+        )
+        let robotPose = RobotPose.fromAprilTag(tagPose)
+
+        let diagnosticSecond = Int(Date().timeIntervalSince1970)
+        if diagnosticSecond != lastRobotPoseDiagnosticSecond {
+            lastRobotPoseDiagnosticSecond = diagnosticSecond
+            print("# AR POSE | raw tag | position \(tagPose.position) | yaw \(tagPose.rotation)")
+            print("# AR POSE | after 13 cm | position \(robotPose.position) | yaw \(robotPose.rotation)")
+        }
+
+        return robotPose
     }
 
     // MARK: - Collect Reference Measurement

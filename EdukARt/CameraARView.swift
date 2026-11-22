@@ -918,6 +918,7 @@ struct CameraARView: UIViewRepresentable {
 
         private var stabilizedRobotPose:
             RobotPose?
+        private var lastRobotPoseDiagnosticSecond = -1
 
         private let robotPoseStabilizationFactor:
             Float = 0.35
@@ -1513,6 +1514,12 @@ struct CameraARView: UIViewRepresentable {
                             stabilizeRobotPose(
                                 robotPose
                             )
+
+                        let diagnosticSecond = Int(Date().timeIntervalSince1970)
+                        if diagnosticSecond != lastRobotPoseDiagnosticSecond {
+                            lastRobotPoseDiagnosticSecond = diagnosticSecond
+                            print("# AR POSE | after smoothing | position \(stabilizedPose.position) | yaw \(stabilizedPose.rotation)")
+                        }
 
                         didUpdateRobotPose =
                             true
@@ -2130,8 +2137,9 @@ struct CameraARView: UIViewRepresentable {
                         ),
 
                     rotation:
+                        // A positive Y quaternion rotates +X toward -Z.
                         atan2(
-                            xAxis.z,
+                            -xAxis.z,
                             xAxis.x
                         )
                 )
