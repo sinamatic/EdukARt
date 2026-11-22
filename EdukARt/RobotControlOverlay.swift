@@ -1,14 +1,9 @@
-//
-//  RobotControlOverlay.swift
-//  EdukARt-Rebuild
-//
-//  Created by Sina Steinmüller on 26.08.26.
-//
-
 import SwiftUI
 
 struct RobotControlOverlay: View {
     @ObservedObject var controller: RobotController
+    var showsTutorialHint = false
+    var onControlInteraction: (() -> Void)? = nil
 
     var body: some View {
         let wifiStatus = controller.isWifiReachable ? "reachable" : "not reachable"
@@ -17,6 +12,7 @@ struct RobotControlOverlay: View {
         HStack(spacing: 7) {
             Button {
                 controller.toggleEnabled()
+                onControlInteraction?()
             } label: {
                 Image(systemName: "power")
                     .font(.subheadline.weight(.bold))
@@ -24,6 +20,9 @@ struct RobotControlOverlay: View {
                     .accessibilityLabel(controller.isEnabled ? "Disable" : "Enable")
             }
             .buttonStyle(RobotStatusIconButtonStyle(isEnabled: controller.isEnabled))
+            .anchorPreference(key: TutorialArrowAnchorsKey.self, value: .bounds) {
+                showsTutorialHint ? [.controlButton: $0] : [:]
+            }
 
             Button {
                 controller.checkConnection()
