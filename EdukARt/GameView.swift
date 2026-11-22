@@ -345,7 +345,7 @@ struct GameView: View {
             alignment:
                 isMapLocalized
                 ? .topTrailing
-                : .center
+                : .bottom
         )
         .padding(
             .top,
@@ -358,6 +358,12 @@ struct GameView: View {
             isMapLocalized
             ? 20
             : 0
+        )
+        .padding(
+            .bottom,
+            isMapLocalized
+            ? 0
+            : 40
         )
         .animation(
             .easeInOut(
@@ -520,12 +526,14 @@ struct GameView: View {
                     .infinity,
 
                 alignment:
-                    .top
+                    isMapLocalized
+                    ? .center
+                    : .top
             )
             .padding(
                 .top,
                 isMapLocalized
-                ? 220
+                ? 0
                 : 70
             )
             .allowsHitTesting(
@@ -1740,7 +1748,7 @@ struct GameView: View {
         .font(
             .system(
                 size:
-                    168,
+                    120,
 
                 weight:
                     .bold,

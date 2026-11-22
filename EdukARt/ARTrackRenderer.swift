@@ -598,11 +598,13 @@ final class ARTrackRenderer {
         }
 
 
-        let material =
+        var material =
             UnlitMaterial(
                 color:
                     .black
             )
+
+        material.blending = .transparent(opacity: .init(floatLiteral: roadOpacity))
 
 
         let entity =
@@ -618,14 +620,6 @@ final class ARTrackRenderer {
 
         entity.name =
             "ARRoadSurface"
-
-
-        entity.components.set(
-            OpacityComponent(
-                opacity:
-                    roadOpacity
-            )
-        )
 
 
         parent.addChild(
@@ -771,29 +765,11 @@ final class ARTrackRenderer {
         }
 
 
-        let entity =
-            ModelEntity(
-                mesh:
-                    mesh,
-                materials:
-                    [
-                        UnlitMaterial(
-                            color:
-                                .white
-                        )
-                    ]
-            )
+        var material = UnlitMaterial(color: .white)
+        material.blending = .transparent(opacity: .init(floatLiteral: roadEdgeOpacity))
 
-
-        entity.name =
-            name
-
-        entity.components.set(
-            OpacityComponent(
-                opacity:
-                    roadEdgeOpacity
-            )
-        )
+        let entity = ModelEntity(mesh: mesh, materials: [material])
+        entity.name = name
 
 
         parent.addChild(

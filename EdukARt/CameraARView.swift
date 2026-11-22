@@ -39,6 +39,96 @@ import SwiftAprilTag
 import SwiftUIJoystick
 import UIKit
 
+extension MeshResource {
+    static func compatibleCylinder(height: Float, radius: Float, segments: Int = 32) -> MeshResource {
+        let segmentCount = max(3, segments)
+        let halfHeight = height / 2
+        var positions: [SIMD3<Float>] = []
+        var normals: [SIMD3<Float>] = []
+        var indices: [UInt32] = []
+
+        func appendTriangle(
+            _ first: SIMD3<Float>,
+            _ second: SIMD3<Float>,
+            _ third: SIMD3<Float>,
+            normal: SIMD3<Float>
+        ) {
+            let baseIndex = UInt32(positions.count)
+            positions.append(contentsOf: [first, second, third])
+            normals.append(contentsOf: [normal, normal, normal])
+            indices.append(contentsOf: [baseIndex, baseIndex + 1, baseIndex + 2])
+        }
+
+        for segment in 0..<segmentCount {
+            let firstAngle = Float(segment) / Float(segmentCount) * 2 * .pi
+            let secondAngle = Float(segment + 1) / Float(segmentCount) * 2 * .pi
+            let firstNormal = SIMD3<Float>(cos(firstAngle), 0, sin(firstAngle))
+            let secondNormal = SIMD3<Float>(cos(secondAngle), 0, sin(secondAngle))
+            let bottomFirst = SIMD3<Float>(radius * firstNormal.x, -halfHeight, radius * firstNormal.z)
+            let bottomSecond = SIMD3<Float>(radius * secondNormal.x, -halfHeight, radius * secondNormal.z)
+            let topFirst = SIMD3<Float>(bottomFirst.x, halfHeight, bottomFirst.z)
+            let topSecond = SIMD3<Float>(bottomSecond.x, halfHeight, bottomSecond.z)
+
+            let sideBaseIndex = UInt32(positions.count)
+            positions.append(contentsOf: [bottomFirst, bottomSecond, topFirst, topSecond])
+            normals.append(contentsOf: [firstNormal, secondNormal, firstNormal, secondNormal])
+            indices.append(contentsOf: [
+                sideBaseIndex, sideBaseIndex + 1, sideBaseIndex + 2,
+                sideBaseIndex + 2, sideBaseIndex + 1, sideBaseIndex + 3
+            ])
+
+            appendTriangle(
+                SIMD3<Float>(0, halfHeight, 0),
+                topFirst,
+                topSecond,
+                normal: SIMD3<Float>(0, 1, 0)
+            )
+            appendTriangle(
+                SIMD3<Float>(0, -halfHeight, 0),
+                bottomSecond,
+                bottomFirst,
+                normal: SIMD3<Float>(0, -1, 0)
+            )
+        }
+
+        var descriptor = MeshDescriptor(name: "iOS17CompatibleCylinder")
+        descriptor.positions = MeshBuffers.Positions(positions)
+        descriptor.normals = MeshBuffers.Normals(normals)
+        descriptor.primitives = .triangles(indices)
+
+        do {
+            return try MeshResource.generate(from: [descriptor])
+        } catch {
+            print("Could not create cylinder mesh:", error)
+            return MeshResource.generateBox(width: radius * 2, height: height, depth: radius * 2)
+        }
+    }
+}
+
+private func applyCompatibleOpacity(_ opacity: Float, to entity: Entity) {
+    if var modelComponent = entity.components[ModelComponent.self] {
+        modelComponent.materials = modelComponent.materials.map { material in
+            if var material = material as? PhysicallyBasedMaterial {
+                material.blending = .transparent(opacity: .init(floatLiteral: opacity))
+                return material
+            }
+            if var material = material as? UnlitMaterial {
+                material.blending = .transparent(opacity: .init(floatLiteral: opacity))
+                return material
+            }
+            if var material = material as? CustomMaterial {
+                material.blending = .transparent(opacity: .init(floatLiteral: opacity))
+                return material
+            }
+            return material
+        }
+        entity.components.set(modelComponent)
+    }
+
+    for child in entity.children {
+        applyCompatibleOpacity(opacity, to: child)
+    }
+}
 
 final class ARCoinRenderer {
 
@@ -172,7 +262,7 @@ final class ARCoinRenderer {
             } catch {
 
                 let mesh =
-                    MeshResource.generateCylinder(
+                    MeshResource.compatibleCylinder(
                         height:
                             0.008,
 
@@ -694,9 +784,9 @@ struct CameraARView: UIViewRepresentable {
 
             if let ghostPlayback {
                 let ghostRoot = Entity()
-                ghostRoot.components.set(OpacityComponent(opacity: 0.65))
                 let ghostModel = model.clone(recursive: true)
                 ghostRoot.addChild(ghostModel)
+                applyCompatibleOpacity(0.65, to: ghostRoot)
                 context.coordinator.ghostRoot = ghostRoot
                 ghostPlayback.simulation.show(entity: ghostRoot)
                 ghostPlayback.simulation.setVisible(false)
@@ -2709,7 +2799,7 @@ struct CameraARView: UIViewRepresentable {
         ) -> Entity {
 
             let mesh =
-                MeshResource.generateCylinder(
+                MeshResource.compatibleCylinder(
                     height:
                         0.004,
                     radius:
@@ -2933,7 +3023,7 @@ struct CameraARView: UIViewRepresentable {
         ) -> Entity {
 
             let mesh =
-                MeshResource.generateCylinder(
+                MeshResource.compatibleCylinder(
                     height:
                         0.003,
 
@@ -3054,7 +3144,7 @@ struct CameraARView: UIViewRepresentable {
 
 
                 let mesh =
-                    MeshResource.generateCylinder(
+                    MeshResource.compatibleCylinder(
                         height:
                             0.003,
 
