@@ -10,7 +10,7 @@ struct RobotConfiguration: Codable, Equatable {
     var environment = "{}"
     var excludedAprilTagID: Int? = 0
 
-    var namespace = "eduard/blue"
+    var namespace = "eduard/blue3"
     var driveTopic = "cmd_vel"
     var driveType = "geometry_msgs/msg/Twist"
     var modeService = "set_mode"
@@ -158,14 +158,14 @@ final class RobotConfigurationStore: ObservableObject {
     @Published private(set) var configuration: RobotConfiguration
 
     private static let key = "activeRobot.configuration"
+    private static let defaultNamespaceMigrationKey = "activeRobot.blue3DefaultMigrationComplete"
     private static let secretService = "EdukARt.RobotSSH"
 
     private init() {
         if let data = UserDefaults.standard.data(forKey: Self.key),
            var saved = try? JSONDecoder().decode(RobotConfiguration.self, from: data) {
             let defaults = RobotConfiguration.defaults
-            let wasBlue3Default = saved.namespace == "eduard/blue3"
-            if wasBlue3Default { saved.namespace = defaults.namespace }
+            let hasLegacyBlue3Namespace = saved.namespace == "eduard/blue3"
             // Old container and ROS setup keys are ignored by Codable. The
             // installation target is now discovered from the live ROS graph.
 
@@ -209,9 +209,9 @@ final class RobotConfigurationStore: ObservableObject {
                 }
                 saved.useCustomCommands = true
             }
-            if wasBlue3Default {
-                // Only rewrite the three former Eduard defaults. Keep every
-                // edited message body and all other absolute ROS names.
+            if hasLegacyBlue3Namespace {
+                // Preserve blue3, but make its known absolute default names
+                // relative so later namespace edits affect these commands.
                 saved.driveMessage = Self.migrateBlue3Name(saved.driveMessage,
                                                             key: "topic", old: "/eduard/blue3/cmd_vel", new: "cmd_vel")
                 saved.enableAction = Self.migrateBlue3Name(saved.enableAction,
@@ -221,10 +221,18 @@ final class RobotConfigurationStore: ObservableObject {
                 saved.lightsAction = Self.migrateBlue3Name(saved.lightsAction,
                                                            key: "topic", old: "/eduard/blue3/set_lighting_color", new: "set_lighting_color")
             }
+            if !UserDefaults.standard.bool(forKey: Self.defaultNamespaceMigrationKey),
+               saved.namespace == "eduard/blue",
+               Self.hasUnchangedAppCommands(saved, defaults: defaults) {
+                // Main previously shipped blue as a wrong default. Migrate
+                // that exact command set while preserving customized robots.
+                saved.namespace = defaults.namespace
+            }
             configuration = saved
         } else {
             configuration = .defaults
         }
+        UserDefaults.standard.set(true, forKey: Self.defaultNamespaceMigrationKey)
     }
 
     private static func json(_ object: [String: Any]) -> String? {
@@ -238,6 +246,21 @@ final class RobotConfigurationStore: ObservableObject {
         }
         object[key] = new
         return json(object) ?? text
+    }
+
+    private static func hasUnchangedAppCommands(_ saved: RobotConfiguration, defaults: RobotConfiguration) -> Bool {
+        zip(
+            [saved.driveMessage, saved.enableAction, saved.disableAction, saved.lightsAction],
+            [defaults.driveMessage, defaults.enableAction, defaults.disableAction, defaults.lightsAction]
+        ).allSatisfy { lhs, rhs in
+            guard let left = normalizedJSON(lhs), let right = normalizedJSON(rhs) else { return false }
+            return left == right
+        }
+    }
+
+    private static func normalizedJSON(_ text: String) -> Data? {
+        guard let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) else { return nil }
+        return try? JSONSerialization.data(withJSONObject: object, options: .sortedKeys)
     }
 
     func save(_ configuration: RobotConfiguration, password: String) throws {

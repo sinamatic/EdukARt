@@ -10,6 +10,7 @@
 
 import Combine
 import Foundation
+import Network
 import UIKit
 
 
@@ -226,9 +227,6 @@ final class RobotController:
     private let commandRepeatInterval =
         0.05
 
-    private let connectionCheckInterval =
-        2.0
-
     private let joystickDeadZone =
         0.05
 
@@ -274,8 +272,8 @@ final class RobotController:
     private var commandTimer:
         Timer?
 
-    private var connectionTimer:
-        Timer?
+    private let wifiMonitor =
+        NWPathMonitor(requiredInterfaceType: .wifi)
 
     private var simulationOilEffectTask:
         Task<Void, Never>?
@@ -433,8 +431,7 @@ final class RobotController:
         commandTimer?
             .invalidate()
 
-        connectionTimer?
-            .invalidate()
+        wifiMonitor.cancel()
 
         physicalOilEffectTask?
             .cancel()
@@ -638,9 +635,6 @@ final class RobotController:
         isConnected =
             true
 
-        isWifiReachable =
-            true
-
         statusMessage =
             "Ready for Eduard."
     }
@@ -661,7 +655,7 @@ final class RobotController:
                 self?.isCheckingConnection =
                     false
 
-                self?.updateConnectionState(isConnected)
+                self?.reportPingResult(isConnected)
             }
         }
     }
@@ -684,9 +678,6 @@ final class RobotController:
         isConnected =
             false
 
-        isWifiReachable =
-            false
-
         isEnabled =
             false
 
@@ -694,23 +685,12 @@ final class RobotController:
             "Disconnected."
     }
 
-    private func updateConnectionState(_ connected: Bool) {
-        let wasReachable =
-            isWifiReachable
-
-        isWifiReachable =
-            connected
-
-        print(
-            "# WIFI PING \(connected) | IS ENABLED \(isEnabled)"
-        )
-
-        if connected != wasReachable || connected == false {
-            statusMessage =
-                connected
-                ? "Eduard WiFi reachable."
-                : "Eduard WiFi not reachable."
-        }
+    private func reportPingResult(_ reachable: Bool) {
+        // ICMP may be blocked even while the bridge accepts UDP commands.
+        // A ping result must not overwrite the iPhone's Wi-Fi status.
+        statusMessage = reachable
+            ? "Eduard responds to ping."
+            : "No ICMP reply. UDP control may still work."
     }
 
 
@@ -746,9 +726,6 @@ final class RobotController:
 
 
         isConnected =
-            true
-
-        isWifiReachable =
             true
 
         isEnabled =
@@ -2666,21 +2643,12 @@ final class RobotController:
 
 
     private func startConnectionChecks() {
-
-        checkConnection()
-
-        connectionTimer =
-            Timer.scheduledTimer(
-                withTimeInterval:
-                    connectionCheckInterval,
-
-                repeats:
-                    true
-            ) { [weak self] _ in
-
-                self?
-                    .checkConnection()
+        wifiMonitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                self?.isWifiReachable = path.status == .satisfied
             }
+        }
+        wifiMonitor.start(queue: .global(qos: .utility))
     }
 
 
