@@ -17,12 +17,20 @@ struct InfoView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     InfoHeader()
 
-                    InfoGameItems()
-
                     InfoTextSection(
                         title: "EdukARt – echte Roboter, virtuelle Abenteuer",
                         primaryText: "Steuere einen echten Roboter durch eine Rennstrecke mit virtuellen Hindernissen und Items: EdukARt verbindet Robotik mit Augmented Reality. Auf dem iPhone verschmelzen die reale Umgebung und digitale Spielelemente – virtuelle Ereignisse beeinflussen dabei die Bewegung und Beleuchtung des echten Roboters.",
                         secondaryText: "Die Idee dahinter: Spaß am Spielen mit Bewegung verbinden, Neugier auf Technik wecken und dazu motivieren, eigene Roboter zu bauen, zu programmieren und weiterzuentwickeln."
+                    )
+
+                    InfoGameInstructions()
+
+                    InfoGameItems()
+
+                    InfoTextSection(
+                        title: "Eigenen Roboter verwenden",
+                        primaryText: "Im Menü „Robot Remote“ gibt es eine rudimentäre Möglichkeit, eigene Roboter hinzuzufügen. Dort kannst du die ROS-Informationen und Steuerungsschnittstellen an deinen Roboter anpassen.",
+                        secondaryText: "Diese Funktion wurde noch nicht ausgiebig getestet. Bitte gib uns Feedback zu deinen Erfahrungen, Problemen und Verbesserungsvorschlägen."
                     )
 
                     InfoTextSection(
@@ -35,22 +43,16 @@ struct InfoView: View {
                         primaryText: "Die App befindet sich noch in der Testphase. Aktuell wird untersucht, welche Spielideen, Funktionen und Einsatzbereiche besonders interessant sind – ob auf Messen, in Bildungsprojekten oder beim Spielen mit dem eigenen Roboter. Deine Erfahrungen und Ideen helfen dabei, die weitere Richtung von EdukARt mitzubestimmen."
                     )
 
-                    InfoTextSection(
-                        title: "Ausprobieren und Feedback geben",
-                        primaryText: "Übernimm die Steuerung und erlebe, wie ein echter Roboter auf virtuelle Spielelemente reagiert! Wenn du anschließend die Umfrage ausfüllst, unterstützt du die weitere Forschung und Entwicklung. Was macht Spaß? Was fehlt? Was würdest du dir wünschen? Auch Anregungen direkt am Stand sind willkommen.",
-                        linkTitle: "Zur Umfrage",
-                        linkURLString: "https://www.umfrageonline.com/c/btxxap4r"
-                    )
-
-                    InfoTextSection(
-                        title: "Dein eigener Roboter in EdukARt",
-                        primaryText: "Als nächster Schritt ist geplant, dass du eigene Roboter für EdukARt bauen oder bereits vorhandene Modelle einbinden kannst. So soll aus dem Spiel auch ein Anlass werden, gemeinsam zu tüfteln und eigene Ideen umzusetzen.",
-                        secondaryText: "Die technische Grundlage bildet die EdukARt-ROS-2-Brücke: Ein Python-Skript auf dem Roboter nimmt Befehle der App über WLAN entgegen und leitet sie an dessen ROS-2-Schnittstellen weiter. Dieser Ansatz soll grundsätzlich die Anbindung unterschiedlicher ROS-2-kompatibler Roboter ermöglichen. Dafür müssen die jeweiligen Steuerungsschnittstellen passend konfiguriert werden; bisher wurde die Anbindung mit Eduard erprobt."
-                    )
-
                     InfoContactSection()
 
                     InfoPrivacyLink()
+
+                    InfoTextSection(
+                        title: "Feedback geben",
+                        primaryText: "Was macht Spaß? Was fehlt? Teile deine Erfahrungen mit EdukARt und hilf dabei, die App weiterzuentwickeln.",
+                        linkTitle: "Zur Feedback-Umfrage",
+                        linkURLString: "https://www.umfrageonline.com/c/btxxap4r"
+                    )
                 }
                 .padding(24)
             }
@@ -60,6 +62,35 @@ struct InfoView: View {
     }
 }
 
+
+private struct InfoGameInstructions: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Spielanleitung")
+                .font(.title2.bold())
+                .foregroundStyle(Color("BrandGreen"))
+
+            InfoTextSection(
+                title: "1. Allgemeines",
+                primaryText: "Drucke die AprilTags über das Tutorial aus – einseitig und in tatsächlicher Größe mit 100 % Skalierung. Versionen für den 3D-Druck gibt es bald auf sinamatic.de/edukart.",
+                secondaryText: "Verbinde dein iPhone per WLAN mit dem Roboter. Über den Knopf rechts oben kannst du ihn aktivieren oder deaktivieren. Bei Verbindungsproblemen verwende den roten Not-Aus-Knopf am Roboter.",
+                linkTitle: "Zu sinamatic.de/edukart",
+                linkURLString: "https://www.sinamatic.de/edukart/"
+            )
+
+            InfoTextSection(
+                title: "2. Strecken erstellen",
+                primaryText: "Verteile die AprilTags im Raum mit weniger als 3 m Abstand zueinander. Öffne „Courses“ und „Create Course“ und scanne die Tags. Der zuerst gescannte Tag wird zum Referenzpunkt für die gesamte Strecke.",
+                secondaryText: "Achte auf die Ausrichtung des Referenz-Tags: Die blaue Ecke muss beim Scannen unten rechts liegen. Andernfalls ist die Orientierung der Strecke falsch. Merke dir den Referenz-Tag für den Spielstart."
+            )
+
+            InfoTextSection(
+                title: "3. Spiel starten",
+                primaryText: "Wähle unter „Start Game“ eine Strecke aus. Scanne ihren Referenz-Tag erneut, um die AR-Strecke im Raum zu platzieren und das Spiel zu starten."
+            )
+        }
+    }
+}
 
 private struct InfoGameItems: View {
     var body: some View {
