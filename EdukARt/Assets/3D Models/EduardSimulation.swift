@@ -84,12 +84,6 @@ final class EduardSimulation {
     private var oilLightEffectTask:
         Task<Void, Never>?
 
-    private var oilSpinTask:
-        Task<Void, Never>?
-
-    // Visual rotation is separate from the pose supplied by driving or AprilTag.
-    private var oilSpinOffset: Float = 0
-
     private var waterEffectActive = false
 
 
@@ -219,10 +213,6 @@ final class EduardSimulation {
 
         oilLightEffectTask?
             .cancel()
-
-        oilSpinTask?
-            .cancel()
-        oilSpinOffset = 0
 
         stopMovement()
     }
@@ -500,60 +490,8 @@ final class EduardSimulation {
         shitLightEffectTask = nil
         oilLightEffectTask?.cancel()
         oilLightEffectTask = nil
-        stopOilSpinEffect()
         waterEffectActive = false
         applyDefaultLightMaterials()
-    }
-
-
-    // MARK: - Oil Effect
-
-    func startOilSpinEffect(
-        duration: TimeInterval = 5.0
-    ) {
-
-        stopOilSpinEffect()
-
-        oilSpinTask =
-            Task { @MainActor [weak self] in
-
-                guard let self
-                else {
-                    return
-                }
-
-                let startTime = Date()
-                let updateInterval = 0.02
-
-                while Date().timeIntervalSince(startTime) < duration {
-
-                    guard Task.isCancelled == false
-                    else {
-                        return
-                    }
-
-                    let progress = Float(Date().timeIntervalSince(startTime) / duration)
-                    self.oilSpinOffset = 2 * .pi * progress
-                    self.applyPose()
-
-                    try? await Task.sleep(
-                        for:
-                            .seconds(
-                                updateInterval
-                            )
-                    )
-                }
-                self.oilSpinOffset = 0
-                self.applyPose()
-                self.oilSpinTask = nil
-            }
-    }
-
-    func stopOilSpinEffect() {
-        oilSpinTask?.cancel()
-        oilSpinTask = nil
-        oilSpinOffset = 0
-        applyPose()
     }
 
 
@@ -756,7 +694,7 @@ final class EduardSimulation {
         let rotation =
             simd_quatf(
                 angle:
-                    pose.rotation + oilSpinOffset
+                    pose.rotation
                     + EduardModelAlignment.yawCorrection,
 
                 axis: SIMD3<Float>(0, 1, 0)

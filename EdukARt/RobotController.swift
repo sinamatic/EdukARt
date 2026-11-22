@@ -275,11 +275,13 @@ final class RobotController:
     private var connectionTimer:
         Timer?
 
-    private var oilEffectTask:
+    private var simulationOilEffectTask:
         Task<Void, Never>?
 
     private var simulationShitEffectTask:
         Task<Void, Never>?
+
+    private var pendingWaterModeAfterOil: Bool?
 
     private var treeLightEffectTask:
         Task<Void, Never>?
@@ -423,7 +425,7 @@ final class RobotController:
         connectionTimer?
             .invalidate()
 
-        oilEffectTask?
+        simulationOilEffectTask?
             .cancel()
 
         treeLightEffectTask?
@@ -928,11 +930,7 @@ final class RobotController:
 
     func resetGameplayEffects() {
 
-        oilEffectTask?
-            .cancel()
-
-        oilEffectTask =
-            nil
+        cancelSimulationItemEffects()
 
         treeLightEffectTask?
             .cancel()
@@ -1966,98 +1964,6 @@ final class RobotController:
     }
 
 
-    func startOilEffect(
-        duration: TimeInterval
-    ) {
-
-        oilEffectTask?
-            .cancel()
-
-        eduardSimulation.startOilEffect(
-            duration:
-                duration
-        )
-
-        isGameplayInputLocked =
-            true
-
-        joystickInput =
-            (
-                x: 0,
-                y: 0
-            )
-
-        activeJoystickDirection =
-            .idle
-
-        mechanumRotationInput =
-            0
-
-        sendCurrentCommand()
-
-        eduardSimulation.startOilSpinEffect(
-            duration:
-                duration
-        )
-
-        mechanumRotationInput =
-            1
-
-        eduard.setAllLightsColor(
-            red:
-                255,
-
-            green:
-                80,
-
-            blue:
-                80
-        )
-
-        eduard.setLightMode(
-            .slowBlinking
-        )
-
-        sendCurrentCommand()
-
-        print(
-            "# OIL EFFECT | rotating"
-        )
-
-
-        oilEffectTask =
-            Task { [weak self] in
-
-                try? await Task.sleep(
-                    for:
-                        .seconds(
-                            duration
-                        )
-                )
-
-
-                guard Task.isCancelled == false,
-                      let self
-                else {
-                    return
-                }
-
-
-                self.mechanumRotationInput =
-                    0
-
-                self.isGameplayInputLocked =
-                    false
-
-                self.sendCurrentCommand()
-
-                self.eduard.setLightMode(
-                    .enabled
-                )
-            }
-    }
-
-
     func startTreeEffect(
         duration: TimeInterval
     ) {
@@ -2129,13 +2035,19 @@ final class RobotController:
 
     private var canRunSimulationItemEffects: Bool {
         isSimulationDriveActive && isLiveSyncEnabled == false
+            && isGhostPlaybackActive == false
+    }
+
+    func stopSimulationItemEffects() {
+        cancelSimulationItemEffects()
     }
 
     private func cancelSimulationItemEffects() {
         simulationShitEffectTask?.cancel()
         simulationShitEffectTask = nil
-        oilEffectTask?.cancel()
-        oilEffectTask = nil
+        simulationOilEffectTask?.cancel()
+        simulationOilEffectTask = nil
+        pendingWaterModeAfterOil = nil
         waterStrokeTask?.cancel()
         waterStrokeTask = nil
         gameplayDriveCommand = nil
@@ -2149,6 +2061,13 @@ final class RobotController:
 
     func setSimulationWaterMode(_ active: Bool) {
         guard canRunSimulationItemEffects || active == false else { return }
+        if simulationOilEffectTask != nil {
+            pendingWaterModeAfterOil = active
+            return
+        }
+        if active && simulationShitEffectTask != nil {
+            cancelSimulationItemEffects()
+        }
         guard isWaterModeActive != active else { return }
         isWaterModeActive = active
         waterStrokeArmed = false
@@ -2205,14 +2124,55 @@ final class RobotController:
     }
 
     func startSimulationOilEffect(duration: TimeInterval) {
-        guard canRunSimulationItemEffects else { return }
-        oilEffectTask?.cancel()
+        guard duration > 0, canRunSimulationItemEffects,
+              simulationOilEffectTask == nil else { return }
+
+        // Oil takes over a running simulation item effect before locking the
+        // joystick; otherwise Shit's drive lock discards the oil command.
+        if simulationShitEffectTask != nil || isWaterModeActive {
+            let shouldResumeWater = isWaterModeActive
+            cancelSimulationItemEffects()
+            if shouldResumeWater {
+                pendingWaterModeAfterOil = true
+            }
+        }
+        guard isGameplayDriveLocked == false else { return }
+
+        isGameplayDriveLocked = true
+        joystickInput = (x: 0, y: 0)
+        mechanumRotationInput = 0
+        activeJoystickDirection = .idle
         eduardSimulation.startOilEffect(duration: duration)
-        eduardSimulation.startOilSpinEffect(duration: duration)
-        oilEffectTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(duration))
-            guard Task.isCancelled == false, let self else { return }
-            self.oilEffectTask = nil
+
+        // updateMovement subtracts command rotation; a negative command
+        // preserves the previous positive, one-turn oil rotation.
+        gameplayDriveCommand = RobotDriveCommand(
+            forward: 0,
+            sideways: 0,
+            rotation: -(2 * .pi / duration)
+        )
+        sendCurrentCommand()
+
+        simulationOilEffectTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(duration))
+            } catch {
+                return // Cancellation stops the simulation in cancelSimulationItemEffects.
+            }
+            guard let self else { return }
+            guard self.canRunSimulationItemEffects else {
+                self.cancelSimulationItemEffects()
+                return
+            }
+            self.gameplayDriveCommand = .stop
+            self.sendCurrentCommand()
+            self.gameplayDriveCommand = nil
+            self.isGameplayDriveLocked = false
+            self.simulationOilEffectTask = nil
+            if let pendingWaterMode = self.pendingWaterModeAfterOil {
+                self.pendingWaterModeAfterOil = nil
+                self.setSimulationWaterMode(pendingWaterMode)
+            }
         }
     }
 
@@ -2305,6 +2265,10 @@ final class RobotController:
     private func sendCurrentCommand() {
 
         guard isGhostPlaybackActive == false else { return }
+        if (simulationOilEffectTask != nil || simulationShitEffectTask != nil)
+            && canRunSimulationItemEffects == false {
+            cancelSimulationItemEffects()
+        }
         var command: RobotDriveCommand
 
         if let gameplayDriveCommand {

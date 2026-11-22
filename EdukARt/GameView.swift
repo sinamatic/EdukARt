@@ -70,6 +70,12 @@ struct GameView: View {
     @State private var didDisableEduardAfterFinish =
         false
 
+    private let recordingTimer = Timer.publish(
+        every: 0.02,
+        on: .main,
+        in: .common
+    ).autoconnect()
+
     private let collisionTimer =
         Timer.publish(
             every:
@@ -138,6 +144,13 @@ struct GameView: View {
 
                 updateGameCollision()
             }
+            .onReceive(recordingTimer) { _ in
+                guard gameController.isRaceRunning else { return }
+                driveRecorder.sample(
+                    realPose: controller.realRobotPose,
+                    simulationPose: controller.eduardSimulation.pose
+                )
+            }
             .onAppear {
 
                 controller.resetGameplayEffects()
@@ -151,6 +164,7 @@ struct GameView: View {
             }
             .onDisappear {
 
+                controller.stopSimulationItemEffects()
                 ghostPlayback.stop()
                 controller.isGhostPlaybackActive = false
                 controller.setGameplayInputLocked(false)
@@ -242,9 +256,6 @@ struct GameView: View {
                 controller.updateRealRobotPose(
                     pose
                 )
-                if gameController.isRaceRunning && controller.isSimulationDriveActive == false {
-                    driveRecorder.record(pose, type: .physicalEduard)
-                }
             },
 
             onRobotPoseLost: {
@@ -370,9 +381,6 @@ struct GameView: View {
 
             simulationRobotPose =
                 controller.eduardSimulation.pose
-            if gameController.isRaceRunning && controller.isSimulationDriveActive {
-                driveRecorder.record(controller.eduardSimulation.pose, type: .arEduard)
-            }
 
             try? await Task.sleep(
                 nanoseconds:
@@ -1343,7 +1351,8 @@ struct GameView: View {
             gameController.startRace()
             driveRecorder.start(
                 map: map,
-                type: controller.isSimulationDriveActive ? .arEduard : .physicalEduard
+                type: controller.isSimulationDriveActive && !controller.isLiveSyncEnabled
+                    ? .arEduard : .physicalEduard
             )
         }
     }
@@ -1484,11 +1493,10 @@ struct GameView: View {
 
         if gameController.phase == .finished {
 
-            driveRecorder.record(
-                gameplayPose,
-                type: actor == .real ? .physicalEduard : .arEduard
-            )
-            if let recording = try? driveRecorder.finish() {
+            if let recording = try? driveRecorder.finish(
+                realPose: controller.realRobotPose,
+                simulationPose: controller.eduardSimulation.pose
+            ) {
                 recordedDrive = recording
                 do {
                     try DriveRecorder.save(recording)
@@ -1496,6 +1504,9 @@ struct GameView: View {
                 } catch {
                     driveSaveError = "Fahrt konnte nicht gespeichert werden: \(error.localizedDescription)"
                 }
+            }
+            if controller.isSimulationDriveActive {
+                controller.stopSimulationItemEffects()
             }
             controller.setGameplayInputLocked(
                 true

@@ -51,9 +51,17 @@ final class DriveRecorder: ObservableObject {
         itemEvents = []
     }
 
-    func record(_ pose: RobotPose, type: DriveEduardType) {
-        guard let startedAt, eduardType == type,
-              pose.position.x.isFinite, pose.position.z.isFinite,
+    func sample(realPose: RobotPose?, simulationPose: RobotPose) {
+        guard let startedAt, let eduardType else { return }
+        let pose: RobotPose
+        switch eduardType {
+        case .physicalEduard:
+            guard let realPose else { return }
+            pose = realPose
+        case .arEduard:
+            pose = simulationPose
+        }
+        guard pose.position.x.isFinite, pose.position.z.isFinite,
               pose.rotation.isFinite else { return }
 
         samples.append(DriveSample(
@@ -64,7 +72,9 @@ final class DriveRecorder: ObservableObject {
         ))
     }
 
-    func finish() throws -> DriveRecording {
+    func finish(realPose: RobotPose?, simulationPose: RobotPose) throws -> DriveRecording {
+        // The shared sampling path may add one final pose at the finish.
+        sample(realPose: realPose, simulationPose: simulationPose)
         guard let mapID, let eduardType, let startedAt,
               samples.isEmpty == false else { throw RecordingError.empty }
 

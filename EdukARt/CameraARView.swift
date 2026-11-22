@@ -694,7 +694,7 @@ struct CameraARView: UIViewRepresentable {
 
             if let ghostPlayback {
                 let ghostRoot = Entity()
-                ghostRoot.components.set(OpacityComponent(opacity: 0.45))
+                ghostRoot.components.set(OpacityComponent(opacity: 0.65))
                 let ghostModel = model.clone(recursive: true)
                 ghostRoot.addChild(ghostModel)
                 context.coordinator.ghostRoot = ghostRoot
