@@ -89,6 +89,19 @@ private extension RobotRemoteView {
             if settingsExpanded {
                 VStack(alignment: .leading, spacing: 12) {
                     
+                    NavigationLink {
+                        RobotConfigurationView(controller: controller)
+                    } label: {
+                        Label("Aktiven Eduard bearbeiten", systemImage: "slider.horizontal.3")
+                            .font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(.white.opacity(0.12))
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+
                     Text("Connect your device to Eduard's WiFi network.")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.72))

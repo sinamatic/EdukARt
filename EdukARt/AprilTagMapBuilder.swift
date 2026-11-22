@@ -77,6 +77,8 @@ final class AprilTagMapBuilder: ObservableObject {
         id: Int
     ) {
 
+        guard id != RobotConfigurationStore.shared.configuration.excludedAprilTagID else { return }
+
         // Reference must only be set once.
         guard referenceTagID == nil
         else {
@@ -118,6 +120,9 @@ final class AprilTagMapBuilder: ObservableObject {
     ) {
 
         // --------------------------------------------------
+        // The active robot tag is used for localization but never becomes a map object.
+        guard pose.id != RobotConfigurationStore.shared.configuration.excludedAprilTagID else { return }
+
         // A reference tag must exist first
         // --------------------------------------------------
 
@@ -428,7 +433,7 @@ final class AprilTagMapBuilder: ObservableObject {
         // Convert the temporary AprilTag map points
         // into persistent map data.
         let storedTags =
-            mapPoints.map { point in
+            mapPoints.filter { $0.id != RobotConfigurationStore.shared.configuration.excludedAprilTagID }.map { point in
 
                 StoredAprilTag(
                     id:

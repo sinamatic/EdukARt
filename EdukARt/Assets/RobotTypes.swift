@@ -46,10 +46,10 @@ enum RobotDriveMode:
         switch self {
 
         case .mechanum:
-            return 2.0
+            return Double(RobotConfigurationStore.shared.configuration.mecanumMode)
 
         case .offroad:
-            return 1.0
+            return Double(RobotConfigurationStore.shared.configuration.offroadMode)
         }
     }
 }

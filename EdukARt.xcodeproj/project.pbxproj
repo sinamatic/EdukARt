@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9067BF1F30B396D400CFEEF9 /* Citadel in Frameworks */ = {isa = PBXBuildFile; productRef = 9067BF1E30B396D400CFEEF9 /* Citadel */; };
 		90819FA8303A106D00090B99 /* SwiftAprilTag in Frameworks */ = {isa = PBXBuildFile; productRef = 90819FA7303A106D00090B99 /* SwiftAprilTag */; };
 		90B4CBC6303846AE005FB20C /* SwiftUIJoystick in Frameworks */ = {isa = PBXBuildFile; productRef = 90B4CBC5303846AE005FB20C /* SwiftUIJoystick */; };
 		90EDCBCB303F56C6008E7D2E /* pingx in Frameworks */ = {isa = PBXBuildFile; productRef = 90EDCBCA303F56C6008E7D2E /* pingx */; };
@@ -30,6 +31,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				90EDCBCB303F56C6008E7D2E /* pingx in Frameworks */,
+				9067BF1F30B396D400CFEEF9 /* Citadel in Frameworks */,
 				90819FA8303A106D00090B99 /* SwiftAprilTag in Frameworks */,
 				90B4CBC6303846AE005FB20C /* SwiftUIJoystick in Frameworks */,
 			);
@@ -77,6 +79,7 @@
 				90B4CBC5303846AE005FB20C /* SwiftUIJoystick */,
 				90819FA7303A106D00090B99 /* SwiftAprilTag */,
 				90EDCBCA303F56C6008E7D2E /* pingx */,
+				9067BF1E30B396D400CFEEF9 /* Citadel */,
 			);
 			productName = "EdukARt-Rebuild";
 			productReference = 90092AA13037942B00D9DE91 /* EdukARt.app */;
@@ -110,6 +113,7 @@
 				90B4CBC4303846AE005FB20C /* XCRemoteSwiftPackageReference "SwiftUIJoystick" */,
 				90819FA6303A106D00090B99 /* XCRemoteSwiftPackageReference "SwiftAprilTag" */,
 				90EDCBC9303F56C6008E7D2E /* XCRemoteSwiftPackageReference "pingx" */,
+				9067BF1D30B396D400CFEEF9 /* XCRemoteSwiftPackageReference "Citadel" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 90092AA23037942B00D9DE91 /* Products */;
@@ -355,6 +359,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		9067BF1D30B396D400CFEEF9 /* XCRemoteSwiftPackageReference "Citadel" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/orlandos-nl/Citadel.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.12.1;
+			};
+		};
 		90819FA6303A106D00090B99 /* XCRemoteSwiftPackageReference "SwiftAprilTag" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/keyqcloud/SwiftAprilTag";
@@ -382,6 +394,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		9067BF1E30B396D400CFEEF9 /* Citadel */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9067BF1D30B396D400CFEEF9 /* XCRemoteSwiftPackageReference "Citadel" */;
+			productName = Citadel;
+		};
 		90819FA7303A106D00090B99 /* SwiftAprilTag */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 90819FA6303A106D00090B99 /* XCRemoteSwiftPackageReference "SwiftAprilTag" */;

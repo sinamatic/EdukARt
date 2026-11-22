@@ -1129,11 +1129,18 @@ struct GameView: View {
         }
 
         gameController.setOilEffectHandler { [weak controller, weak gameController] duration in
-            guard let controller, let gameController,
-                  gameController.currentCollisionActor == .simulation,
-                  controller.isSimulationDriveActive,
-                  controller.isLiveSyncEnabled == false else { return }
-            controller.startSimulationOilEffect(duration: duration)
+            guard let controller, let gameController else { return }
+            switch gameController.currentCollisionActor {
+            case .real:
+                guard controller.isPhysicalDriveActive else { return }
+                controller.startPhysicalOilEffect(duration: duration)
+            case .simulation:
+                guard controller.isSimulationDriveActive,
+                      controller.isLiveSyncEnabled == false else { return }
+                controller.startSimulationOilEffect(duration: duration)
+            case nil:
+                return
+            }
         }
 
         gameController.setTreeEffectHandler { [weak controller, weak gameController] duration in
@@ -1145,11 +1152,20 @@ struct GameView: View {
         }
 
         gameController.setWaterModeHandler { [weak controller, weak gameController] active in
-            guard let controller, let gameController,
-                  (gameController.currentCollisionActor == .simulation ||
-                   gameController.currentCollisionActor == nil),
-                  controller.isLiveSyncEnabled == false else { return }
-            controller.setSimulationWaterMode(active)
+            guard let controller, let gameController else { return }
+            switch gameController.currentCollisionActor {
+            case .real:
+                guard active == false || controller.isPhysicalDriveActive else { return }
+                controller.setWaterMode(active)
+            case .simulation:
+                guard controller.isLiveSyncEnabled == false else { return }
+                controller.setSimulationWaterMode(active)
+            case nil:
+                if active == false {
+                    controller.setWaterMode(false)
+                    controller.setSimulationWaterMode(false)
+                }
+            }
         }
 
         gameController.setCoinCollectedHandler { [weak controller, weak gameController] in

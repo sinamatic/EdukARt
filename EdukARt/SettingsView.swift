@@ -38,6 +38,14 @@ struct SettingsView: View {
                     .white
                 )
 
+                NavigationLink {
+                    RobotConfigurationView(controller: controller)
+                } label: {
+                    Label("Aktiven Eduard bearbeiten", systemImage: "gearshape")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SettingsMenuButtonStyle())
+
                 Text(
                     "Use this if the physical Eduard keeps an old drive state after a game. It stops gameplay effects and sends a fresh disable/enable reset to the robot."
                 )

@@ -209,15 +209,9 @@ final class Eduard {
 
 
     private enum LightingGroup {
-
-        static let all =
-            "all"
-
-        static let leftSide =
-            "left_side"
-
-        static let rightSide =
-            "right_side"
+        static var all: String { RobotConfigurationStore.shared.configuration.allLights }
+        static var leftSide: String { RobotConfigurationStore.shared.configuration.leftLights }
+        static var rightSide: String { RobotConfigurationStore.shared.configuration.rightLights }
     }
 
 
@@ -225,17 +219,21 @@ final class Eduard {
     // MARK: - ROS
     // ======================================================
 
-    private let setModeService =
-        "set_mode"
+    private var setModeService: String {
+        RobotConfigurationStore.shared.configuration.modeService
+    }
 
-    private let driveVelocityTopic =
-        "cmd_vel"
+    private var driveVelocityTopic: String {
+        RobotConfigurationStore.shared.configuration.driveTopic
+    }
 
-    private let lightingTopic =
-        "/eduard/blue3/set_lighting_color"
+    private var lightingTopic: String {
+        RobotConfigurationStore.shared.configuration.lightingTopic
+    }
 
-    private let lightingMessageType =
-        "edu_robot/msg/SetLightingColor"
+    private var lightingMessageType: String {
+        RobotConfigurationStore.shared.configuration.lightingType
+    }
 
 
     
@@ -327,11 +325,13 @@ final class Eduard {
     // MARK: - Values
     // ======================================================
 
-    private let remoteControlledModeValue =
-        2.0
+    private var remoteControlledModeValue: Double {
+        Double(RobotConfigurationStore.shared.configuration.enabledMode)
+    }
 
-    private let disabledModeValue =
-        0.0
+    private var disabledModeValue: Double {
+        Double(RobotConfigurationStore.shared.configuration.disabledMode)
+    }
 
 
     // ======================================================
@@ -385,13 +385,13 @@ final class Eduard {
 
         let endpointHost =
             NWEndpoint.Host(
-                targetHost
+                RobotConfigurationStore.shared.configuration.host
             )
 
         let endpointPort =
             NWEndpoint.Port(
                 rawValue:
-                    targetPort
+                    UInt16(RobotConfigurationStore.shared.configuration.udpPort)
             )
             ?? 50505
 
@@ -423,11 +423,13 @@ final class Eduard {
     // MARK: - UDP Transport
     // ======================================================
 
-    private let targetHost =
-        "192.168.0.100"
+    private var targetHost: String {
+        RobotConfigurationStore.shared.configuration.host
+    }
 
-    private let targetPort:
-        UInt16 = 50505
+    private var targetPort: UInt16 {
+        UInt16(RobotConfigurationStore.shared.configuration.udpPort)
+    }
 
     private var connection:
         NWConnection
@@ -461,43 +463,17 @@ final class Eduard {
         }
 
 
-        call(
-            service:
-                setModeService,
-
-            serviceType:
-                "edu_robot/srv/SetMode",
-
-            request: [
-
-                "mode":
-                    .object([
-
-                        "mode":
-                            .double(
-                                enabled
-                                ? remoteControlledModeValue
-                                : disabledModeValue
-                            ),
-
-                        "drive_kinematic":
-                            .double(
-                                driveMode
-                                    .driveKinematicValue
-                            ),
-
-                        "feature_mode":
-                            .double(0)
-                    ]),
-
-                "disable_feature":
-                    .double(
-                        enabled
-                        ? 0
-                        : 1
-                    )
-            ]
-        )
+        let config = RobotConfigurationStore.shared.configuration
+        let action = enabled ? config.enableAction : config.disableAction
+        let values: [String: Any] = [
+            "$mode": enabled ? config.enabledMode : config.disabledMode,
+            "$driveKinematic": Int(driveMode.driveKinematicValue),
+            "$featureMode": config.featureMode,
+            "$disableFeature": enabled ? config.enabledDisableFeature : config.disabledDisableFeature
+        ]
+        if let packet = try? config.customPacket(action, values: values) {
+            sendPacket(packet)
+        }
 
 
         if enabled {
@@ -514,48 +490,10 @@ final class Eduard {
             RobotDriveCommand
     ) {
 
-        send(
-            topic:
-                driveVelocityTopic,
-
-            messageType:
-                "geometry_msgs/msg/Twist",
-
-            message: [
-
-                "linear":
-                    .object([
-
-                        "x":
-                            .double(
-                                command.forward
-                            ),
-
-                        "y":
-                            .double(
-                                command.sideways
-                            ),
-
-                        "z":
-                            .double(0)
-                    ]),
-
-                "angular":
-                    .object([
-
-                        "x":
-                            .double(0),
-
-                        "y":
-                            .double(0),
-
-                        "z":
-                            .double(
-                                -command.rotation
-                            )
-                    ])
-            ]
-        )
+        let config = RobotConfigurationStore.shared.configuration
+        if let packet = try? config.drivePacket(command) {
+            sendPacket(packet)
+        }
     }
 
     // MARK: - Stop
@@ -898,43 +836,36 @@ final class Eduard {
         _ command:
             LightingCommand
     ) {
-
-        send(
-            topic:
-                lightingTopic,
-
-            messageType:
-                lightingMessageType,
-
-            message: [
-
-                "lighting_name":
-                    .string(command.lightingName),
-
-                "r":
-                    .int(command.red),
-
-                "g":
-                    .int(command.green),
-
-                "b":
-                    .int(command.blue),
-
-                "brightness": .object([
-                    "data":
-                        .double(command.brightness)
-                ]),
-
-                "mode":
-                    .int(command.mode.rawValue)
-            ]
-        )
+        let config = RobotConfigurationStore.shared.configuration
+        let values: [String: Any] = [
+            "$lightingName": command.lightingName,
+            "$red": command.red,
+            "$green": command.green,
+            "$blue": command.blue,
+            "$brightness": command.brightness,
+            "$mode": configuredLightMode(command.mode)
+        ]
+        if let packet = try? config.customPacket(config.lightsAction, values: values) {
+            sendPacket(packet)
+        }
     }
     
 
 
 
     // ======================================================
+    private func configuredLightMode(_ mode: LightingMode) -> Int {
+        let config = RobotConfigurationStore.shared.configuration
+        switch mode {
+        case .off: return config.lightOff
+        case .dim: return config.lightDim
+        case .flash: return config.lightFlash
+        case .pulsation: return config.lightPulsation
+        case .rotation: return config.lightRotation
+        case .running: return config.lightRunning
+        }
+    }
+
     // MARK: - Rainbow
     // ======================================================
 
@@ -1329,6 +1260,10 @@ final class Eduard {
         }
 
 
+        sendPacket(encodedCommand)
+    }
+
+    private func sendPacket(_ encodedCommand: Data) {
         var packet =
             encodedCommand
 

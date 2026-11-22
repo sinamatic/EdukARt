@@ -81,7 +81,9 @@ final class RobotController:
     @Published var controlMode:
         RobotControlMode = .real {
             didSet {
-                if controlMode != .simulation {
+                if controlMode == .simulation {
+                    cancelPhysicalOilEffect()
+                } else {
                     cancelSimulationItemEffects()
                 }
             }
@@ -278,6 +280,11 @@ final class RobotController:
     private var simulationOilEffectTask:
         Task<Void, Never>?
 
+    private var physicalOilEffectTask:
+        Task<Void, Never>?
+
+    private var pendingPhysicalWaterModeAfterOil: Bool?
+
     private var simulationShitEffectTask:
         Task<Void, Never>?
 
@@ -344,6 +351,10 @@ final class RobotController:
 
     var isSimulationDriveActive: Bool {
         isSimulationVisible && effectiveControlMode == .simulation
+    }
+
+    var isPhysicalDriveActive: Bool {
+        isConnected && isEnabled && effectiveControlMode != .simulation
     }
 
 
@@ -424,6 +435,9 @@ final class RobotController:
 
         connectionTimer?
             .invalidate()
+
+        physicalOilEffectTask?
+            .cancel()
 
         simulationOilEffectTask?
             .cancel()
@@ -654,6 +668,7 @@ final class RobotController:
 
     func disconnect() {
 
+        cancelPhysicalOilEffect()
         stopCommandLoop()
 
         eduard.stop()
@@ -749,6 +764,7 @@ final class RobotController:
 
 
     func sendDisable() {
+        cancelPhysicalOilEffect()
         stopJoystick()
         stopMechanumRotation()
         stopCommandLoop()
@@ -930,6 +946,7 @@ final class RobotController:
 
     func resetGameplayEffects() {
 
+        cancelPhysicalOilEffect()
         cancelSimulationItemEffects()
 
         treeLightEffectTask?
@@ -1079,10 +1096,85 @@ final class RobotController:
             revealedTreeIDs
     }
 
+    // MARK: - Physical Oil Effect
+
+    func startPhysicalOilEffect(duration: TimeInterval) {
+        guard duration > 0,
+              isConnected,
+              isEnabled,
+              isPhysicalDriveActive,
+              isGhostPlaybackActive == false,
+              isGameplayDriveLocked == false,
+              physicalOilEffectTask == nil else { return }
+
+        let resumeWater = isWaterModeActive
+        if resumeWater { setWaterMode(false) }
+        pendingPhysicalWaterModeAfterOil = resumeWater
+
+        let previousLightMode = eduard.activeLightMode
+        let previousColor = eduard.activeAllLightsColor
+
+        isGameplayDriveLocked = true
+        joystickInput = (x: 0, y: 0)
+        mechanumRotationInput = 0
+        activeJoystickDirection = .idle
+
+        gameplayDriveCommand = RobotDriveCommand(
+            forward: 0,
+            sideways: 0,
+            rotation: maxAngularSpeed * gameplaySpeedMultiplier
+        )
+        eduard.setAllLightsColor(red: 255, green: 80, blue: 80)
+        eduard.setLightMode(.slowBlinking)
+        sendCurrentCommand()
+
+        physicalOilEffectTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(duration))
+            } catch {
+                return
+            }
+            guard let self, Task.isCancelled == false else { return }
+            self.gameplayDriveCommand = .stop
+            self.sendCurrentCommand()
+            self.gameplayDriveCommand = nil
+            self.isGameplayDriveLocked = false
+            self.physicalOilEffectTask = nil
+
+            self.eduard.setAllLightsColor(
+                red: previousColor.red,
+                green: previousColor.green,
+                blue: previousColor.blue
+            )
+            self.eduard.setLightMode(previousLightMode)
+
+            let resumeWater = self.pendingPhysicalWaterModeAfterOil ?? false
+            self.pendingPhysicalWaterModeAfterOil = nil
+            if resumeWater { self.setWaterMode(true) }
+        }
+    }
+
+    private func cancelPhysicalOilEffect() {
+        guard physicalOilEffectTask != nil else { return }
+        physicalOilEffectTask?.cancel()
+        physicalOilEffectTask = nil
+        pendingPhysicalWaterModeAfterOil = nil
+        if isConnected && isEnabled && isGhostPlaybackActive == false {
+            eduard.drive(.stop)
+        }
+        gameplayDriveCommand = nil
+        isGameplayDriveLocked = false
+    }
+
     func setWaterMode(
         _ active:
             Bool
     ) {
+
+        if physicalOilEffectTask != nil {
+            pendingPhysicalWaterModeAfterOil = active
+            return
+        }
 
         guard isWaterModeActive != active
         else {
@@ -1138,6 +1230,9 @@ final class RobotController:
             waterStrokeArmed =
                 false
 
+            gameplayDriveCommand = .stop
+            sendCurrentCommand()
+            gameplayDriveCommand = nil
             restoreWaterLights()
         }
     }
@@ -1475,6 +1570,14 @@ final class RobotController:
     // MARK: - Water Movement
     // ======================================================
 
+    private var canRunWaterStroke: Bool {
+        guard isWaterModeActive, isGhostPlaybackActive == false else { return false }
+        if effectiveControlMode == .simulation {
+            return canRunSimulationItemEffects
+        }
+        return isConnected && isEnabled && isGameplayDriveLocked == false
+    }
+
     private func updateWaterJoystickInput(
         x: Float,
         y: Float
@@ -1541,7 +1644,7 @@ final class RobotController:
         y: Double
     ) {
 
-        guard canRunSimulationItemEffects,
+        guard canRunWaterStroke,
               waterStrokeTask == nil
         else {
             return
@@ -1603,7 +1706,7 @@ final class RobotController:
                     return
                 }
 
-                guard self.canRunSimulationItemEffects else { return }
+                guard self.canRunWaterStroke else { return }
 
 
                 gameplayDriveCommand =
@@ -1619,7 +1722,7 @@ final class RobotController:
                 )
 
                 guard Task.isCancelled == false,
-                      self.canRunSimulationItemEffects
+                      self.canRunWaterStroke
                 else {
                     return
                 }
@@ -1678,7 +1781,7 @@ final class RobotController:
         x: Double
     ) {
 
-        guard canRunSimulationItemEffects,
+        guard canRunWaterStroke,
               waterStrokeTask == nil
         else {
             return
@@ -1716,7 +1819,7 @@ final class RobotController:
                     return
                 }
 
-                guard self.canRunSimulationItemEffects else { return }
+                guard self.canRunWaterStroke else { return }
 
 
                 gameplayDriveCommand =
@@ -1732,7 +1835,7 @@ final class RobotController:
                 )
 
                 guard Task.isCancelled == false,
-                      self.canRunSimulationItemEffects
+                      self.canRunWaterStroke
                 else {
                     return
                 }
