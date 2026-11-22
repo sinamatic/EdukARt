@@ -20,11 +20,6 @@ import UIKit
 
 enum EduardModelAlignment {
 
-    /// Move the visible robot and occluder backward
-    /// relative to Eduard's local heading.
-    static let backwardOffset:
-        Float = 0.13
-
     /// Negative yaw is a small clockwise/right correction
     /// in the current map coordinate convention.
     static let yawCorrection:
@@ -38,6 +33,10 @@ final class EduardSimulation {
 
     private(set) var pose:
         RobotPose = .zero
+
+    private var activeDriveCommand: RobotDriveCommand = .stop
+    private var movementTask: Task<Void, Never>?
+    private var lastMovementUpdate: Date?
 
 
     // MARK: - AR Representation
@@ -104,6 +103,13 @@ final class EduardSimulation {
 
         self.entity =
             entity
+
+        // Keep the wrapper at the logical center even if the imported pivot moves.
+        let center = entity.visualBounds(relativeTo: entity).center
+        let visualOffset = SIMD3<Float>(center.x, 0, center.z)
+        for child in entity.children {
+            child.position -= visualOffset
+        }
         
 
 
@@ -209,6 +215,8 @@ final class EduardSimulation {
 
         oilSpinTask?
             .cancel()
+
+        stopMovement()
     }
 
 
@@ -229,6 +237,7 @@ final class EduardSimulation {
         _ pose: RobotPose
     ) {
 
+        stopMovement()
         self.pose =
             pose
 
@@ -242,75 +251,56 @@ final class EduardSimulation {
         _ command:
             RobotDriveCommand
     ) {
+        updateMovement()
+        activeDriveCommand = command
+        lastMovementUpdate = Date()
 
-        // ----------------------------------------------
-        // Update lightweight simulation state
-        // ----------------------------------------------
-
-        pose.rotation -=
-            Float(
-                command.rotation
-            )
-            * movementUpdateInterval
-
-
-        // Robot-relative movement.
-
-        let forward =
-            Float(
-                command.forward
-            )
-            * movementUpdateInterval
-
-        let sideways =
-            -Float(
-                command.sideways
-            )
-            * movementUpdateInterval
-
-
-        let sinRotation =
-            sin(
-                pose.rotation
-            )
-
-        let cosRotation =
-            cos(
-                pose.rotation
-            )
-
-
-        pose.position.x +=
-            sideways
-                * cosRotation
-            +
-            forward
-                * -sinRotation
-
-
-        pose.position.z +=
-            forward
-                * -cosRotation
-            -
-            sideways
-                * sinRotation
-
-
-        // ----------------------------------------------
-        // Nothing else required if AR robot is hidden.
-        // ----------------------------------------------
-
-        guard entity != nil
-        else {
+        guard hasMovement(command) else {
+            stopMovement()
             return
         }
 
+        guard movementTask == nil else { return }
+        movementTask = Task { @MainActor [weak self] in
+            while Task.isCancelled == false {
+                try? await Task.sleep(for: .seconds(1.0 / 60.0))
+                guard Task.isCancelled == false else { return }
+                self?.updateMovement()
+            }
+        }
+    }
 
+    private func updateMovement() {
+        guard let lastMovementUpdate else { return }
+        let elapsed = min(Float(Date().timeIntervalSince(lastMovementUpdate)), 0.1)
+        self.lastMovementUpdate = Date()
+        pose.rotation -= Float(activeDriveCommand.rotation) * elapsed
+        let forward = Float(activeDriveCommand.forward) * elapsed
+        let sideways = -Float(activeDriveCommand.sideways) * elapsed
+        let sinRotation = sin(pose.rotation)
+        let cosRotation = cos(pose.rotation)
+        pose.position.x += sideways * cosRotation - forward * sinRotation
+        pose.position.z += -forward * cosRotation - sideways * sinRotation
         applyPose()
+        let wheelScale = elapsed / movementUpdateInterval
+        animateWheels(RobotDriveCommand(
+            forward: activeDriveCommand.forward * Double(wheelScale),
+            sideways: activeDriveCommand.sideways * Double(wheelScale),
+            rotation: activeDriveCommand.rotation * Double(wheelScale)
+        ))
+    }
 
-        animateWheels(
-            command
-        )
+    private func hasMovement(_ command: RobotDriveCommand) -> Bool {
+        abs(command.forward) > 0.0001
+            || abs(command.sideways) > 0.0001
+            || abs(command.rotation) > 0.0001
+    }
+
+    private func stopMovement() {
+        movementTask?.cancel()
+        movementTask = nil
+        activeDriveCommand = .stop
+        lastMovementUpdate = nil
     }
 
 
@@ -320,6 +310,8 @@ final class EduardSimulation {
         _ command:
             RobotDriveCommand
     ) {
+
+        stopMovement()
 
         // In synchronized mode the position comes
         // from AprilTag localization.
@@ -342,10 +334,7 @@ final class EduardSimulation {
 
     func stop() {
 
-        // No persistent visual state is required.
-        //
-        // The wheels simply stop receiving
-        // additional rotation.
+        stopMovement()
     }
 
 
@@ -747,20 +736,7 @@ final class EduardSimulation {
                 axis: SIMD3<Float>(0, 1, 0)
             )
 
-        let backward =
-            rotation.act(
-                SIMD3<Float>(
-                    0,
-                    0,
-                    1
-                )
-            )
-
-        // Place visible model relative to the logical robot pose.
-        entity.position =
-            pose.position
-            + backward
-            * EduardModelAlignment.backwardOffset
+        entity.position = pose.position
 
         // Rotate around vertical Y axis.
         entity.orientation =
@@ -983,19 +959,7 @@ final class EduardOccluder {
                     )
             )
 
-        let backward =
-            rotation.act(
-                SIMD3<Float>(
-                    0,
-                    0,
-                    1
-                )
-            )
-
-        entity.position =
-            pose.position
-            + backward
-            * EduardModelAlignment.backwardOffset
+        entity.position = pose.position
 
         entity.orientation =
             rotation

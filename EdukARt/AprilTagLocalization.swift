@@ -590,7 +590,7 @@ final class AprilTagLocalization {
             )
 
 
-        return RobotPose(
+        return RobotPose.fromAprilTag(RobotPose(
             position:
                 SIMD3<Float>(
                     mapX,
@@ -599,7 +599,7 @@ final class AprilTagLocalization {
                 ),
             rotation:
                 rotation
-        )
+        ))
     }
 
     // MARK: - Collect Reference Measurement

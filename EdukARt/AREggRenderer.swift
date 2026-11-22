@@ -422,9 +422,6 @@ final class AREggRenderer {
 
         let position =
             robotPose.position
-            + backward
-            * EduardModelAlignment
-                .backwardOffset
             - backward
             * eggCarryForwardOffset
             + SIMD3<Float>(

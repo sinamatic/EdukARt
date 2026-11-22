@@ -1628,21 +1628,41 @@ final class ARTrackRenderer {
         // START
         // ======================================================
 
-        let startDirection =
-            normalizedDirection(
-                from: path[0],
-                to: path[1]
+        let cumulativeDistances =
+            calculateCumulativeDistances(
+                for: path
             )
 
-        let startPosition =
-            path[0]
-            + startDirection * 0.30
+        guard let totalLength = cumulativeDistances.last,
+              totalLength > 0.001 else {
+            return
+        }
+
+        let startDistance = min(0.20, totalLength)
+        let startPosition = point(
+            atDistance: startDistance,
+            path: path,
+            cumulativeDistances: cumulativeDistances
+        )
+        let directionSampleDistance = min(pathSampleDistance, totalLength / 2)
+        let startDirection = normalizedDirection(
+            from: point(
+                atDistance: max(0, startDistance - directionSampleDistance),
+                path: path,
+                cumulativeDistances: cumulativeDistances
+            ),
+            to: point(
+                atDistance: min(totalLength, startDistance + directionSampleDistance),
+                path: path,
+                cumulativeDistances: cumulativeDistances
+            )
+        )
 
 
         makeMarker(
             imageName: "Start",
             position: startPosition,
-            direction: startDirection,
+            direction: -startDirection,
             parent: parent
         )
 
@@ -1667,8 +1687,8 @@ final class ARTrackRenderer {
            makeMarker(
                imageName: "Finish",
                position: finishPosition,
-               direction: finishDirection,
-               rotationOffset: -.pi,
+               // Readable while approaching from the start.
+               direction: -finishDirection,
                parent: parent
            )
 
@@ -1701,7 +1721,6 @@ final class ARTrackRenderer {
         imageName: String,
         position: SIMD3<Float>,
         direction: SIMD3<Float>,
-        rotationOffset: Float = 0,
         parent: Entity
     ) {
 
@@ -1787,15 +1806,13 @@ final class ARTrackRenderer {
             let yaw =
                 atan2(
                     normalizedDirection.x,
-                    normalizedDirection.y
+                    normalizedDirection.z
                 )
 
             marker.orientation =
                 simd_quatf(
                     angle:
-                        yaw
-                        + .pi / 2
-                        + rotationOffset,
+                        yaw,
                     axis:
                         SIMD3<Float>(
                             0,

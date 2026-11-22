@@ -313,12 +313,17 @@ final class RobotController:
         // If the physical robot cannot receive commands,
         // automatically fall back to the AR simulation.
         if isConnected == false
-            || isEnabled == false {
+            || isEnabled == false
+            || (isSimulationVisible && realRobotPose == nil) {
 
             return .simulation
         }
 
         return controlMode
+    }
+
+    var isSimulationDriveActive: Bool {
+        isSimulationVisible && effectiveControlMode == .simulation
     }
 
 
@@ -2092,7 +2097,7 @@ final class RobotController:
     func placeSimulationAtReference() {
 
         eduardSimulation.setPose(
-            .zero
+            .fromAprilTag(.zero, additionalRearOffset: 0.05)
         )
     }
 
@@ -2141,6 +2146,11 @@ final class RobotController:
             .setPose(
                 pose
             )
+    }
+
+    func clearRealRobotPose() {
+        realRobotPose = nil
+        eduardOccluder.setEnabled(false)
     }
 
 
@@ -2267,6 +2277,7 @@ final class RobotController:
 
         case .real:
 
+            eduardSimulation.stop()
             eduard.drive(
                 command
             )

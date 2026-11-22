@@ -217,9 +217,7 @@ struct GameView: View {
 
             onRobotPoseLost: {
 
-                controller.eduardOccluder.setEnabled(
-                    false
-                )
+                controller.clearRealRobotPose()
             }
         )
         .ignoresSafeArea()
@@ -693,7 +691,7 @@ struct GameView: View {
                                 "scope",
 
                             title:
-                                "Place"
+                                "Place on Start"
                         )
                     }
 
@@ -1191,13 +1189,10 @@ struct GameView: View {
     private var currentRaceStartPose:
         RobotPose? {
 
-        controller.realRobotPose
-        ??
-        (
-            controller.isSimulationVisible
-            ? controller.eduardSimulation.pose
-            : nil
-        )
+        if controller.isSimulationDriveActive {
+            return controller.eduardSimulation.pose
+        }
+        return controller.realRobotPose
     }
 
 
@@ -1393,8 +1388,8 @@ struct GameView: View {
 
         syncBlockingObjects()
 
-        if let realPose =
-            controller.realRobotPose {
+        if let realPose = controller.realRobotPose,
+           controller.isSimulationDriveActive == false {
 
             updateGameCollision(
                 actor:

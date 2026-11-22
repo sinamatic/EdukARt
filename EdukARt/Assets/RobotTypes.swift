@@ -70,6 +70,19 @@ struct RobotPose {
             position: .zero,
             rotation: 0
         )
+
+    // The AprilTag is mounted at Eduard's front, 13 cm ahead of its center.
+    static func fromAprilTag(_ tagPose: RobotPose, additionalRearOffset: Float = 0) -> RobotPose {
+        let distance = 0.13 + additionalRearOffset
+        return RobotPose(
+            position: tagPose.position + SIMD3<Float>(
+                sin(tagPose.rotation) * distance,
+                0,
+                cos(tagPose.rotation) * distance
+            ),
+            rotation: tagPose.rotation
+        )
+    }
 }
 
 
