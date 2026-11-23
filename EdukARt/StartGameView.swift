@@ -50,6 +50,16 @@ struct StartGameView: View {
                     }
                     .buttonStyle(MapMenuButtonStyle(color: Color("BlackOverlay")))
 
+                    NavigationLink {
+                        ExampleARView(
+                            eduardModelStore: eduardModelStore,
+                            controller: controller
+                        )
+                    } label: {
+                        Text("Start without Map")
+                    }
+                    .buttonStyle(MapMenuButtonStyle(color: Color("BlackOverlay")))
+
                     if let selectedMap {
                         NavigationLink {
                             GameView(

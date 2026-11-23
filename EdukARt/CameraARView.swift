@@ -1165,23 +1165,7 @@ struct CameraARView: UIViewRepresentable {
         }
 
 
-        struct AnimatedMapObject {
-
-            let entity:
-                Entity
-
-            let type:
-                MapObjectType
-
-            let basePosition:
-                SIMD3<Float>
-
-            let baseOrientation:
-                simd_quatf
-
-            let phase:
-                Float
-        }
+        typealias AnimatedMapObject = ARAnimatedMapObject
 
 
         struct GrowingTree {
@@ -2569,145 +2553,31 @@ struct CameraARView: UIViewRepresentable {
 
 
                 do {
+                    guard let objectRoot = try ARMapObjectContent.makeEntity(for: object) else {
+                        continue
+                    }
 
-                    let entity =
-                        try Entity.load(
-                            named:
-                                modelName
-                        )
-
-
-                    let objectRoot =
-                        Entity()
-
-                    objectRoot.name =
-                        "ARMapObject-\(object.id)"
-
-
-                    let basePosition =
-                        mapObjectPosition(
-                            for:
-                                object
-                        )
-
-                    if object.type == .tree
-                        && revealedTreeIDs.contains(
-                            object.id
-                        ) == false {
-
-                        objectRoot.position =
-                            basePosition
-
-                        objectRoot.isEnabled =
-                            false
-
-                    } else {
-
-                        objectRoot.position =
-                            basePosition
-
-                        if object.type == .tree {
-
-                            revealedTreeEntityIDs.insert(
-                                object.id
-                            )
+                    if object.type == .tree {
+                        if revealedTreeIDs.contains(object.id) {
+                            revealedTreeEntityIDs.insert(object.id)
+                        } else {
+                            objectRoot.isEnabled = false
                         }
                     }
 
+                    mapRoot.addChild(objectRoot)
+                    mapObjectEntities[object.id] = objectRoot
 
-                    let uprightRotation =
-                        simd_quatf(
-                            angle:
-                                0,
-
-                            axis:
-                                SIMD3<Float>(
-                                    0,
-                                    0,
-                                    1
-                                )
-                        )
-
-                    let mapRotation =
-                        simd_quatf(
-                            angle:
-                                object.rotation
-                                + (
-                                    object.type == .eggCup
-                                    ? .pi
-                                    : 0
-                                ),
-
-                            axis:
-                                SIMD3<Float>(
-                                    0,
-                                    1,
-                                    0
-                                )
-                        )
-
-                    let baseOrientation =
-                        mapRotation
-                        * uprightRotation
-
-                    objectRoot.orientation =
-                        baseOrientation
-
-                    entity.scale *=
-                        SIMD3<Float>(
-                            repeating:
-                                object.type
-                                    .arModelScale
-                        )
-
-                    objectRoot.addChild(
-                        entity
-                    )
-
-                    mapRoot.addChild(
-                        objectRoot
-                    )
-
-
-                    mapObjectEntities[
-                        object.id
-                    ] =
-                        objectRoot
-
-                    if object.type != .oil
-                        && object.type != .eggCup
-                        && object.type != .rock
-                        && object.type != .tree {
-
-                        animatedMapObjects.append(
-                            AnimatedMapObject(
-                                entity:
-                                    objectRoot,
-
-                                type:
-                                    object.type,
-
-                                basePosition:
-                                    basePosition,
-
-                                baseOrientation:
-                                    baseOrientation,
-
-                                phase:
-                                    Float(
-                                        animatedMapObjects.count
-                                    )
-                                    * 0.7
-                            )
-                        )
-
+                    if let animation = ARMapObjectContent.animation(
+                        for: object,
+                        entity: objectRoot,
+                        phase: Float(animatedMapObjects.count) * 0.7
+                    ) {
+                        animatedMapObjects.append(animation)
                         startMapObjectAnimationIfNeeded()
                     }
 
-
-                    print(
-                        "# AR OBJECT ADDED | \(object.type.name)"
-                    )
+                    print("# AR OBJECT ADDED | \(object.type.name)")
 
                 } catch {
 
@@ -3430,90 +3300,10 @@ struct CameraARView: UIViewRepresentable {
                     }
 
 
-                    for object in self.animatedMapObjects {
-
-                        let time =
-                            self.mapObjectAnimationTime
-                            + object.phase
-
-                        if object.type == .eggs {
-
-                            let verticalOffset =
-                                max(
-                                    0,
-                                    sin(time * 5.0)
-                                )
-                                * 0.03 // ToDo: position
-
-
-                            object.entity.position =
-                                object.basePosition
-                                + SIMD3<Float>(
-                                    0,
-                                    verticalOffset,
-                                    0
-                                )
-
-                            object.entity.orientation =
-                                object.baseOrientation
-
-                            continue
-                        }
-
-                        if object.type == .water {
-
-                            object.entity.position =
-                                object.basePosition
-
-                            object.entity.orientation =
-                                simd_quatf(
-                                    angle:
-                                        time * 0.35,
-
-                                    axis:
-                                        SIMD3<Float>(
-                                            0,
-                                            1,
-                                            0
-                                        )
-                                )
-                                * object.baseOrientation
-
-                            continue
-                        }
-
-
-                        let verticalOffset =
-                            sin(time * 3.2)
-                            * 0.018
-
-                        let rotationOffset =
-                            sin(time * 4.0)
-                            * 0.10
-
-
-                        object.entity.position =
-                            object.basePosition
-                            + SIMD3<Float>(
-                                0,
-                                verticalOffset,
-                                0
-                            )
-
-                        object.entity.orientation =
-                            simd_quatf(
-                                angle:
-                                    rotationOffset,
-
-                                axis:
-                                    SIMD3<Float>(
-                                        0,
-                                        1,
-                                        0
-                                    )
-                            )
-                            * object.baseOrientation
-                    }
+                    ARMapObjectContent.animate(
+                        self.animatedMapObjects,
+                        at: self.mapObjectAnimationTime
+                    )
                 }
         }
 

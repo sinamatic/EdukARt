@@ -105,7 +105,7 @@ struct TutorialView: View {
     }
 }
 
-private struct TutorialTagsPage: View {
+struct TutorialTagsPage: View {
     @State private var thumbnail: UIImage?
     @State private var presentation: PDFPresentation?
     @State private var attachment = Data()

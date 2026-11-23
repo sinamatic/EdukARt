@@ -270,115 +270,19 @@ struct GameView: View {
     // MARK: - Saved Game Map
 
     private var savedMapView: some View {
-
-        VStack(
-            alignment:
-                .trailing,
-
-            spacing:
-                6
-        ) {
-
-            StoredGameMapView(
-                map:
-                    map,
-
-                robotPose:
-                    controller.realRobotPose,
-
-                simulationPose:
-                    controller.isSimulationVisible
-                    ? simulationRobotPose
-                    : nil,
-
-                runtimeMapObjects:
-                    gameController.activeMapObjects,
-
-                shitDots:
-                    gameController.shitDots
-            )
-            .frame(
-                width:
-                    isMapLocalized
-                    ? 180
-                    : 360,
-
-                height:
-                    isMapLocalized
-                    ? 180
-                    : 360
-            )
-
-            Text(
-                "🪙 \(gameController.collectedCoins)/\(gameController.totalCoins)"
-            )
-            .font(
-                .caption.bold()
-            )
-            .foregroundStyle(
-                .white
-            )
-            .padding(
-                .horizontal,
-                10
-            )
-            .padding(
-                .vertical,
-                5
-            )
-            .background(
-                .black.opacity(
-                    0.55
-                )
-            )
-            .clipShape(
-                Capsule()
-            )
-        }
-        .frame(
-            maxWidth:
-                .infinity,
-
-            maxHeight:
-                .infinity,
-
-            alignment:
-                isMapLocalized
-                ? .topTrailing
-                : .bottom
+        GameMinimapPanel(
+            map: map,
+            robotPose: controller.realRobotPose,
+            simulationPose: controller.isSimulationVisible ? simulationRobotPose : nil,
+            runtimeMapObjects: gameController.activeMapObjects,
+            shitDots: gameController.shitDots,
+            isLocalized: isMapLocalized,
+            coinCount: "🪙 \(gameController.collectedCoins)/\(gameController.totalCoins)"
         )
-        .padding(
-            .top,
-            isMapLocalized
-            ? 20
-            : 0
-        )
-        .padding(
-            .trailing,
-            isMapLocalized
-            ? 20
-            : 0
-        )
-        .padding(
-            .bottom,
-            isMapLocalized
-            ? 0
-            : 40
-        )
-        .animation(
-            .easeInOut(
-                duration:
-                    0.45
-            ),
-            value:
-                isMapLocalized
-        )
-        .allowsHitTesting(false)
         .task {
             await updateSimulationPoseLoop()
         }
     }
-
 
     @MainActor
     private func updateSimulationPoseLoop() async {
@@ -663,297 +567,31 @@ struct GameView: View {
     // MARK: - AR Robot Control
 
     private var arRobotControl: some View {
-
-        VStack(
-            alignment:
-                .leading,
-            
-            spacing:
-                8
-        ) {
-
-            Button {
-
-                withAnimation(
-                    .easeInOut(
-                        duration:
-                            0.2
-                    )
-                ) {
-
-                    isARMenuOpen.toggle()
+        GameARMenu(
+            isOpen: $isARMenuOpen,
+            isSimulationVisible: controller.isSimulationVisible,
+            isLiveSyncEnabled: controller.isLiveSyncEnabled,
+            canPlaceOnStart: startLinePose != nil,
+            canShowAR: true,
+            isExample: false,
+            topInset: shouldShowTopRestartButton ? 84 : 28,
+            onPlaceOnStart: { placeAROnStart() },
+            onSync: { controller.synchronizeSimulationToEduard() },
+            onToggleLiveSync: {
+                controller.isLiveSyncEnabled.toggle()
+                if controller.isLiveSyncEnabled {
+                    gameController.stopSimulationItemEffects()
                 }
-
-            } label: {
-
-                Image(
-                    systemName:
-                        "arkit"
-                )
-                .font(
-                    .title3.weight(
-                        .bold
-                    )
-                )
-                .frame(
-                    width:
-                        44,
-
-                    height:
-                        44
-                )
-                .accessibilityLabel(
-                    "AR Menu"
-                )
-            }
-            .buttonStyle(
-                RobotStatusIconButtonStyle(
-                    isEnabled:
-                        isARMenuOpen
-                )
-            )
-            .overlay {
-                Circle()
-                    .stroke(
-                        .white.opacity(
-                            0.36
-                        ),
-                        lineWidth:
-                            2
-                    )
-                    .allowsHitTesting(
-                        false
-                    )
-            }
-
-
-            if isARMenuOpen {
-
-                VStack(
-                    alignment:
-                        .leading,
-
-                    spacing:
-                        10
-                ) {
-
-                    Button {
-
-                        placeAROnStart()
-
-                    } label: {
-
-                        arMenuRow(
-                            icon:
-                                "scope",
-
-                            title:
-                                "Place on Start"
-                        )
-                    }
-                    .disabled(startLinePose == nil)
-
-
-                    Button {
-
-                        controller
-                            .synchronizeSimulationToEduard()
-
-                    } label: {
-
-                        arMenuRow(
-                            icon:
-                                "arrow.triangle.2.circlepath",
-
-                            title:
-                                "Sync"
-                        )
-                    }
-
-
-                    Button {
-
-                        controller.isLiveSyncEnabled.toggle()
-                        if controller.isLiveSyncEnabled {
-                            gameController.stopSimulationItemEffects()
-                        }
-
-                    } label: {
-
-                        arMenuRow(
-                            icon:
-                                "dot.radiowaves.left.and.right",
-
-                            title:
-                                "Live Sync",
-
-                            statusIcon:
-                                controller.isLiveSyncEnabled
-                                ? "checkmark.circle.fill"
-                                : "xmark.circle.fill",
-
-                            statusColor:
-                                controller.isLiveSyncEnabled
-                                ? .green
-                                : .red
-                        )
-                    }
-
-
-                    Button {
-
-                        if controller.isSimulationVisible == false,
-                           hasPlacedAROnStart == false {
-                            placeAROnStart()
-                        } else {
-                            controller.toggleSimulationVisibility()
-                        }
-
-                    } label: {
-
-                        arMenuRow(
-                            icon:
-                                controller.isSimulationVisible
-                                ? "eye.slash"
-                                : "arkit",
-
-                            title:
-                                controller.isSimulationVisible
-                                ? "Hide AR"
-                                : "Show AR"
-                        )
-                    }
+            },
+            onToggleAR: {
+                if !controller.isSimulationVisible && !hasPlacedAROnStart {
+                    placeAROnStart()
+                } else {
+                    controller.toggleSimulationVisibility()
                 }
-                .font(
-                    .caption.bold()
-                )
-                .foregroundStyle(
-                    .white
-                )
-                .padding(
-                    .horizontal,
-                    10
-                )
-                .padding(
-                    .vertical,
-                    9
-                )
-                .background(
-                    .black.opacity(
-                        0.68
-                    )
-                )
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius:
-                            8,
-
-                        style:
-                            .continuous
-                    )
-                )
-                .transition(
-                    .opacity.combined(
-                        with:
-                            .move(
-                                edge:
-                                    .top
-                            )
-                    )
-                )
             }
-        }
-        .buttonStyle(
-            .plain
-        )
-        .padding(
-            .top,
-            shouldShowTopRestartButton
-            ? 84
-            : 28
-        )
-        .padding(
-            .leading,
-            21
         )
     }
-
-
-    private func arMenuRow(
-        icon: String,
-        title: String,
-        statusIcon: String? = nil,
-        statusColor: Color = .white
-    ) -> some View {
-
-        HStack(
-            spacing:
-                8
-        ) {
-
-            ZStack(
-                alignment:
-                    .topTrailing
-            ) {
-
-                Image(
-                    systemName:
-                        icon
-                )
-                .frame(
-                    width:
-                        28,
-
-                    height:
-                        22
-                )
-
-                if let statusIcon {
-
-                    Image(
-                        systemName:
-                            statusIcon
-                    )
-                    .foregroundStyle(
-                        statusColor
-                    )
-                    .font(
-                        .caption2
-                    )
-                    .offset(
-                        x:
-                            8,
-
-                        y:
-                            -4
-                    )
-                }
-            }
-
-            Text(
-                title
-            )
-            .lineLimit(
-                1
-            )
-
-            Spacer(
-                minLength:
-                    0
-            )
-        }
-        .frame(
-            width:
-                124,
-
-            alignment:
-                .leading
-        )
-        .contentShape(
-            Rectangle()
-        )
-    }
-
 
     @ViewBuilder
     private var startNewGameButton: some View {
@@ -1036,95 +674,13 @@ struct GameView: View {
 
 
     private var joystickView: some View {
-
-        JoystickView(
-            joystickMonitor:
-                joystickMonitor,
-
-            turnJoystickMonitor:
-                turnJoystickMonitor,
-
-            width:
-                180,
-
-            shape:
-                .circle,
-            spreadsControls:
-                DeviceLayout.isPad
-        )
-        .frame(
-            maxWidth:
-                .infinity
-        )
-        .onChange(
-            of:
-                joystickMonitor.xyPoint
-        ) { _, newInput in
-            handleJoystickInput(newInput)
-        }
-        .onChange(
-            of:
-                turnJoystickMonitor.xyPoint
-        ) { _, newInput in
-            handleTurnJoystickInput(newInput)
-        }
-        .onDisappear(
-            perform:
-                stopJoystickInput
+        GameJoystickControls(
+            joystickMonitor: joystickMonitor,
+            turnJoystickMonitor: turnJoystickMonitor,
+            controller: controller,
+            isEnabled: !isCountdownRunning && gameController.phase != .finished
         )
     }
-
-
-    private func handleJoystickInput(
-        _ input: CGPoint
-    ) {
-
-        guard isCountdownRunning == false,
-              gameController.phase != .finished
-        else {
-            return
-        }
-
-        controller.updateJoystickInput(
-            x:
-                Float(
-                    input.x / 180
-                ),
-
-            y:
-                Float(
-                    input.y / 180
-                )
-        )
-    }
-
-
-    private func handleTurnJoystickInput(
-        _ input: CGPoint
-    ) {
-
-        guard isCountdownRunning == false,
-              gameController.phase != .finished
-        else {
-            return
-        }
-
-        controller.updateMechanumRotationInput(
-            x:
-                Float(
-                    input.x / 120
-                )
-        )
-    }
-
-
-    private func stopJoystickInput() {
-
-        controller.stopJoystick()
-
-        controller.stopMechanumRotation()
-    }
-
 
     // MARK: - Game Collision
 
@@ -1638,79 +1194,16 @@ struct GameView: View {
 
     @ViewBuilder
     private var timerDisplay: some View {
-
         if isNoDebugMode,
            hasStartedGameplay,
            gameController.phase == .racing {
-
-            HStack(
-                spacing:
-                    8
-            ) {
-
-                Text(
-                    formattedTime(
-                        gameController.elapsedTime
-                    )
-                )
-                .font(
-                    .headline.monospacedDigit()
-                )
-
-                Text(
-                    "Speed \(controller.currentSpeedPercent)%"
-                )
-                .font(
-                    .caption.bold()
-                )
-
-                Text(
-                    "Damage \(gameController.obstacleHits)"
-                )
-                .font(
-                    .caption.bold()
-                )
-            }
-            .foregroundStyle(
-                .white
-            )
-            .padding(
-                .horizontal,
-                14
-            )
-            .padding(
-                .vertical,
-                8
-            )
-            .background(
-                .black.opacity(
-                    0.62
-                )
-            )
-            .clipShape(
-                Capsule()
-            )
-            .frame(
-                maxWidth:
-                    .infinity,
-
-                maxHeight:
-                    .infinity,
-
-                alignment:
-                    .top
-            )
-            .padding(
-                .top,
-                28
-            )
-            .offset(
-                y:
-                    -50
+            GameStatusBar(
+                timeText: formattedTime(gameController.elapsedTime),
+                speedPercent: controller.currentSpeedPercent,
+                damageCount: gameController.obstacleHits
             )
         }
     }
-
 
     @ViewBuilder
     private var gameplayOverlay: some View {

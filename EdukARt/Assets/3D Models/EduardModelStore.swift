@@ -11,13 +11,12 @@ import Combine
 final class EduardModelStore: ObservableObject {
 
     @Published private(set) var model: Entity?
+    private var isLoading = false
 
     func load() async {
-
-        // Nicht nochmal laden, wenn es schon da ist
-        guard model == nil else {
-            return
-        }
+        guard model == nil, !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
 
         PerformanceLogger.shared.start(
             "Preload Eduard"

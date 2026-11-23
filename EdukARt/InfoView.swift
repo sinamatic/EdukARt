@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct InfoView: View {
     var body: some View {
@@ -64,23 +65,35 @@ private struct InfoGameInstructions: View {
                 .font(.title2.bold())
                 .foregroundStyle(Color("BrandGreen"))
 
+            TutorialTagsPage()
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(20)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
+
             InfoTextSection(
-                title: "1. Allgemeines",
-                primaryText: "Die AprilTag-Druckvorlage findest du im Tutorial. Für 3D-Druckdateien besuche meine Website.",
-                secondaryText: "Verbinde dein iPhone per WLAN mit dem Roboter. Über den Knopf rechts oben kannst du ihn aktivieren oder deaktivieren. Im Notfall oder bei Verbindungsverlust verwende den roten Not-Aus-Knopf am echten Roboter. Du kannst auch ohne echten Roboter mit dem AR-Roboter spielen.",
-                linkTitle: "Zu sinamatic.de/edukart",
-                linkURLString: "https://www.sinamatic.de/edukart/"
+                title: "Roboter oder AR wählen",
+                primaryText: "Verbinde dein iPhone mit dem WLAN von Eduard. Du kannst auch ohne echten Roboter mit dem AR-Roboter spielen: Öffne nach „Start Game“ das AR-Menü über das AR-Symbol und wähle „Show AR“.",
+                linkTitle: "WLAN-Einstellungen",
+                linkURLString: UIApplication.openSettingsURLString
             )
 
             InfoTextSection(
-                title: "2. Strecken erstellen",
+                title: "Roboter aktivieren und deaktivieren",
+                primaryText: "Der Knopf rechts oben aktiviert oder deaktiviert den Roboter. Die Ampel zeigt den Status: Rot bedeutet, dass das WLAN nicht erreichbar ist; Gelb bedeutet deaktiviert; Grün bedeutet aktiviert. Tippe auf den Knopf, bis die Ampel grün zeigt.",
+                secondaryText: "Bei Verbindungsverlust kann es nötig sein, den Knopf ein- bis zweimal zu drücken. Im Notfall verwende den roten Not-Aus-Knopf am echten Roboter."
+            )
+
+            InfoTextSection(
+                title: "Strecken erstellen",
                 primaryText: "Verteile die AprilTags im Raum mit weniger als 3 m Abstand zueinander. Öffne „Courses“ und „Create Course“ und scanne die Tags. Der zuerst gescannte Tag wird zum Referenzpunkt für die gesamte Strecke.",
                 secondaryText: "Merke dir den zuerst gescannten Referenz-Tag für den Spielstart. Danach kannst du den Streckenverlauf zeichnen und Items sowie Hindernisse platzieren."
             )
 
             InfoTextSection(
-                title: "3. Spiel starten",
-                primaryText: "Wähle unter „Start Game“ eine Strecke aus. Scanne ihren Referenz-Tag erneut und halte ihn etwa drei Sekunden im Bild, um die AR-Strecke zu platzieren. Wähle im AR-Menü „Show AR“, wenn du mit dem virtuellen Roboter spielen möchtest."
+                title: "Spiel starten",
+                primaryText: "Wähle unter „Start Game“ eine Strecke aus. Scanne ihren Referenz-Tag erneut und halte ihn etwa drei Sekunden im Bild, um die AR-Strecke zu platzieren. Wähle im AR-Menü „Show AR“, wenn du mit dem virtuellen Roboter spielen möchtest.",
+                secondaryText: "Mit „Start without Map“ kannst du eine kurze Beispielstrecke auf einer erkannten Bodenfläche platzieren. Der rechte Joystick bewegt den AR-Roboter vorwärts und seitwärts, der linke dreht ihn. Für Item-Effekte brauchst du gedruckte AprilTags und eine erstellte Karte."
             )
         }
     }
